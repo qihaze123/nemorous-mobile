@@ -660,18 +660,28 @@ h1 {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
 }
 
-.patch {
+.patch-viewport {
   margin-top: 2px;
+  max-height: 70vh;
+  overflow: auto;
   border: 1px solid var(--border-soft);
   border-radius: 12px;
   background: var(--bg-elev);
-  overflow-x: auto;
-  font: 12px/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font: 12px/20px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.patch {
+  line-height: 20px;
 }
 
 .diff-line {
   display: flex;
   min-width: max-content;
+  height: 20px;
+}
+
+.patch.virtual {
+  position: relative;
 }
 
 .diff-line .gutter {
@@ -1657,4 +1667,88 @@ h1 {
   .tabbar {
     border-radius: 18px 18px 0 0;
   }
+}
+
+/* ---------- pairing / devices ---------- */
+
+.code-input {
+  text-align: center;
+  font: 700 28px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.28em;
+  padding: 14px 12px 14px 20px;
+}
+
+.pair-code {
+  padding: 4px 0;
+  text-align: center;
+  font: 700 36px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.26em;
+}
+
+.pair-panel .action-row {
+  margin: 0;
+}
+
+.device-panel {
+  gap: 0;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.device-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.device-row:last-child {
+  border-bottom: 0;
+}
+
+.device-icon {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--accent);
+}
+
+.device-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.device-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.device-name em {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 500;
+}
+
+.device-meta {
+  font-size: 11px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

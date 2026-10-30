@@ -1,16 +1,21 @@
 package app
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func run(t *testing.T, dir string, args ...string) string {
@@ -68,7 +73,7 @@ func newTestApp(t *testing.T) (*App, string) {
 	newRepo(t, root, "repo-b", false)
 	writeFile(t, filepath.Join(a, "a.txt"), "line one\nline two changed\n")
 	writeFile(t, filepath.Join(a, "new.txt"), "brand new\n")
-	app, err := New(root, "secret-token")
+	app, err := NewWithOptions(root, Options{Token: "secret-token", StateDir: t.TempDir(), PairCode: "123456"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +175,7 @@ func TestUnstageWithoutHeadAndDiscardUntracked(t *testing.T) {
 	run(t, dir, "config", "user.name", "Test")
 	run(t, dir, "config", "user.email", "test@example.com")
 	writeFile(t, filepath.Join(dir, "x.txt"), "x\n")
-	app, err := New(root, "t")
+	app, err := NewWithOptions(root, Options{Token: "t", StateDir: t.TempDir(), PairCode: "123456"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -409,5 +414,236 @@ func TestContentSearchFallsBackWithoutRipgrep(t *testing.T) {
 	}
 	if len(res.Matches) != 1 || res.Matches[0].Path != "new.txt" || res.Matches[0].Line != 1 {
 		t.Fatalf("fallback search = %+v", res.Matches)
+	}
+}
+
+func newCookieClient(t *testing.T) *http.Client {
+	t.Helper()
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &http.Client{Jar: jar}
+}
+
+func postJSON(t *testing.T, client *http.Client, target string, body any, headers map[string]string) (*http.Response, []byte) {
+	t.Helper()
+	data, err := json.Marshal(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, err := http.NewRequest(http.MethodPost, target, bytes.NewReader(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	return res, out
+}
+
+func TestPairingCookieDevicesAndRevocation(t *testing.T) {
+	app, _ := newTestApp(t)
+	srv := httptest.NewServer(app.APIHandler())
+	defer srv.Close()
+	client := newCookieClient(t)
+
+	res, body := postJSON(t, client, srv.URL+"/api/pair", map[string]string{"code": "000000", "name": "iPhone"}, nil)
+	if res.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("wrong code status = %d (%s)", res.StatusCode, body)
+	}
+	res, body = postJSON(t, client, srv.URL+"/api/pair", map[string]string{"code": "123456", "name": "iPhone"}, nil)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("pair status = %d (%s)", res.StatusCode, body)
+	}
+	u, _ := url.Parse(srv.URL)
+	if len(client.Jar.Cookies(u)) == 0 {
+		t.Fatal("pairing did not set a cookie")
+	}
+	res, err := client.Get(srv.URL + "/api/workspace")
+	if err != nil || res.StatusCode != http.StatusOK {
+		t.Fatalf("workspace after pairing: %v %d", err, res.StatusCode)
+	}
+	res.Body.Close()
+
+	var devices struct {
+		Devices   []Device `json:"devices"`
+		CurrentID string   `json:"currentId"`
+	}
+	res, err = client.Get(srv.URL + "/api/devices")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.NewDecoder(res.Body).Decode(&devices); err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if len(devices.Devices) != 1 || !devices.Devices[0].Current || devices.Devices[0].Name != "iPhone" {
+		t.Fatalf("devices = %+v", devices)
+	}
+
+	req, _ := http.NewRequest(http.MethodDelete, srv.URL+"/api/devices/"+devices.CurrentID, nil)
+	res, err = client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("revoke status = %d", res.StatusCode)
+	}
+	res, err = client.Get(srv.URL + "/api/workspace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("revoked cookie still works: %d", res.StatusCode)
+	}
+}
+
+func TestPairingRateLimit(t *testing.T) {
+	app, _ := newTestApp(t)
+	srv := httptest.NewServer(app.APIHandler())
+	defer srv.Close()
+	client := newCookieClient(t)
+	for range maxPairFails {
+		res, _ := postJSON(t, client, srv.URL+"/api/pair", map[string]string{"code": "000001", "name": "x"}, nil)
+		if res.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("fail %d status = %d", 0, res.StatusCode)
+		}
+	}
+	res, body := postJSON(t, client, srv.URL+"/api/pair", map[string]string{"code": "123456", "name": "x"}, nil)
+	if res.StatusCode != http.StatusUnauthorized || !strings.Contains(string(body), "过多") {
+		t.Fatalf("rate limit not enforced: %d %s", res.StatusCode, body)
+	}
+}
+
+func TestCookieWritesRequireSameOrigin(t *testing.T) {
+	app, _ := newTestApp(t)
+	srv := httptest.NewServer(app.APIHandler())
+	defer srv.Close()
+	client := newCookieClient(t)
+	res, body := postJSON(t, client, srv.URL+"/api/pair", map[string]string{"code": "123456", "name": "x"}, nil)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("pair: %d %s", res.StatusCode, body)
+	}
+	res, err := client.Get(srv.URL + "/api/workspace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ws Workspace
+	if err := json.NewDecoder(res.Body).Decode(&ws); err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	repo := ws.Repos[0]
+	file := repo.Files[0]
+
+	target := srv.URL + "/api/repos/" + repo.ID + "/stage"
+	res, _ = postJSON(t, client, target, map[string]any{"paths": []string{file.Path}}, map[string]string{"Origin": "https://evil.example"})
+	if res.StatusCode != http.StatusForbidden {
+		t.Fatalf("cross-site write status = %d", res.StatusCode)
+	}
+	res, _ = postJSON(t, client, target, map[string]any{"paths": []string{file.Path}}, map[string]string{"Origin": srv.URL})
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("same-origin write status = %d", res.StatusCode)
+	}
+}
+
+func TestDeviceSessionSurvivesRestart(t *testing.T) {
+	root := t.TempDir()
+	stateDir := t.TempDir()
+	app1, err := NewWithOptions(root, Options{StateDir: stateDir, PairCode: "123456"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv1 := httptest.NewServer(app1.APIHandler())
+	client := newCookieClient(t)
+	res, body := postJSON(t, client, srv1.URL+"/api/pair", map[string]string{"code": "123456", "name": "phone"}, nil)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("pair: %d %s", res.StatusCode, body)
+	}
+	u, _ := url.Parse(srv1.URL)
+	cookies := client.Jar.Cookies(u)
+	srv1.Close()
+
+	app2, err := NewWithOptions(root, Options{StateDir: stateDir, PairCode: "654321"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv2 := httptest.NewServer(app2.APIHandler())
+	defer srv2.Close()
+	req, _ := http.NewRequest(http.MethodGet, srv2.URL+"/api/workspace", nil)
+	req.AddCookie(cookies[0])
+	res, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("persisted session status = %d", res.StatusCode)
+	}
+}
+
+func TestEventsStreamInvalidatesAfterMutation(t *testing.T) {
+	app, _ := newTestApp(t)
+	srv := httptest.NewServer(app.APIHandler())
+	defer srv.Close()
+	client := newCookieClient(t)
+	res, body := postJSON(t, client, srv.URL+"/api/pair", map[string]string{"code": "123456", "name": "x"}, nil)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("pair: %d %s", res.StatusCode, body)
+	}
+	res, err := client.Get(srv.URL + "/api/workspace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ws Workspace
+	if err := json.NewDecoder(res.Body).Decode(&ws); err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	repo := ws.Repos[0]
+
+	stream, err := client.Get(srv.URL + "/api/events")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stream.Body.Close()
+	reader := bufio.NewReader(stream.Body)
+	if line, err := reader.ReadString('\n'); err != nil || !strings.Contains(line, "retry:") {
+		t.Fatalf("events preamble = %q err=%v", line, err)
+	}
+	if res, body := postJSON(t, client, srv.URL+"/api/repos/"+repo.ID+"/stage", map[string]any{"paths": []string{repo.Files[0].Path}}, nil); res.StatusCode != http.StatusOK {
+		t.Fatalf("stage: %d %s", res.StatusCode, body)
+	}
+	got := make(chan string, 1)
+	go func() {
+		for {
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				got <- "error"
+				return
+			}
+			if strings.Contains(line, "invalidate") {
+				got <- "invalidate"
+				return
+			}
+		}
+	}()
+	select {
+	case event := <-got:
+		if event != "invalidate" {
+			t.Fatalf("event = %q", event)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for invalidate")
 	}
 }

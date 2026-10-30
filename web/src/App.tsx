@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Workspace } from './types'
-import { ApiError, api, checkPairing, clearPairing, getServer, getToken, setServer, setToken } from './api'
+import { ApiError, api, clearPairing, deviceName, forgetPairCode, getServer, pairDevice, pendingPairCode } from './api'
 import { go, useRoute } from './hooks'
 import { Icon, Spinner } from './components'
 import { ChangesScreen } from './views/Changes'
@@ -35,78 +35,79 @@ function Shell({ children, tab }: { children: ReactNode; tab?: string }) {
 }
 
 function PairingScreen({ initialError }: { initialError?: string }) {
-  const [server, setServerValue] = useState(getServer() || location.origin)
-  const [token, setTokenValue] = useState('')
+  const autoCode = useRef(pendingPairCode())
+  const attempted = useRef(false)
+  const [code, setCode] = useState(autoCode.current)
   const [error, setError] = useState(initialError ?? '')
   const [busy, setBusy] = useState(false)
 
-  const connect = async () => {
-    if (!server.trim() || !token.trim()) {
-      setError('请填写服务地址和配对令牌')
+  const connect = useCallback(async (value: string) => {
+    const clean = value.trim()
+    if (!/^\d{6}$/.test(clean)) {
+      setError('请输入电脑端显示的 6 位配对码')
       return
     }
     setBusy(true)
     setError('')
     try {
-      await checkPairing(server, token)
-      setServer(server)
-      setToken(token)
+      await pairDevice(getServer(), clean)
+      forgetPairCode()
       location.reload()
     } catch (err) {
-      setError(err instanceof Error ? err.message : '连接失败')
+      setError(err instanceof Error ? err.message : '配对失败')
       setBusy(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    if (attempted.current || !/^\d{6}$/.test(autoCode.current)) return
+    attempted.current = true
+    void connect(autoCode.current)
+  }, [connect])
 
   return (
     <div className="pairing">
-        <div className="pairing-brand">
-          <span className="brand-mark">N</span>
-          <div>
-            <h1>Nemorous Mobile</h1>
-            <p>手机上的多仓 Git 控制台</p>
-          </div>
+      <div className="pairing-brand">
+        <span className="brand-mark">N</span>
+        <div>
+          <h1>Nemorous Mobile</h1>
+          <p>手机上的多仓 Git 控制台</p>
         </div>
-        <div className="panel pairing-panel">
-          <p className="pairing-lead">
-            先在电脑上运行伴生服务，再把启动时打印的地址与令牌填到这里。Git 操作始终在电脑上执行，手机不保存仓库副本。
-          </p>
-          <label className="field">
-            <span>服务地址</span>
-            <input
-              className="text-input"
-              value={server}
-              onChange={(e) => setServerValue(e.target.value)}
-              placeholder="http://192.168.1.5:8787"
-              autoCapitalize="off"
-              autoCorrect="off"
-              spellCheck={false}
-            />
-          </label>
-          <label className="field">
-            <span>配对令牌</span>
-            <input
-              className="text-input"
-              type="password"
-              value={token}
-              onChange={(e) => setTokenValue(e.target.value)}
-              placeholder="32 位十六进制令牌"
-              autoCapitalize="off"
-              spellCheck={false}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') void connect()
-              }}
-            />
-          </label>
-          {error ? <p className="error-text">{error}</p> : null}
-          <button className="btn primary block" disabled={busy} onClick={() => void connect()}>
-            {busy ? '连接中…' : '连接工作区'}
-          </button>
-        </div>
+      </div>
+      <div className="panel pairing-panel">
+        <p className="pairing-lead">
+          在电脑端启动服务后，把终端打印的 6 位配对码填到这里。Git 操作始终在电脑上执行，手机不保存仓库副本。
+        </p>
+        <label className="field">
+          <span>配对码</span>
+          <input
+            className="text-input code-input"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={6}
+            value={code}
+            onChange={(e) => {
+              setCode(e.target.value.replace(/\D/g, '').slice(0, 6))
+              setError('')
+            }}
+            placeholder="000000"
+            autoFocus
+            autoComplete="one-time-code"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void connect(code)
+            }}
+          />
+        </label>
+        <p className="hint">本机将被记录为：{deviceName()}</p>
+        {error ? <p className="error-text">{error}</p> : null}
+        <button className="btn primary block" disabled={busy || code.length !== 6} onClick={() => void connect(code)}>
+          {busy ? '配对中…' : '连接工作区'}
+        </button>
+      </div>
       <div className="pairing-steps">
         <p><b>1</b> 电脑端启动：<code>./nemorous-mobile -workspace ~/code</code></p>
         <p><b>2</b> 手机与电脑处于同一局域网 / Tailscale</p>
-        <p><b>3</b> 打开终端打印的链接，或在上方手动配对</p>
+        <p><b>3</b> 打开终端打印的链接（自动带配对码），或手动输入配对码</p>
       </div>
     </div>
   )
@@ -127,6 +128,7 @@ export default function App() {
       setAuthFailed(false)
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
+        setWs(null)
         setAuthFailed(true)
       } else {
         setError(err instanceof Error ? err.message : '无法连接服务')
@@ -137,32 +139,54 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (!getToken()) {
-      setLoading(false)
-      return
-    }
     void refresh()
   }, [refresh])
 
+  // Live invalidation: the server only says "something changed"; the client
+  // refetches through the normal API. A slow poll remains as a fallback.
+  const connected = ws !== null
   useEffect(() => {
-    if (!getToken()) return
-    const tick = () => {
-      if (document.visibilityState === 'visible') void refresh()
+    if (!connected || authFailed) return
+    let debounce: number | undefined
+    let lastErrorCheck = 0
+    const events = new EventSource('/api/events')
+    events.addEventListener('invalidate', () => {
+      window.clearTimeout(debounce)
+      debounce = window.setTimeout(() => void refresh(), 250)
+    })
+    events.onopen = () => void refresh()
+    events.onerror = () => {
+      // EventSource reconnects on its own; a 401 only surfaces via the API.
+      const now = Date.now()
+      if (now - lastErrorCheck > 5000) {
+        lastErrorCheck = now
+        void refresh()
+      }
     }
-    const timer = setInterval(tick, 30_000)
+    return () => {
+      events.close()
+      window.clearTimeout(debounce)
+    }
+  }, [connected, authFailed, refresh])
+
+  useEffect(() => {
+    const tick = () => {
+      if (document.visibilityState === 'visible' && !authFailed) void refresh()
+    }
+    const timer = setInterval(tick, 60_000)
     document.addEventListener('visibilitychange', tick)
     return () => {
       clearInterval(timer)
       document.removeEventListener('visibilitychange', tick)
     }
-  }, [refresh])
+  }, [refresh, authFailed])
 
   useEffect(() => {
     if (route.screen === 'changes' || route.screen === 'git') void refresh()
   }, [route.screen, refresh])
 
-  if (!getToken() || authFailed) {
-    return <PairingScreen initialError={authFailed ? '配对令牌已失效，请重新输入电脑端当前的令牌' : undefined} />
+  if (authFailed) {
+    return <PairingScreen initialError="设备未配对或会话已失效，请输入电脑端当前的配对码" />
   }
 
   if (loading && !ws) {
@@ -182,9 +206,9 @@ export default function App() {
           <p className="error-text">{error}</p>
           <div className="action-row">
             <button className="btn primary" onClick={() => void refresh()}>重试</button>
-            <button className="btn ghost" onClick={() => { clearPairing(); location.reload() }}>重新配对</button>
+            <button className="btn ghost" onClick={() => { clearPairing(); location.reload() }}>清除本地配对</button>
           </div>
-          <p className="hint">确认电脑端服务仍在运行，且手机可访问上面的地址。</p>
+          <p className="hint">确认电脑端服务仍在运行，且手机可访问当前地址。</p>
         </div>
       </div>
     )

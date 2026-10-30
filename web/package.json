@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "types": "cd .. && go generate ./internal/app",
+    "prebuild": "npm run types",
+    "predev": "npm run types"
   },
   "dependencies": {
     "highlight.js": "^11.10.0",

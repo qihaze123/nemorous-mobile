@@ -1,5 +1,20 @@
 package app
 
+//go:generate go run ./gentypes
+
+// RepoHealth is the high-level state shown on a repository card.
+type RepoHealth string
+
+const (
+	HealthClean    RepoHealth = "clean"
+	HealthDirty    RepoHealth = "dirty"
+	HealthConflict RepoHealth = "conflict"
+	HealthBehind   RepoHealth = "behind"
+	HealthAhead    RepoHealth = "ahead"
+	HealthDiverged RepoHealth = "diverged"
+	HealthError    RepoHealth = "error"
+)
+
 // Repo is a Git repository discovered under the workspace root.
 type Repo struct {
 	ID   string `json:"id"`
@@ -43,7 +58,7 @@ type RepoState struct {
 	Upstream       string       `json:"upstream,omitempty"`
 	Ahead          int          `json:"ahead"`
 	Behind         int          `json:"behind"`
-	Health         string       `json:"health"` // clean dirty conflict behind ahead diverged
+	Health         RepoHealth   `json:"health"` // clean dirty conflict behind ahead diverged
 	Error          string       `json:"error,omitempty"`
 	Files          []FileChange `json:"files"`
 	StagedCount    int          `json:"stagedCount"`
@@ -145,4 +160,30 @@ type CommitTarget struct {
 	RepoID string   `json:"repoId"`
 	Paths  []string `json:"paths"`
 	Amend  bool     `json:"amend"`
+}
+
+// Device is one paired browser or phone, as shown in Settings.
+type Device struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	CreatedAt  int64  `json:"createdAt"`
+	LastSeenAt int64  `json:"lastSeenAt"`
+	Current    bool   `json:"current,omitempty"`
+}
+
+// DevicesResponse is returned by GET /api/devices.
+type DevicesResponse struct {
+	Devices   []Device `json:"devices"`
+	CurrentID string   `json:"currentId"`
+}
+
+// PairCodeResponse is returned by GET /api/pair/code.
+type PairCodeResponse struct {
+	Code      string `json:"code"`
+	ExpiresAt int64  `json:"expiresAt"`
+}
+
+// PairResponse is returned by POST /api/pair.
+type PairResponse struct {
+	Device Device `json:"device"`
 }

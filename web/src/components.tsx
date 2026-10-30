@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { FileChange, Health } from './types'
+import { flushSync } from 'react-dom'
+import type { FileChange, RepoHealth } from './types'
 
 /* ---------- icons ---------- */
 
@@ -50,7 +51,7 @@ export function Icon({ name, size = 20, className }: { name: string; size?: numb
 
 /* ---------- small display pieces ---------- */
 
-const healthLabel: Record<Health, string> = {
+const healthLabel: Record<RepoHealth, string> = {
   clean: '干净',
   dirty: '有改动',
   conflict: '冲突',
@@ -60,7 +61,7 @@ const healthLabel: Record<Health, string> = {
   error: '错误',
 }
 
-export function HealthPill({ health }: { health: Health }) {
+export function HealthPill({ health }: { health: RepoHealth }) {
   return <span className={`pill health-${health}`}>{healthLabel[health]}</span>
 }
 
@@ -271,19 +272,75 @@ export function parsePatch(patch: string): DiffLine[] {
   return out
 }
 
+const DIFF_LINE_HEIGHT = 20
+const DIFF_OVERSCAN = 12
+const DIFF_VIRTUAL_THRESHOLD = 200
+
 export function PatchView({ patch, binary }: { patch: string; binary?: boolean }) {
   const lines = useMemo(() => parsePatch(patch), [patch])
+  const viewport = useRef<HTMLDivElement>(null)
+  const [scrollTop, setScrollTop] = useState(0)
+  const [height, setHeight] = useState(600)
+  const settle = useRef<number | undefined>(undefined)
+  const virtual = lines.length > DIFF_VIRTUAL_THRESHOLD
+
+  useEffect(() => {
+    const el = viewport.current
+    if (!el) return
+    setScrollTop(0)
+    el.scrollTop = 0
+    setHeight(el.clientHeight || 600)
+    const observer = new ResizeObserver(() => setHeight(el.clientHeight || 600))
+    observer.observe(el)
+    return () => {
+      observer.disconnect()
+      window.clearTimeout(settle.current)
+    }
+  }, [patch])
+
   if (binary) return <Empty icon="warning" title="二进制文件" hint="手机端不展示二进制差异，请在桌面端查看。" />
   if (!patch.trim()) return <Empty title="没有差异" hint="文件内容与对比版本一致。" />
+
+  let start = 0
+  let end = lines.length
+  if (virtual) {
+    start = Math.max(0, Math.floor(scrollTop / DIFF_LINE_HEIGHT) - DIFF_OVERSCAN)
+    end = Math.min(lines.length, Math.ceil((scrollTop + height) / DIFF_LINE_HEIGHT) + DIFF_OVERSCAN)
+  }
+  const visible = virtual ? lines.slice(start, end) : lines
   return (
-    <div className="patch">
-      {lines.map((line, i) => (
-        <div key={i} className={`diff-line ${line.kind}`}>
-          <span className="gutter">{line.old ?? ''}</span>
-          <span className="gutter">{line.new ?? ''}</span>
-          <span className="code">{line.kind === 'add' ? '+' : line.kind === 'del' ? '-' : line.kind === 'ctx' ? ' ' : ''}{line.text}</span>
-        </div>
-      ))}
+    <div
+      className="patch-viewport"
+      ref={viewport}
+      onScroll={(e) => {
+        const top = e.currentTarget.scrollTop
+        flushSync(() => setScrollTop(top))
+        // Some browsers coalesce the last scroll event of a fling.
+        window.clearTimeout(settle.current)
+        settle.current = window.setTimeout(() => {
+          if (viewport.current) setScrollTop(viewport.current.scrollTop)
+        }, 120)
+      }}
+    >
+      <div
+        className={`patch ${virtual ? 'virtual' : ''}`}
+        style={virtual ? { height: lines.length * DIFF_LINE_HEIGHT } : undefined}
+      >
+        {visible.map((line, i) => {
+          const index = virtual ? start + i : i
+          return (
+            <div
+              key={index}
+              className={`diff-line ${line.kind}`}
+              style={virtual ? { position: 'absolute', top: index * DIFF_LINE_HEIGHT, left: 0, minWidth: '100%', width: 'max-content' } : undefined}
+            >
+              <span className="gutter">{line.old ?? ''}</span>
+              <span className="gutter">{line.new ?? ''}</span>
+              <span className="code">{line.kind === 'add' ? '+' : line.kind === 'del' ? '-' : line.kind === 'ctx' ? ' ' : ''}{line.text}</span>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

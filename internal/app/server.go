@@ -1,13 +1,11 @@
 package app
 
 import (
-	"crypto/subtle"
 	"encoding/json"
 	"io"
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
 )
 
 // Version is stamped into the health response and the UI footer.
@@ -17,6 +15,7 @@ const Version = "0.1.0"
 func (a *App) APIHandler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", a.handleHealth)
+	mux.HandleFunc("POST /api/pair", a.handlePair)
 	mux.HandleFunc("GET /api/workspace", a.authed(a.handleWorkspace))
 	mux.HandleFunc("GET /api/repos/{id}", a.authed(a.handleRepo))
 	mux.HandleFunc("GET /api/repos/{id}/diff", a.authed(a.handleDiff))
@@ -35,22 +34,25 @@ func (a *App) APIHandler() http.Handler {
 	mux.HandleFunc("GET /api/search", a.authed(a.handleSearch))
 	mux.HandleFunc("POST /api/batch", a.authed(a.handleBatch))
 	mux.HandleFunc("POST /api/batch/commit", a.authed(a.handleBatchCommit))
+	mux.HandleFunc("GET /api/pair/code", a.authed(a.handlePairCode))
+	mux.HandleFunc("GET /api/devices", a.authed(a.handleDevices))
+	mux.HandleFunc("DELETE /api/devices/{id}", a.authed(a.handleRevokeDevice))
+	mux.HandleFunc("GET /api/events", a.authed(a.handleEvents))
 	return withCommon(mux)
 }
 
-// authed enforces the bearer token. The token is accepted as an
-// Authorization header or as a ?token= query parameter for first pairing.
+// authed accepts a paired-device cookie or the optional API bearer token.
 func (a *App) authed(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		got := ""
-		if h := r.Header.Get("Authorization"); strings.HasPrefix(h, "Bearer ") {
-			got = strings.TrimSpace(strings.TrimPrefix(h, "Bearer "))
+		info, ok := a.authenticate(r)
+		if !ok {
+			writeError(w, http.StatusUnauthorized, "设备未配对或会话已失效，请用配对码连接")
+			return
 		}
-		if got == "" {
-			got = r.URL.Query().Get("token")
-		}
-		if subtle.ConstantTimeCompare([]byte(got), []byte(a.Token)) != 1 {
-			writeError(w, http.StatusUnauthorized, "访问令牌无效，请在设置中填写配对令牌")
+		// A cookie is ambient authority; require same-origin writes so a
+		// malicious site cannot drive the console with the user's session.
+		if info.Cookie && r.Method != http.MethodGet && r.Method != http.MethodHead && !sameOrigin(r) {
+			writeError(w, http.StatusForbidden, "跨站请求被拒绝")
 			return
 		}
 		next(w, r)
@@ -61,7 +63,7 @@ func withCommon(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
@@ -137,6 +139,7 @@ func (a *App) handleStage(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, err)
 		return
 	}
+	a.hub.notify()
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
@@ -150,6 +153,7 @@ func (a *App) handleUnstage(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, err)
 		return
 	}
+	a.hub.notify()
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
@@ -163,6 +167,7 @@ func (a *App) handleDiscard(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, err)
 		return
 	}
+	a.hub.notify()
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
@@ -177,6 +182,7 @@ func (a *App) handleCommit(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, err)
 		return
 	}
+	a.hub.notify()
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "hash": hash})
 }
 
@@ -186,6 +192,7 @@ func (a *App) handlePush(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, err)
 		return
 	}
+	a.hub.notify()
 	writeJSON(w, http.StatusOK, res)
 }
 
@@ -195,6 +202,7 @@ func (a *App) handlePull(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, err)
 		return
 	}
+	a.hub.notify()
 	writeJSON(w, http.StatusOK, res)
 }
 
@@ -209,6 +217,7 @@ func (a *App) handleCheckout(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, err)
 		return
 	}
+	a.hub.notify()
 	writeJSON(w, http.StatusOK, res)
 }
 
@@ -271,6 +280,7 @@ func (a *App) handleBatch(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, err)
 		return
 	}
+	a.hub.notify()
 	writeJSON(w, http.StatusOK, map[string]any{"results": results})
 }
 
@@ -285,6 +295,7 @@ func (a *App) handleBatchCommit(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, err)
 		return
 	}
+	a.hub.notify()
 	writeJSON(w, http.StatusOK, map[string]any{"results": results})
 }
 

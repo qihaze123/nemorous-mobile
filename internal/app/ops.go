@@ -15,15 +15,38 @@ import (
 	"time"
 )
 
-// App owns the workspace configuration shared by all handlers.
-type App struct {
-	Root  string
+// Options configures the application core.
+type Options struct {
+	// Token is an optional API bearer token. The mobile client pairs with a
+	// short code and an HttpOnly cookie; the token remains for scripts.
 	Token string
-	repos []Repo
+	// StateDir stores paired devices across restarts.
+	StateDir string
+	// PairCode overrides the generated six-digit code (used by tests).
+	PairCode string
+	// PairTTL is how long a pairing code stays valid. Defaults to 10 minutes.
+	PairTTL time.Duration
 }
 
-// New discovers the workspace and returns the application core.
+// App owns the workspace configuration shared by all handlers.
+type App struct {
+	Root     string
+	Token    string
+	StateDir string
+	repos    []Repo
+	devices  *deviceStore
+	pairs    *pairStore
+	hub      *Hub
+}
+
+// New discovers the workspace and returns the application core with the
+// default state directory.
 func New(root, token string) (*App, error) {
+	return NewWithOptions(root, Options{Token: token})
+}
+
+// NewWithOptions discovers the workspace and opens the device store.
+func NewWithOptions(root string, opts Options) (*App, error) {
 	abs, err := filepath.Abs(root)
 	if err != nil {
 		return nil, err
@@ -32,7 +55,38 @@ func New(root, token string) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &App{Root: abs, Token: token, repos: repos}, nil
+	stateDir := opts.StateDir
+	if stateDir == "" {
+		dir, err := os.UserConfigDir()
+		if err != nil {
+			return nil, err
+		}
+		stateDir = filepath.Join(dir, "nemorous-mobile")
+	}
+	if err := os.MkdirAll(stateDir, 0o700); err != nil {
+		return nil, err
+	}
+	devices, err := newDeviceStore(stateDir)
+	if err != nil {
+		return nil, err
+	}
+	ttl := opts.PairTTL
+	if ttl <= 0 {
+		ttl = 10 * time.Minute
+	}
+	pairs, err := newPairStore(opts.PairCode, ttl)
+	if err != nil {
+		return nil, err
+	}
+	return &App{
+		Root: abs, Token: opts.Token, StateDir: stateDir,
+		repos: repos, devices: devices, pairs: pairs, hub: newHub(),
+	}, nil
+}
+
+// PairCode returns the current pairing code and its expiry.
+func (a *App) PairCode() (string, time.Time) {
+	return a.pairs.current()
 }
 
 func (a *App) Repos() []Repo { return a.repos }

@@ -101,6 +101,21 @@ export function DiffScreen({
         ) : (
           <button className="mini-btn" disabled={!!busy} onClick={() => void act('unstage')}>取消暂存</button>
         )}
+        <button
+          className="mini-btn"
+          disabled={!diff?.patch}
+          onClick={async () => {
+            if (!diff) return
+            try {
+              await navigator.clipboard.writeText(diff.patch)
+              notify('已复制 patch', 'ok')
+            } catch {
+              notify('复制失败', 'error')
+            }
+          }}
+        >
+          复制
+        </button>
         <button className="mini-btn danger" disabled={!!busy} onClick={() => setConfirmDiscard(true)}>丢弃</button>
       </div>
 

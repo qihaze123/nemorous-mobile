@@ -58,6 +58,12 @@
 - 单仓拉取 / 推送；跨仓**统一提交**（可选提交后推送）
 - 冲突文件标记（`U`）
 
+### 实时
+
+- 服务端在暂存 / 提交 / 推送 / 拉取 / 切分支 / 撤销设备后通过 SSE 广播 `invalidate`
+- 所有已配对设备自动重新拉取工作区；60 秒轮询作为断线兜底
+- SSE 只传“有变化”，不复制仓库数据
+
 ### 代码
 
 - 跨仓文件名搜索（Git 索引）与内容搜索（优先 `rg`，未安装时内置扫描）
@@ -75,8 +81,9 @@
 
 ### 设置
 
-- 配对服务地址与令牌、主题（跟随系统 / 暗色 / 亮色）
-- 工作区路径、仓库数、服务版本
+- 6 位配对码（10 分钟有效，过期自动轮换并打印到终端）
+- 已配对设备列表：设备名、最近活跃、加入时间；可逐台撤销
+- 主题（跟随系统 / 暗色 / 亮色）、工作区路径、仓库数、服务版本
 - 安全说明
 
 ---
@@ -88,12 +95,15 @@
 - **绝不强制推送**：任何路径都不会出现 `--force` / `--force-with-lease`。
 - **脏仓库跳过**：拉取、切分支前检查未提交改动，直接 `SKIP`，不 stash、不覆盖。
 - **丢弃必须确认**：UI 二次确认 + 服务端 `confirm:true` 双重校验。
-- **令牌鉴权**：`Authorization: Bearer` 或首次配对 `?token=`，常量时间比较；未授权请求无法读取任何仓库信息。
+- **配对码 + 会话 Cookie**：手机用 6 位配对码换取 `HttpOnly` + `SameSite=Lax` 会话 Cookie；页面脚本读不到凭证。配对码按 IP 限制失败次数，10 分钟过期后自动轮换。
+- **设备可撤销**：每个会话对应一台设备，设置页可立即撤销；会话令牌以 SHA-256 存储，泄露状态文件也无法直接使用。
+- **同源写保护**：Cookie 鉴权的写请求校验 `Origin` / `Sec-Fetch-Site`，跨站请求返回 403。
+- **可选 API 令牌**：`-token` 仍支持 `Authorization: Bearer`，只给脚本使用；手机端不使用长令牌。
 - **路径隔离**：所有仓库相对路径做规范化与 symlink 逃逸检查，禁止访问 `.git`。
 - **命令可控**：`GIT_TERMINAL_PROMPT=0`，读操作 15s、写操作 120s 超时。
 - **请求体上限** 1 MiB。
 
-> 令牌等同于工作区写权限。只在可信网络（家庭 / 公司内网 / Tailscale）中启动服务，不要把端口直接暴露到公网。
+> 一台已配对设备等同于工作区写权限。只在可信网络（家庭 / 公司内网 / Tailscale）中启动服务，不要把端口直接暴露到公网；手机丢失时在设置页立即撤销。
 
 ---
 
@@ -118,11 +128,11 @@ go build -o nemorous-mobile .
 ```text
 Nemorous Mobile 0.1.0
 工作区: /Users/you/code（6 个仓库）
-令牌:   <32 位十六进制>
-手机打开: http://192.168.1.5:8787/?token=<令牌>
+配对码: 123456（19:42 前有效）
+手机打开: http://192.168.1.5:8787/?pair=123456
 ```
 
-手机与电脑处于同一网络后打开该链接即可；令牌会自动保存到浏览器，并从地址栏移除。
+手机与电脑处于同一网络后打开该链接即可自动配对；也可以在任意页面输入配对码。需要用二维码时，把终端里的链接交给任意二维码工具生成后再用手机扫描。配对成功后 Cookie 自动保存，地址栏里的配对码会被移除。
 
 ### 参数
 
@@ -130,14 +140,16 @@ Nemorous Mobile 0.1.0
 | --- | --- | --- |
 | `-workspace` | 当前目录 / `$NEMOROUS_WORKSPACE` | 工作区根目录；根本身是仓库时只服务该仓库，否则扫描直接子目录 |
 | `-addr` | `:8787` | 监听地址 |
-| `-token` | 自动生成并持久化 | 访问令牌；也可用 `$NEMOROUS_TOKEN` |
+| `-token` | 空 | 可选的 API Bearer 令牌（脚本 / curl）；也可用 `$NEMOROUS_TOKEN`；手机端不使用 |
+| `-state` | `os.UserConfigDir()/nemorous-mobile` | 配对设备状态目录（devices.json） |
 | `-web` | 空（使用内嵌资源） | 开发时从指定目录提供前端 |
 
-令牌持久化位置：`os.UserConfigDir()/nemorous-mobile/token`（macOS 为 `~/Library/Application Support/`，Linux 为 `~/.config/`），权限 `0600`。
+配对设备保存在 `os.UserConfigDir()/nemorous-mobile/devices.json`（macOS 为 `~/Library/Application Support/`，Linux 为 `~/.config/`），权限 `0600`；只存会话令牌的 SHA-256。
 
 ### 开发
 
 ```bash
+go generate ./internal/app          # 重新生成 web/src/types.ts
 go test ./...                       # 后端测试（真实 git 夹具）
 go run . -workspace /tmp/nemo-ws    # 后端 :8787
 
@@ -150,11 +162,16 @@ npm run build                       # 类型检查 + 生产构建
 
 ## HTTP API
 
-所有 `/api/*`（除 `health`）都需要令牌。
+所有 `/api/*`（除 `health` 和 `POST /api/pair`）都需要已配对会话 Cookie，或可选的 API Bearer 令牌。
 
 | 方法 | 路径 | 作用 |
 | --- | --- | --- |
 | GET | `/api/health` | 版本探活（无鉴权） |
+| POST | `/api/pair` | 用 6 位配对码换取会话 Cookie |
+| GET | `/api/pair/code` | 当前配对码与过期时间（已配对设备） |
+| GET | `/api/devices` | 已配对设备列表 |
+| DELETE | `/api/devices/{id}` | 撤销设备；撤销当前设备会清除 Cookie |
+| GET | `/api/events` | SSE：`invalidate` 事件，客户端据此重新拉取 |
 | GET | `/api/workspace` | 全部仓库状态与改动文件 |
 | GET | `/api/repos/{id}` | 单仓状态 + 本地/远端分支 |
 | GET | `/api/repos/{id}/diff?path=&staged=` | 单文件统一 Diff |
@@ -179,16 +196,19 @@ npm run build                       # 类型检查 + 生产构建
 
 ```text
 .
-├── main.go                 # 嵌入前端、令牌、静态服务
+├── main.go                 # 嵌入前端、配对码、静态服务
 ├── internal/app
 │   ├── git.go              # 仓库发现、status 解析、健康度
 │   ├── ops.go              # diff / 暂存 / 提交 / 推送 / 分支 / 搜索
+│   ├── auth.go             # 配对码、设备会话、Cookie、限流
+│   ├── events.go           # SSE invalidate 广播
 │   ├── server.go           # 路由、鉴权、CORS、请求体
-│   ├── types.go
+│   ├── types.go            # API DTO（生成 TS 类型的源头）
+│   ├── gentypes/           # Go AST → web/src/types.ts
 │   └── app_test.go         # 真实 git 夹具集成测试
 └── web
     ├── src
-    │   ├── App.tsx         # 路由、工作区轮询、配对
+    │   ├── App.tsx         # 路由、SSE 实时刷新、配对
     │   ├── views/          # 改动 / 代码 / 提交 / 设置 / Diff
     │   └── styles.css      # 移动优先主题
     └── public              # PWA manifest、图标、service worker
@@ -201,6 +221,10 @@ npm run build                       # 类型检查 + 生产构建
 - **不提供手机端编辑保存**：代码查看器只读；行级微调、终端、AI 合并、`mani` 任务仍留在桌面端，手机键盘不适合这些操作。
 - 文件查看上限 1 MiB、文件树 20000 条、高亮 4000 行（超出仍可纯文本查看）。
 - 拉取只使用 `--ff-only`，不做桌面端的 stash / pop 自动恢复。
+- **Web Push 尚未实现**：需要 HTTPS（或 localhost）+ 已安装的 PWA + VAPID；当前只提供 SSE 实时刷新，手机在后台时不会收到通知。
+- **Capacitor 原生壳尚未打包**：同一套 `web/dist` 可以包成 iOS / Android 应用，但需要 Xcode 签名、Android SDK 与商店配置；仓库目前只交付 PWA。
+- 会话 Cookie 只支持同源；反向代理到不同域名时需要 HTTPS + 同源部署（或后续给 Capacitor 增加 Bearer 模式）。
+- 多 PC / SSH、PTY 终端、AI Agent 仍不在范围内。
 - iOS 不允许后台常驻服务：手机是客户端，电脑端必须在线。
 - PWA 的安装入口受浏览器策略影响；需要稳定商店分发时，用 Capacitor 把 `web/dist` 包成 iOS / Android 应用，API 不变。
 - HarmonyOS NEXT 没有 Android 运行时，但可通过浏览器使用本 PWA。

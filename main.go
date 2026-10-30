@@ -4,9 +4,7 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
 	"embed"
-	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
@@ -17,7 +15,6 @@ import (
 	"os"
 	"os/signal"
 	"path"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -31,15 +28,12 @@ var embeddedWeb embed.FS
 func main() {
 	workspace := flag.String("workspace", defaultWorkspace(), "多仓工作区目录")
 	addr := flag.String("addr", ":8787", "监听地址，例如 :8787")
-	token := flag.String("token", "", "访问令牌；留空则自动生成并保存")
+	token := flag.String("token", envOr("NEMOROUS_TOKEN", ""), "可选的 API Bearer 令牌（脚本使用）；手机通过配对码连接")
+	stateDir := flag.String("state", "", "状态目录（配对设备），默认 os.UserConfigDir()/nemorous-mobile")
 	webDir := flag.String("web", "", "开发模式：从该目录提供前端静态文件")
 	flag.Parse()
 
-	tok, err := resolveToken(*token)
-	if err != nil {
-		log.Fatal(err)
-	}
-	core, err := app.New(*workspace, tok)
+	core, err := app.NewWithOptions(*workspace, app.Options{Token: *token, StateDir: *stateDir})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -58,10 +52,11 @@ func main() {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
+	code, expires := core.PairCode()
 	fmt.Printf("Nemorous Mobile %s\n", app.Version)
 	fmt.Printf("工作区: %s（%d 个仓库）\n", core.Root, len(core.Repos()))
-	fmt.Printf("令牌:   %s\n", tok)
-	for _, u := range urls(*addr, tok) {
+	fmt.Printf("配对码: %s（%s 前有效）\n", code, expires.Format("15:04"))
+	for _, u := range urls(*addr, code) {
 		fmt.Printf("手机打开: %s\n", u)
 	}
 
@@ -90,39 +85,6 @@ func defaultWorkspace() string {
 	return wd
 }
 
-// resolveToken picks the CLI/env token, then the saved pairing token, then a
-// fresh one persisted with 0600 permissions.
-func resolveToken(flagValue string) (string, error) {
-	if flagValue != "" {
-		return flagValue, nil
-	}
-	if v := os.Getenv("NEMOROUS_TOKEN"); v != "" {
-		return v, nil
-	}
-	dir, err := os.UserConfigDir()
-	if err != nil {
-		return "", err
-	}
-	file := filepath.Join(dir, "nemorous-mobile", "token")
-	if data, err := os.ReadFile(file); err == nil {
-		if t := strings.TrimSpace(string(data)); t != "" {
-			return t, nil
-		}
-	}
-	buf := make([]byte, 16)
-	if _, err := rand.Read(buf); err != nil {
-		return "", err
-	}
-	token := hex.EncodeToString(buf)
-	if err := os.MkdirAll(filepath.Dir(file), 0o700); err != nil {
-		return "", err
-	}
-	if err := os.WriteFile(file, []byte(token+"\n"), 0o600); err != nil {
-		return "", err
-	}
-	return token, nil
-}
-
 func webRoot(devDir string) (fs.FS, error) {
 	if devDir != "" {
 		return os.DirFS(devDir), nil
@@ -131,23 +93,23 @@ func webRoot(devDir string) (fs.FS, error) {
 }
 
 // urls lists the LAN URLs a phone can reach.
-func urls(addr, token string) []string {
+func urls(addr, code string) []string {
 	port := addr
 	if host, p, err := net.SplitHostPort(addr); err == nil {
 		if host == "" || host == "0.0.0.0" || host == "::" {
 			port = p
-			return lanURLs(p, token)
+			return lanURLs(p, code)
 		}
-		return []string{fmt.Sprintf("http://%s/?token=%s", net.JoinHostPort(host, p), token)}
+		return []string{fmt.Sprintf("http://%s/?pair=%s", net.JoinHostPort(host, p), code)}
 	}
-	return []string{fmt.Sprintf("http://localhost%s/?token=%s", port, token)}
+	return []string{fmt.Sprintf("http://localhost%s/?pair=%s", port, code)}
 }
 
-func lanURLs(port, token string) []string {
+func lanURLs(port, code string) []string {
 	var out []string
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
-		return []string{fmt.Sprintf("http://localhost:%s/?token=%s", port, token)}
+		return []string{fmt.Sprintf("http://localhost:%s/?pair=%s", port, code)}
 	}
 	for _, a := range addrs {
 		ipnet, ok := a.(*net.IPNet)
@@ -158,10 +120,10 @@ func lanURLs(port, token string) []string {
 		if ip == nil {
 			continue
 		}
-		out = append(out, fmt.Sprintf("http://%s/?token=%s", net.JoinHostPort(ip.String(), port), token))
+		out = append(out, fmt.Sprintf("http://%s/?pair=%s", net.JoinHostPort(ip.String(), port), code))
 	}
 	if len(out) == 0 {
-		out = append(out, fmt.Sprintf("http://localhost:%s/?token=%s", port, token))
+		out = append(out, fmt.Sprintf("http://localhost:%s/?pair=%s", port, code))
 	}
 	return out
 }
@@ -214,4 +176,11 @@ func logRequests(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }

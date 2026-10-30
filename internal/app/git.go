@@ -315,7 +315,7 @@ func statusKind(f FileChange) string {
 	}
 }
 
-func healthOf(st RepoState) string {
+func healthOf(st RepoState) RepoHealth {
 	switch {
 	case st.ConflictCount > 0:
 		return "conflict"
