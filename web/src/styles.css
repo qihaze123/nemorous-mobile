@@ -308,8 +308,8 @@ h1 {
 .summary-strip {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 14px;
-  padding: 8px 2px 12px;
+  gap: 4px 12px;
+  padding: 5px 2px 8px;
   font-size: 12px;
   color: var(--muted);
 }
@@ -357,10 +357,10 @@ h1 {
 }
 
 .repo-avatar.small {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  font-size: 11.5px;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  font-size: 10.5px;
 }
 
 .repo-meta,
@@ -416,10 +416,10 @@ h1 {
 
 .pill {
   flex: none;
-  padding: 3px 7px;
+  padding: 2px 6px;
   border-radius: 999px;
   border: 1px solid var(--border);
-  font-size: 10.5px;
+  font-size: 10px;
   color: var(--muted);
   white-space: nowrap;
 }
@@ -474,11 +474,11 @@ h1 {
 .file-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 46px;
-  padding: 8px 12px;
+  gap: 6px;
+  min-height: 33px;
+  padding: 3px 10px;
   border-bottom: 1px solid var(--border-soft);
-  font-size: 13.5px;
+  font-size: 12.5px;
 }
 
 .file-row:last-child {
@@ -495,8 +495,8 @@ h1 {
 
 .checkbox {
   flex: none;
-  width: 21px;
-  height: 21px;
+  width: 17px;
+  height: 17px;
   display: grid;
   place-items: center;
   border-radius: 6px;
@@ -511,9 +511,9 @@ h1 {
 
 .status-letter {
   flex: none;
-  width: 16px;
+  width: 14px;
   text-align: center;
-  font: 700 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  font: 700 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .s-M {
@@ -544,7 +544,7 @@ h1 {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12.5px;
+  font-size: 11.5px;
 }
 
 .file-dir {
@@ -554,8 +554,8 @@ h1 {
 .file-stats {
   flex: none;
   display: flex;
-  gap: 5px;
-  font: 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+  gap: 4px;
+  font: 10px ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .plus {
@@ -570,13 +570,13 @@ h1 {
 
 .mini-btn {
   flex: none;
-  min-height: 32px;
-  padding: 7px 10px;
-  border-radius: 8px;
+  min-height: 27px;
+  padding: 4px 8px;
+  border-radius: 7px;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--fg);
-  font-size: 11.5px;
+  font-size: 11px;
 }
 
 .mini-btn:disabled {
@@ -593,7 +593,7 @@ h1 {
 }
 
 .mini-btn.stage {
-  min-width: 48px;
+  min-width: 42px;
 }
 
 .floating-bar {
@@ -1063,15 +1063,15 @@ h1 {
 
 .action-row {
   display: flex;
-  gap: 8px;
-  margin: 2px 0 14px;
+  gap: 6px;
+  margin: 4px 0 8px;
 }
 
 .section-title {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 18px 2px 8px;
+  margin: 12px 2px 6px;
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1081,9 +1081,9 @@ h1 {
 .repo-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
-  padding: 10px 6px;
+  padding: 7px 6px;
   border: 0;
   border-bottom: 1px solid var(--border-soft);
   background: none;
@@ -1107,7 +1107,7 @@ h1 {
   position: sticky;
   top: calc(env(safe-area-inset-top) + 58px);
   z-index: 5;
-  padding: 8px 2px 6px;
+  padding: 5px 2px 3px;
   background: var(--bg);
   font-size: 11px;
   color: var(--muted);
@@ -1117,9 +1117,9 @@ h1 {
 .commit-row {
   display: flex;
   align-items: flex-start;
-  gap: 9px;
+  gap: 8px;
   width: 100%;
-  padding: 10px 4px;
+  padding: 6px 4px;
   border: 0;
   border-bottom: 1px solid var(--border-soft);
   background: none;
@@ -1148,14 +1148,14 @@ h1 {
 }
 
 .commit-subject {
-  font-size: 13.5px;
+  font-size: 12.5px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .commit-meta {
-  font-size: 10.5px;
+  font-size: 10px;
   color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1828,9 +1828,9 @@ h1 {
 /* ---------- staged / unstaged sections ---------- */
 
 .change-section {
-  margin-bottom: 14px;
+  margin-bottom: 8px;
   border: 1px solid var(--border-soft);
-  border-radius: 14px;
+  border-radius: 9px;
   background: var(--bg-elev);
   overflow: hidden;
 }
@@ -1838,8 +1838,8 @@ h1 {
 .change-section-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: 6px;
+  padding: 3px 8px;
   background: var(--surface);
   border-bottom: 1px solid var(--border-soft);
 }
@@ -1847,10 +1847,10 @@ h1 {
 .section-toggle {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   flex: 1;
   min-width: 0;
-  padding: 2px 0;
+  padding: 1px 0;
   border: 0;
   background: none;
   color: var(--fg);
@@ -1858,7 +1858,7 @@ h1 {
 }
 
 .section-name {
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 650;
 }
 
@@ -1867,13 +1867,13 @@ h1 {
 }
 
 .section-count {
-  min-width: 18px;
-  padding: 0 5px;
+  min-width: 16px;
+  padding: 0 4px;
   border-radius: 999px;
   background: var(--bg);
   color: var(--muted);
-  font-size: 10.5px;
-  line-height: 18px;
+  font-size: 10px;
+  line-height: 16px;
   text-align: center;
 }
 
@@ -1884,14 +1884,14 @@ h1 {
 }
 
 .section-actions .mini-btn {
-  min-height: 28px;
-  padding: 4px 8px;
-  font-size: 10.5px;
+  min-height: 22px;
+  padding: 2px 6px;
+  font-size: 10px;
 }
 
 .section-empty {
-  padding: 10px 14px;
-  font-size: 11.5px;
+  padding: 5px 12px;
+  font-size: 11px;
   color: var(--muted);
 }
 
@@ -1902,8 +1902,8 @@ h1 {
 .repo-block-head {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 9px 12px 6px;
+  gap: 7px;
+  padding: 5px 10px 3px;
 }
 
 .repo-block-main {
@@ -1921,8 +1921,8 @@ h1 {
 }
 
 .repo-sync .icon-btn.tiny {
-  width: 30px;
-  height: 30px;
+  width: 26px;
+  height: 26px;
 }
 
 .file-list .file-row:last-child {
@@ -1985,35 +1985,35 @@ h1 {
 
 .commit-tree {
   border: 1px solid var(--border-soft);
-  border-radius: 12px;
+  border-radius: 9px;
   background: var(--bg-elev);
   overflow: hidden;
-  padding: 4px 0 6px;
+  padding: 2px 0 3px;
 }
 
 .commit-tree-root {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 6px 10px;
+  gap: 5px;
+  padding: 3px 8px;
   border-bottom: 1px solid var(--border-soft);
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
 }
 
 .commit-tree-row {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 5px;
   width: 100%;
-  min-height: 36px;
-  padding-right: 10px;
+  min-height: 27px;
+  padding-right: 8px;
   border: 0;
   background: none;
   color: var(--fg);
   text-align: left;
-  font-size: 12.5px;
+  font-size: 12px;
 }
 
 .commit-tree-row.dir {
@@ -2035,7 +2035,7 @@ h1 {
 
 .commit-tree-row.file .tree-name {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
+  font-size: 11.5px;
 }
 
 .commit-tree-row svg {
@@ -2057,4 +2057,31 @@ h1 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.repo-block-head .repo-avatar.small {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  font-size: 9.5px;
+}
+
+.repo-block-head .repo-name {
+  font-size: 12.5px;
+  line-height: 1.2;
+}
+
+.repo-block-head .repo-sub {
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.repo-block-head .pill {
+  padding: 1px 5px;
+  font-size: 9px;
+}
+
+.repo-sync .icon-btn.tiny {
+  width: 24px;
+  height: 24px;
 }
