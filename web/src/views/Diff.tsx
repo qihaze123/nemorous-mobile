@@ -178,7 +178,10 @@ export function DiffScreen({
         onNextChange={() => stepChange(1)}
         onPrevFile={() => jumpFile(-1)}
         onNextFile={() => jumpFile(1)}
-        onOpen={() => go(`#/file?repo=${repoId}&path=${encodeURIComponent(path)}`)}
+        onOpen={() => {
+          const line = patchRef.current?.currentLine()
+          go(`#/file?repo=${repoId}&path=${encodeURIComponent(path)}${line ? `&line=${line}` : ''}`)
+        }}
       />
 
       {error ? <div className="error-banner"><Icon name="warning" size={15} /> {error}</div> : null}

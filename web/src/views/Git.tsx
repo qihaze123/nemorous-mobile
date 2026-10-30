@@ -937,7 +937,10 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
             onNextChange={() => step(1)}
             onPrevFile={() => jump(-1)}
             onNextFile={() => jump(1)}
-            onOpen={() => go(`#/file?repo=${repoId}&path=${encodeURIComponent(path)}&rev=${hash}`)}
+            onOpen={() => {
+              const line = patchRef.current?.currentLine()
+              go(`#/file?repo=${repoId}&path=${encodeURIComponent(path)}&rev=${hash}${line ? `&line=${line}` : ''}`)
+            }}
           />
           <PatchView ref={patchRef} patch={chunks.get(path) ?? ''} />
         </>

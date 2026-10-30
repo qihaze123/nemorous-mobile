@@ -229,6 +229,7 @@ interface DiffLine {
   text: string
   old?: number
   new?: number
+  hunkNew?: number
 }
 
 export function parsePatch(patch: string): DiffLine[] {
@@ -243,7 +244,7 @@ export function parsePatch(patch: string): DiffLine[] {
         oldNo = Number(m[1])
         newNo = Number(m[2])
       }
-      out.push({ kind: 'hunk', text: raw })
+      out.push({ kind: 'hunk', text: raw, hunkNew: newNo })
       inHunk = true
       continue
     }
@@ -284,6 +285,8 @@ const DIFF_VIRTUAL_THRESHOLD = 200
 export interface PatchViewHandle {
   /** Scrolls to the next/previous hunk; false means the file boundary was reached. */
   scrollToHunk(direction: 1 | -1): boolean
+  /** New-file line number at the top of the current viewport. */
+  currentLine(): number | undefined
 }
 
 export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: boolean }>(function PatchView(
@@ -314,7 +317,32 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
       el.scrollTop = Math.max(0, target * DIFF_LINE_HEIGHT - 4)
       return true
     },
-  }), [hunkLines])
+    currentLine() {
+      const el = viewport.current
+      if (!el) return undefined
+      const top = el.scrollTop + 1
+      const visible = hunkLines.find((index) => index * DIFF_LINE_HEIGHT >= top - 4)
+      if (visible !== undefined && visible * DIFF_LINE_HEIGHT < top + 80) {
+        const value = lines[visible].hunkNew
+        if (value !== undefined) return value
+      }
+      let hunk: number | undefined
+      for (const index of hunkLines) {
+        if (index * DIFF_LINE_HEIGHT <= top) {
+          const value = lines[index].hunkNew
+          if (value !== undefined) hunk = value
+        } else {
+          break
+        }
+      }
+      if (hunk !== undefined) return hunk
+      const start = Math.max(0, Math.floor(el.scrollTop / DIFF_LINE_HEIGHT))
+      for (let i = start; i < lines.length; i++) {
+        if (lines[i].new !== undefined) return lines[i].new
+      }
+      return undefined
+    },
+  }), [hunkLines, lines])
 
   useEffect(() => {
     const el = viewport.current
