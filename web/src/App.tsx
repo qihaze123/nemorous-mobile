@@ -5,7 +5,7 @@ import { go, useRoute } from './hooks'
 import { Icon, Spinner } from './components'
 import { ChangesScreen } from './views/Changes'
 import { CodeScreen, FileScreen, TreeScreen } from './views/Code'
-import { CommitFileScreen, CommitScreen, GitScreen } from './views/Git'
+import { CommitFileScreen, CommitPatchScreen, CommitScreen, GitScreen } from './views/Git'
 import { DiffScreen } from './views/Diff'
 import { SettingsScreen } from './views/Settings'
 
@@ -217,10 +217,10 @@ export default function App() {
   const tab =
     route.screen === 'diff' ? 'changes'
       : route.screen === 'file' || route.screen === 'tree' ? 'code'
-        : route.screen === 'commit' || route.screen === 'commit-file' ? 'git'
+        : route.screen === 'commit' || route.screen === 'commit-file' || route.screen === 'commit-patch' ? 'git'
           : route.screen
 
-  const detail = ['diff', 'file', 'tree', 'commit', 'commit-file'].includes(route.screen)
+  const detail = ['diff', 'file', 'tree', 'commit', 'commit-file', 'commit-patch'].includes(route.screen)
   const p = route.params
   const repoId = p.get('repo') ?? ''
   const path = p.get('path') ?? ''
@@ -251,6 +251,11 @@ export default function App() {
       screen = repoId && p.get('hash') && path
         ? <CommitFileScreen repoId={repoId} hash={p.get('hash') ?? ''} path={path} />
         : <div className="screen"><p className="hint">缺少提交文件参数。</p></div>
+      break
+    case 'commit-patch':
+      screen = repoId && p.get('hash')
+        ? <CommitPatchScreen repoId={repoId} hash={p.get('hash') ?? ''} />
+        : <div className="screen"><p className="hint">缺少提交参数。</p></div>
       break
     case 'git':
       screen = <GitScreen ws={ws} refresh={refresh} />

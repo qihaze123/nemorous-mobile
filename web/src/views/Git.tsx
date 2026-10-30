@@ -767,12 +767,10 @@ function CommitTreeRows({
 export function CommitScreen({ repoId, hash }: { repoId: string; hash: string }) {
   const [detail, setDetail] = useState<CommitDetail | null>(null)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
-  const [showAll, setShowAll] = useState(false)
   const [error, setError] = useState('')
   useEffect(() => {
     setDetail(null)
     setCollapsed(new Set())
-    setShowAll(false)
     api<CommitDetail>(`/api/repos/${repoId}/commits/${hash}`)
       .then(setDetail)
       .catch((err) => setError(err instanceof Error ? err.message : '读取提交失败'))
@@ -805,8 +803,11 @@ export function CommitScreen({ repoId, hash }: { repoId: string; hash: string })
           </div>
           <SectionTitle
             action={
-              <button className="mini-btn" onClick={() => setShowAll((v) => !v)}>
-                {showAll ? '收起完整 Patch' : '查看完整 Patch'}
+              <button
+                className="mini-btn"
+                onClick={() => go(`#/commit-patch?repo=${repoId}&hash=${hash}`)}
+              >
+                完整 Patch
               </button>
             }
           >
@@ -834,7 +835,7 @@ export function CommitScreen({ repoId, hash }: { repoId: string; hash: string })
               }
             />
           </div>
-          {showAll ? <PatchView patch={detail.patch} /> : <p className="hint">点文件查看单独 Diff；目录可折叠。</p>}
+          <p className="hint">点文件查看单独 Diff；目录可折叠；完整 Patch 在右上角。</p>
         </>
       ) : null}
       <div className="screen-bottom-space" />
@@ -933,6 +934,66 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
             <span className="diff-position">{index >= 0 ? `${index + 1}/${detail.files.length}` : ''}</span>
           </div>
           <PatchView ref={patchRef} patch={chunks.get(path) ?? ''} />
+        </>
+      ) : null}
+      <div className="screen-bottom-space" />
+    </div>
+  )
+}
+
+export function CommitPatchScreen({ repoId, hash }: { repoId: string; hash: string }) {
+  const [detail, setDetail] = useState<CommitDetail | null>(null)
+  const [error, setError] = useState('')
+  const notify = useToast()
+  useEffect(() => {
+    setDetail(null)
+    api<CommitDetail>(`/api/repos/${repoId}/commits/${hash}`)
+      .then(setDetail)
+      .catch((err) => setError(err instanceof Error ? err.message : '读取提交失败'))
+  }, [repoId, hash])
+
+  const added = detail?.files.reduce((n, f) => n + f.added, 0) ?? 0
+  const deleted = detail?.files.reduce((n, f) => n + f.deleted, 0) ?? 0
+
+  return (
+    <div className="screen">
+      <header className="topbar">
+        <button className="icon-btn" onClick={() => go(`#/commit?repo=${repoId}&hash=${hash}`)} aria-label="返回提交">
+          <Icon name="back" />
+        </button>
+        <div className="grow">
+          <div className="eyebrow">完整 Patch</div>
+          <h1 className="file-title">{detail?.commit.subject ?? hash.slice(0, 8)}</h1>
+        </div>
+        <button
+          className="icon-btn"
+          disabled={!detail?.patch}
+          onClick={async () => {
+            if (!detail) return
+            try {
+              await navigator.clipboard.writeText(detail.patch)
+              notify('已复制完整 Patch', 'ok')
+            } catch {
+              notify('复制失败', 'error')
+            }
+          }}
+          aria-label="复制完整 Patch"
+        >
+          <Icon name="copy" />
+        </button>
+      </header>
+      {error ? <div className="error-banner">{error}</div> : null}
+      {!detail && !error ? <Spinner label="读取提交…" /> : null}
+      {detail ? (
+        <>
+          <div className="commit-patch-meta">
+            <span>{detail.files.length} 个文件</span>
+            <span className="plus">+{added}</span>
+            <span className="minus">−{deleted}</span>
+            <span className="grow" />
+            <code>{detail.commit.short}</code>
+          </div>
+          <PatchView patch={detail.patch} />
         </>
       ) : null}
       <div className="screen-bottom-space" />

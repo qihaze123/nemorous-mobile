@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 
-export type Screen = 'changes' | 'code' | 'git' | 'settings' | 'diff' | 'file' | 'commit' | 'commit-file' | 'tree'
+export type Screen = 'changes' | 'code' | 'git' | 'settings' | 'diff' | 'file' | 'commit' | 'commit-file' | 'commit-patch' | 'tree'
 
 export interface Route {
   screen: Screen
   params: URLSearchParams
 }
 
-const screens: Screen[] = ['changes', 'code', 'git', 'settings', 'diff', 'file', 'commit', 'commit-file', 'tree']
+const screens: Screen[] = ['changes', 'code', 'git', 'settings', 'diff', 'file', 'commit', 'commit-file', 'commit-patch', 'tree']
 
 export function parseHash(hash: string): Route {
   const raw = hash.replace(/^#\/?/, '')
