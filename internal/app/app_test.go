@@ -727,3 +727,71 @@ func TestCommitFilters(t *testing.T) {
 		t.Fatalf("branches = %+v", branches)
 	}
 }
+
+func TestStashRoundTrip(t *testing.T) {
+	app, _ := newTestApp(t)
+	ctx := context.Background()
+	a := findRepo(t, app.Workspace(ctx), "repo-a")
+	res, err := app.Stash(ctx, a.ID, "wip")
+	if err != nil || res.Status != "OK" {
+		t.Fatalf("stash = %+v err=%v", res, err)
+	}
+	a = findRepo(t, app.Workspace(ctx), "repo-a")
+	if len(a.Files) != 0 {
+		t.Fatalf("after stash files = %+v", a.Files)
+	}
+	res, err = app.StashPop(ctx, a.ID)
+	if err != nil || res.Status != "OK" {
+		t.Fatalf("stash pop = %+v err=%v", res, err)
+	}
+	a = findRepo(t, app.Workspace(ctx), "repo-a")
+	if len(a.Files) != 2 {
+		t.Fatalf("after pop files = %+v", a.Files)
+	}
+	if res, err := app.StashPop(ctx, a.ID); err != nil || res.Status != "SKIP" {
+		t.Fatalf("empty pop = %+v err=%v", res, err)
+	}
+}
+
+func TestUndoAndAmendSafety(t *testing.T) {
+	app, _ := newTestApp(t)
+	ctx := context.Background()
+	b := findRepo(t, app.Workspace(ctx), "repo-b")
+	writeFile(t, filepath.Join(b.Path, "undo.txt"), "undo\n")
+	if err := app.Stage(ctx, b.ID, []string{"undo.txt"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := app.Commit(ctx, b.ID, "to undo", nil, false); err != nil {
+		t.Fatal(err)
+	}
+	res, err := app.UndoLastCommit(ctx, b.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Subject != "to undo" || res.Hash == "" {
+		t.Fatalf("undo result = %+v", res)
+	}
+	b = findRepo(t, app.Workspace(ctx), "repo-b")
+	if b.LastCommit != nil && b.LastCommit.Subject == "to undo" {
+		t.Fatal("HEAD still points at the undone commit")
+	}
+	if len(b.Files) != 1 || !b.Files[0].Staged {
+		t.Fatalf("soft reset should leave staged changes: %+v", b.Files)
+	}
+
+	a := findRepo(t, app.Workspace(ctx), "repo-a")
+	if _, err := app.UndoLastCommit(ctx, a.ID); err == nil {
+		t.Fatal("pushed commit was undone")
+	}
+	if _, err := app.Commit(ctx, a.ID, "amend pushed", nil, true); err == nil {
+		t.Fatal("pushed commit was amended")
+	}
+
+	if _, err := app.Commit(ctx, b.ID, "amended message", nil, true); err != nil {
+		t.Fatalf("amend unpushed: %v", err)
+	}
+	b = findRepo(t, app.Workspace(ctx), "repo-b")
+	if b.LastCommit == nil || b.LastCommit.Subject != "amended message" {
+		t.Fatalf("amended subject = %+v", b.LastCommit)
+	}
+}

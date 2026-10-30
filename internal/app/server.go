@@ -26,6 +26,9 @@ func (a *App) APIHandler() http.Handler {
 	mux.HandleFunc("POST /api/repos/{id}/push", a.authed(a.handlePush))
 	mux.HandleFunc("POST /api/repos/{id}/pull", a.authed(a.handlePull))
 	mux.HandleFunc("POST /api/repos/{id}/checkout", a.authed(a.handleCheckout))
+	mux.HandleFunc("POST /api/repos/{id}/stash", a.authed(a.handleStash))
+	mux.HandleFunc("POST /api/repos/{id}/stash/pop", a.authed(a.handleStashPop))
+	mux.HandleFunc("POST /api/repos/{id}/undo", a.authed(a.handleUndo))
 	mux.HandleFunc("GET /api/repos/{id}/commits", a.authed(a.handleCommits))
 	mux.HandleFunc("GET /api/repos/{id}/commits/{hash}", a.authed(a.handleCommitDetail))
 	mux.HandleFunc("GET /api/repos/{id}/files", a.authed(a.handleFiles))
@@ -247,6 +250,47 @@ func (a *App) handleAllCommits(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, commits)
+}
+
+func (a *App) handleStash(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Message string `json:"message"`
+	}
+	if err := decode(r, &req); err != nil {
+		a.fail(w, err)
+		return
+	}
+	res, err := a.Stash(r.Context(), r.PathValue("id"), req.Message)
+	if err != nil {
+		a.fail(w, err)
+		return
+	}
+	if res.Status == "OK" {
+		a.hub.notify()
+	}
+	writeJSON(w, http.StatusOK, res)
+}
+
+func (a *App) handleStashPop(w http.ResponseWriter, r *http.Request) {
+	res, err := a.StashPop(r.Context(), r.PathValue("id"))
+	if err != nil {
+		a.fail(w, err)
+		return
+	}
+	if res.Status == "OK" {
+		a.hub.notify()
+	}
+	writeJSON(w, http.StatusOK, res)
+}
+
+func (a *App) handleUndo(w http.ResponseWriter, r *http.Request) {
+	res, err := a.UndoLastCommit(r.Context(), r.PathValue("id"))
+	if err != nil {
+		a.fail(w, err)
+		return
+	}
+	a.hub.notify()
+	writeJSON(w, http.StatusOK, res)
 }
 
 func (a *App) handleCommits(w http.ResponseWriter, r *http.Request) {

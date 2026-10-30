@@ -194,3 +194,10 @@ type BranchesResponse struct {
 	Branches []string            `json:"branches"`
 	ByRepo   map[string][]string `json:"byRepo"`
 }
+
+// UndoResult is returned by POST /api/repos/{id}/undo.
+type UndoResult struct {
+	Hash    string `json:"hash"`
+	Short   string `json:"short"`
+	Subject string `json:"subject"`
+}

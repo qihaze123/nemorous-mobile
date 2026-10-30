@@ -333,6 +333,11 @@ func (a *App) Commit(ctx context.Context, id, message string, paths []string, am
 	if message == "" {
 		return "", errors.New("提交说明不能为空")
 	}
+	if amend {
+		if err := ensureUnpublished(ctx, repo.Path); err != nil {
+			return "", err
+		}
+	}
 	if len(paths) > 0 {
 		if err := a.Stage(ctx, id, paths); err != nil {
 			return "", err
@@ -556,6 +561,99 @@ func runParallel(repos []Repo, concurrency int, fn func(Repo) OpResult) []OpResu
 	}
 	wg.Wait()
 	return results
+}
+
+// ensureUnpublished refuses to rewrite a commit that already exists on a
+// remote or is pointed at by a tag.
+func ensureUnpublished(ctx context.Context, repoPath string) error {
+	if _, err := gitOK(ctx, repoPath, inspectTimeout, "rev-parse", "--verify", "HEAD"); err != nil {
+		return errors.New("还没有可修改的提交")
+	}
+	out, err := gitOK(ctx, repoPath, inspectTimeout,
+		"for-each-ref", "--contains", "HEAD", "--format=%(refname)", "refs/remotes", "refs/tags")
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(out) != "" {
+		return errors.New("提交已推送到远端或已打标签，拒绝改写")
+	}
+	return nil
+}
+
+// UndoLastCommit soft-resets the last unpublished, non-merge commit. The
+// working tree is untouched; its changes stay in the index.
+func (a *App) UndoLastCommit(ctx context.Context, id string) (UndoResult, error) {
+	repo, err := a.repo(id)
+	if err != nil {
+		return UndoResult{}, err
+	}
+	parents, err := gitOK(ctx, repo.Path, inspectTimeout, "rev-list", "--parents", "-n", "1", "HEAD")
+	if err != nil {
+		return UndoResult{}, errors.New("还没有可撤销的提交")
+	}
+	fields := strings.Fields(parents)
+	if len(fields) < 2 {
+		return UndoResult{}, errors.New("根提交不能撤销")
+	}
+	if len(fields) > 2 {
+		return UndoResult{}, errors.New("合并提交不能撤销")
+	}
+	if err := ensureUnpublished(ctx, repo.Path); err != nil {
+		return UndoResult{}, err
+	}
+	meta, err := gitOK(ctx, repo.Path, inspectTimeout, "log", "-1", "--pretty=format:%H%x1f%h%x1f%s")
+	if err != nil {
+		return UndoResult{}, err
+	}
+	parts := strings.Split(meta, "\x1f")
+	if len(parts) < 3 {
+		return UndoResult{}, errors.New("读取提交失败")
+	}
+	if _, err := gitOK(ctx, repo.Path, writeTimeout, "reset", "--soft", "HEAD~1"); err != nil {
+		return UndoResult{}, err
+	}
+	return UndoResult{Hash: parts[0], Short: parts[1], Subject: parts[2]}, nil
+}
+
+// Stash shelves tracked and untracked changes. Ignored files stay untouched.
+func (a *App) Stash(ctx context.Context, id, message string) (OpResult, error) {
+	repo, err := a.repo(id)
+	if err != nil {
+		return OpResult{}, err
+	}
+	st := inspect(ctx, repo)
+	if st.Error != "" {
+		return OpResult{RepoID: repo.ID, RepoName: repo.Name, Status: "FAIL", Message: st.Error}, nil
+	}
+	if len(st.Files) == 0 {
+		return OpResult{RepoID: repo.ID, RepoName: repo.Name, Status: "SKIP", Message: "没有可暂存的改动"}, nil
+	}
+	message = strings.TrimSpace(message)
+	if message == "" {
+		message = "nemorous-mobile " + time.Now().Format("2006-01-02 15:04")
+	}
+	_, errOut, err := git(ctx, repo.Path, writeTimeout, "stash", "push", "-u", "-m", message)
+	if err != nil {
+		return OpResult{RepoID: repo.ID, RepoName: repo.Name, Status: "FAIL", Message: firstLine(firstNonEmptyLine(errOut, err.Error()))}, nil
+	}
+	return OpResult{RepoID: repo.ID, RepoName: repo.Name, Status: "OK", Message: "已暂存改动"}, nil
+}
+
+// StashPop restores the newest stash entry.
+func (a *App) StashPop(ctx context.Context, id string) (OpResult, error) {
+	repo, err := a.repo(id)
+	if err != nil {
+		return OpResult{}, err
+	}
+	list, err := gitOK(ctx, repo.Path, inspectTimeout, "stash", "list")
+	if err != nil || strings.TrimSpace(list) == "" {
+		return OpResult{RepoID: repo.ID, RepoName: repo.Name, Status: "SKIP", Message: "没有可恢复的 Stash"}, nil
+	}
+	_, errOut, err := git(ctx, repo.Path, writeTimeout, "stash", "pop")
+	if err != nil {
+		return OpResult{RepoID: repo.ID, RepoName: repo.Name, Status: "FAIL", Message: firstLine(firstNonEmptyLine(errOut, err.Error()))}, nil
+	}
+	return OpResult{RepoID: repo.ID, RepoName: repo.Name, Status: "OK", Message: "已恢复 Stash"}, nil
 }
 
 // BatchCommit commits the given per-repository file selections with one message.

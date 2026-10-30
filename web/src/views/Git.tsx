@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { BranchList, BranchesResponse, Commit, CommitDetail, OpResult, Workspace } from '../types'
+import type { BranchList, BranchesResponse, Commit, CommitDetail, OpResult, UndoResult, Workspace } from '../types'
 import { api, post } from '../api'
 import { back, go, useDebounced } from '../hooks'
-import { Empty, Icon, PatchView, SectionTitle, Sheet, Spinner, ago, dayKey, repoColor, timeOf, useToast } from '../components'
+import { ConfirmSheet, Empty, Icon, PatchView, SectionTitle, Sheet, Spinner, ago, dayKey, repoColor, timeOf, useToast } from '../components'
 
 function ResultSheet({ results, onClose }: { results: OpResult[] | null; onClose: () => void }) {
   return (
@@ -429,6 +429,7 @@ function RepoSheet({
   const [busy, setBusy] = useState('')
   const [newBranch, setNewBranch] = useState('')
   const [loading, setLoading] = useState(false)
+  const [confirmUndo, setConfirmUndo] = useState(false)
 
   useEffect(() => {
     if (!repoId) {
@@ -468,6 +469,22 @@ function RepoSheet({
     }
   }
 
+  const undo = async () => {
+    if (!repoId) return
+    setBusy('undo')
+    try {
+      const res = await post<UndoResult>(`/api/repos/${repoId}/undo`, {})
+      notify(`已撤销 ${res.short} ${res.subject}`, 'ok')
+      setConfirmUndo(false)
+      await refresh()
+      setDetail(await api<BranchList>(`/api/repos/${repoId}`))
+    } catch (err) {
+      notify(err instanceof Error ? err.message : '撤销失败', 'error')
+    } finally {
+      setBusy('')
+    }
+  }
+
   const branches = detail?.branches ?? []
   const remotes = (detail?.remotes ?? []).filter((r) => !r.endsWith('/HEAD'))
 
@@ -487,6 +504,11 @@ function RepoSheet({
             <button className="btn subtle" disabled={!!busy} onClick={() => void act('/pull', {}, '拉取')}>拉取</button>
             <button className="btn subtle" disabled={!!busy} onClick={() => void act('/push', {}, '推送')}>推送</button>
             <button className="btn subtle" disabled={!!busy} onClick={() => void reload()}>刷新</button>
+          </div>
+          <div className="action-row">
+            <button className="btn subtle" disabled={!!busy} onClick={() => void act('/stash', { message: '' }, '暂存改动')}>暂存改动</button>
+            <button className="btn subtle" disabled={!!busy} onClick={() => void act('/stash/pop', {}, '恢复 Stash')}>恢复 Stash</button>
+            <button className="btn subtle" disabled={!!busy} onClick={() => setConfirmUndo(true)}>撤销提交</button>
           </div>
 
           <SectionTitle>本地分支</SectionTitle>
@@ -546,6 +568,15 @@ function RepoSheet({
             </>
           ) : null}
           <p className="hint">切换分支遇到未提交改动会被安全跳过。推送永不使用 --force。</p>
+          <ConfirmSheet
+            open={confirmUndo}
+            title="撤销上一次提交"
+            body={`将对 ${detail.repo.name} 执行 git reset --soft HEAD~1：提交回到暂存区，工作区文件不变。仅允许撤销未推送、非合并的提交。`}
+            confirmText="确认撤销"
+            danger
+            onCancel={() => setConfirmUndo(false)}
+            onConfirm={() => void undo()}
+          />
         </>
       ) : null}
     </Sheet>

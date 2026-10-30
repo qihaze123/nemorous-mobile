@@ -30,6 +30,7 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
   const [commitOpen, setCommitOpen] = useState(false)
   const [message, setMessage] = useState('')
   const [pushAfter, setPushAfter] = useState(false)
+  const [amend, setAmend] = useState(false)
   const [busy, setBusy] = useState(false)
   const [busyKey, setBusyKey] = useState('')
   const [open, setOpen] = useState<Record<Section, boolean>>({ staged: true, unstaged: true })
@@ -168,7 +169,7 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
       const res = await post<{ results: OpResult[] }>('/api/batch/commit', {
         message,
         push: pushAfter,
-        repos: groups.map((g) => ({ repoId: g.repo.id, paths: g.paths })),
+        repos: groups.map((g) => ({ repoId: g.repo.id, paths: g.paths, amend: amend && groups.length === 1 })),
       })
       const failed = res.results.filter((r) => r.status !== 'OK')
       if (failed.length) {
@@ -182,6 +183,7 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
       setSelected(new Set())
       setMessage('')
       setPushAfter(false)
+      setAmend(false)
       setCommitOpen(false)
       await refresh()
     } catch (err) {
@@ -403,7 +405,13 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
           <input type="checkbox" checked={pushAfter} onChange={(e) => setPushAfter(e.target.checked)} />
           <span>提交后立即推送到远端</span>
         </label>
-        <p className="hint">提交会先把所选文件加入暂存区。推送永不使用 --force。</p>
+        {groups.length === 1 ? (
+          <label className="check-row">
+            <input type="checkbox" checked={amend} onChange={(e) => setAmend(e.target.checked)} />
+            <span>修改上一次提交（--amend，仅未推送）</span>
+          </label>
+        ) : null}
+        <p className="hint">提交会先把所选文件加入暂存区。推送永不使用 --force；已推送或已打标签的提交不能 amend。</p>
       </Sheet>
 
       {busy && commitOpen ? <Spinner label="正在提交…" /> : null}

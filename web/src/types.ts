@@ -161,3 +161,9 @@ export interface BranchesResponse {
   byRepo: Record<string, string[]>
 }
 
+export interface UndoResult {
+  hash: string
+  short: string
+  subject: string
+}
+
