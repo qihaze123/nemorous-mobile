@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { BranchList, BranchesResponse, Commit, CommitDetail, OpResult, UndoResult, Workspace } from '../types'
+import type { BranchList, BranchPreset, BranchesResponse, Commit, CommitDetail, OpResult, PresetsResponse, UndoResult, Workspace } from '../types'
 import { api, post } from '../api'
 import { back, go, useDebounced } from '../hooks'
 import { ConfirmSheet, Empty, Icon, PatchView, SectionTitle, Sheet, Spinner, ago, dayKey, repoColor, timeOf, useToast } from '../components'
@@ -60,6 +60,8 @@ export function GitScreen({ ws, refresh }: { ws: Workspace; refresh: () => Promi
   const [branchSheet, setBranchSheet] = useState(false)
   const [branchInput, setBranchInput] = useState('')
   const [createBranch, setCreateBranch] = useState(false)
+  const [stashFirst, setStashFirst] = useState(false)
+  const [presets, setPresets] = useState<BranchPreset[]>([])
   const [busy, setBusy] = useState(false)
   const notify = useToast()
 
@@ -107,17 +109,57 @@ export function GitScreen({ ws, refresh }: { ws: Workspace; refresh: () => Promi
     }
   }
 
+  const openBranchSheet = () => {
+    setBranchSheet(true)
+    api<PresetsResponse>('/api/presets').then((res) => setPresets(res.presets)).catch(() => {})
+  }
+
+  const applyPreset = async (name: string) => {
+    setBusy(true)
+    try {
+      const res = await post<{ results: OpResult[] }>('/api/presets/apply', { name })
+      setResults(res.results)
+      setBranchSheet(false)
+      await refresh()
+      setReload((v) => v + 1)
+    } catch (err) {
+      notify(err instanceof Error ? err.message : '应用预设失败', 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const batchStash = async (pop: boolean) => {
+    setBusy(true)
+    try {
+      const res = await post<{ results: OpResult[] }>(pop ? '/api/batch/stash/pop' : '/api/batch/stash', { repos: [] })
+      setResults(res.results)
+      await refresh()
+      setReload((v) => v + 1)
+    } catch (err) {
+      notify(err instanceof Error ? err.message : '操作失败', 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const switchAll = async () => {
     if (!branchInput.trim()) return
     setBusy(true)
     try {
+      let stashResults: OpResult[] = []
+      if (stashFirst) {
+        const stashed = await post<{ results: OpResult[] }>('/api/batch/stash', { repos: [] })
+        stashResults = stashed.results
+      }
       const res = await post<{ results: OpResult[] }>('/api/batch', {
         action: 'checkout',
         branch: branchInput.trim(),
         create: createBranch,
       })
-      setResults(res.results)
+      setResults([...stashResults, ...res.results])
       setBranchSheet(false)
+      setStashFirst(false)
       await refresh()
       setReload((v) => v + 1)
     } catch (err) {
@@ -178,8 +220,16 @@ export function GitScreen({ ws, refresh }: { ws: Workspace; refresh: () => Promi
         <button className="btn subtle" disabled={busy} onClick={() => void batch('push')}>
           <Icon name="branch" size={16} /> 全部推送
         </button>
-        <button className="btn subtle" disabled={busy} onClick={() => setBranchSheet(true)}>
+        <button className="btn subtle" disabled={busy} onClick={openBranchSheet}>
           <Icon name="git" size={16} /> 统一切分支
+        </button>
+      </div>
+      <div className="action-row">
+        <button className="btn subtle" disabled={busy} onClick={() => void batchStash(false)}>
+          <Icon name="folder" size={16} /> 全部 Stash
+        </button>
+        <button className="btn subtle" disabled={busy} onClick={() => void batchStash(true)}>
+          <Icon name="refresh" size={16} /> 恢复全部 Stash
         </button>
       </div>
 
@@ -392,6 +442,18 @@ export function GitScreen({ ws, refresh }: { ws: Workspace; refresh: () => Promi
           </>
         }
       >
+        {presets.length > 0 ? (
+          <>
+            <SectionTitle>已保存的组合</SectionTitle>
+            <div className="repo-chips wrap">
+              {presets.map((preset) => (
+                <button key={preset.name} className="chip" disabled={busy} onClick={() => void applyPreset(preset.name)}>
+                  {preset.name}
+                </button>
+              ))}
+            </div>
+          </>
+        ) : null}
         <input
           className="text-input"
           value={branchInput}
@@ -405,7 +467,11 @@ export function GitScreen({ ws, refresh }: { ws: Workspace; refresh: () => Promi
           <input type="checkbox" checked={createBranch} onChange={(e) => setCreateBranch(e.target.checked)} />
           <span>不存在时基于当前提交新建</span>
         </label>
-        <p className="hint">有未提交改动的仓库会被安全跳过，不会覆盖本地代码。</p>
+        <label className="check-row">
+          <input type="checkbox" checked={stashFirst} onChange={(e) => setStashFirst(e.target.checked)} />
+          <span>先 stash 有改动的仓库（不自动恢复）</span>
+        </label>
+        <p className="hint">有未提交改动的仓库默认会被安全跳过；勾选 stash 后会先收起改动再切换，恢复需手动操作。</p>
       </Sheet>
 
       <ResultSheet results={results} onClose={() => setResults(null)} />
@@ -583,15 +649,42 @@ function RepoSheet({
   )
 }
 
+function splitPatch(patch: string): Map<string, string> {
+  const out = new Map<string, string>()
+  let current = ''
+  let lines: string[] = []
+  const flush = () => {
+    if (current && lines.length) out.set(current, lines.join('\n'))
+  }
+  for (const line of patch.split('\n')) {
+    if (line.startsWith('diff --git ')) {
+      flush()
+      const rest = line.slice('diff --git '.length)
+      const sep = rest.lastIndexOf(' b/')
+      current = sep >= 0 ? rest.slice(sep + 3) : ''
+      lines = [line]
+    } else if (current) {
+      lines.push(line)
+    }
+  }
+  flush()
+  return out
+}
+
 export function CommitScreen({ repoId, hash }: { repoId: string; hash: string }) {
   const [detail, setDetail] = useState<CommitDetail | null>(null)
+  const [selected, setSelected] = useState('')
   const [error, setError] = useState('')
   useEffect(() => {
     setDetail(null)
+    setSelected('')
     api<CommitDetail>(`/api/repos/${repoId}/commits/${hash}`)
       .then(setDetail)
       .catch((err) => setError(err instanceof Error ? err.message : '读取提交失败'))
   }, [repoId, hash])
+
+  const chunks = useMemo(() => splitPatch(detail?.patch ?? ''), [detail])
+  const patch = selected ? (chunks.get(selected) ?? '') : (detail?.patch ?? '')
 
   return (
     <div className="screen">
@@ -616,16 +709,35 @@ export function CommitScreen({ repoId, hash }: { repoId: string; hash: string })
               <span>哈希</span><code>{detail.commit.hash}</code>
             </div>
           </div>
-          <SectionTitle>{detail.files.length} 个文件变更</SectionTitle>
+          <SectionTitle
+            action={
+              selected ? (
+                <button className="mini-btn" onClick={() => setSelected('')}>全部文件</button>
+              ) : detail.files.length > 1 ? (
+                <span className="hint">点文件看单独 Diff</span>
+              ) : undefined
+            }
+          >
+            {selected ? <span className="commit-selected">{selected}</span> : `${detail.files.length} 个文件变更`}
+          </SectionTitle>
           <div className="commit-files">
             {detail.files.map((f) => (
-              <div className="commit-file" key={f.path}>
+              <button
+                className={`commit-file ${selected === f.path ? 'active' : ''}`}
+                key={f.path}
+                onClick={() => setSelected((prev) => (prev === f.path ? '' : f.path))}
+              >
                 <span className={`status-letter s-${f.status.slice(0, 1) === '?' ? 'untracked' : f.status.slice(0, 1)}`}>{f.status.slice(0, 1)}</span>
                 <span className="file-path">{f.path}</span>
-              </div>
+                <span className="file-stats">
+                  {f.added > 0 ? <em className="plus">+{f.added}</em> : null}
+                  {f.deleted > 0 ? <em className="minus">−{f.deleted}</em> : null}
+                </span>
+                <Icon name={selected === f.path ? 'down' : 'chevron'} size={15} />
+              </button>
             ))}
           </div>
-          <PatchView patch={detail.patch} />
+          <PatchView patch={patch} />
         </>
       ) : null}
       <div className="screen-bottom-space" />

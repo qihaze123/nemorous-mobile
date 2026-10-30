@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { DevicesResponse, PairCodeResponse, Workspace } from '../types'
-import { api, clearPairing, getServer, getTheme, setTheme } from '../api'
+import type { BranchPreset, DevicesResponse, PairCodeResponse, PresetsResponse, Workspace } from '../types'
+import { api, clearPairing, getServer, getTheme, post, setTheme } from '../api'
 import { Icon, SectionTitle, Spinner, ago, useToast } from '../components'
 
 const THEMES = [
@@ -12,6 +12,8 @@ const THEMES = [
 export function SettingsScreen({ ws }: { ws: Workspace }) {
   const [devices, setDevices] = useState<DevicesResponse | null>(null)
   const [pair, setPair] = useState<PairCodeResponse | null>(null)
+  const [presets, setPresets] = useState<BranchPreset[]>([])
+  const [presetName, setPresetName] = useState('')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
@@ -23,12 +25,14 @@ export function SettingsScreen({ ws }: { ws: Workspace }) {
     setLoading(true)
     setError('')
     try {
-      const [devicesRes, pairRes] = await Promise.all([
+      const [devicesRes, pairRes, presetsRes] = await Promise.all([
         api<DevicesResponse>('/api/devices'),
         api<PairCodeResponse>('/api/pair/code'),
+        api<PresetsResponse>('/api/presets'),
       ])
       setDevices(devicesRes)
       setPair(pairRes)
+      setPresets(presetsRes.presets ?? [])
     } catch (err) {
       setError(err instanceof Error ? err.message : '读取设备失败')
     } finally {
@@ -54,6 +58,35 @@ export function SettingsScreen({ ws }: { ws: Workspace }) {
       notify('已撤销设备', 'ok')
     } catch (err) {
       notify(err instanceof Error ? err.message : '撤销失败', 'error')
+    } finally {
+      setBusy('')
+    }
+  }
+
+  const savePreset = async () => {
+    const branches = Object.fromEntries(ws.repos.filter((r) => r.branch).map((r) => [r.id, r.branch]))
+    if (!presetName.trim() || Object.keys(branches).length === 0) return
+    setBusy('preset')
+    try {
+      await post('/api/presets', { name: presetName.trim(), branches })
+      setPresetName('')
+      await load()
+      notify('已保存分支预设', 'ok')
+    } catch (err) {
+      notify(err instanceof Error ? err.message : '保存失败', 'error')
+    } finally {
+      setBusy('')
+    }
+  }
+
+  const deletePreset = async (name: string) => {
+    setBusy(`preset:${name}`)
+    try {
+      await post('/api/presets/delete', { name })
+      await load()
+      notify('已删除预设', 'ok')
+    } catch (err) {
+      notify(err instanceof Error ? err.message : '删除失败', 'error')
     } finally {
       setBusy('')
     }
@@ -126,6 +159,41 @@ export function SettingsScreen({ ws }: { ws: Workspace }) {
             </span>
             <button className="mini-btn" disabled={busy === device.id} onClick={() => void revoke(device.id, !!device.current)}>
               {device.current ? '退出' : '撤销'}
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <SectionTitle>分支预设</SectionTitle>
+      <div className="panel">
+        <div className="inline-form">
+          <input
+            className="text-input"
+            value={presetName}
+            onChange={(e) => setPresetName(e.target.value)}
+            placeholder="预设名称，例如 Billing-V2"
+            autoCapitalize="off"
+            spellCheck={false}
+          />
+          <button className="btn primary" disabled={busy === 'preset' || !presetName.trim()} onClick={() => void savePreset()}>
+            保存当前
+          </button>
+        </div>
+        <p className="hint">保存当前各仓库的分支组合；应用时脏仓库仍会被跳过。</p>
+        {presets.length === 0 ? <p className="hint">还没有预设。</p> : null}
+        {presets.map((preset) => (
+          <div className="preset-row" key={preset.name}>
+            <div className="preset-main">
+              <span className="preset-name">{preset.name}</span>
+              <span className="preset-branches">
+                {Object.entries(preset.branches).map(([repoId, branch]) => {
+                  const repo = ws.repos.find((r) => r.id === repoId)
+                  return <span className="repo-chip" key={repoId}>{repo?.name ?? '已移除仓库'} → {branch}</span>
+                })}
+              </span>
+            </div>
+            <button className="mini-btn" disabled={busy === `preset:${preset.name}`} onClick={() => void deletePreset(preset.name)}>
+              删除
             </button>
           </div>
         ))}

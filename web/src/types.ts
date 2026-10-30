@@ -86,6 +86,8 @@ export interface OpResult {
 export interface CommitFile {
   path: string
   status: string
+  added: number
+  deleted: number
 }
 
 export interface CommitDetail {
@@ -165,5 +167,15 @@ export interface UndoResult {
   hash: string
   short: string
   subject: string
+}
+
+export interface BranchPreset {
+  name: string
+  branches: Record<string, string>
+  updatedAt: number
+}
+
+export interface PresetsResponse {
+  presets: BranchPreset[]
 }
 

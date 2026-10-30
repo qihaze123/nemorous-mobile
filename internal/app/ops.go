@@ -36,6 +36,7 @@ type App struct {
 	repos    []Repo
 	devices  *deviceStore
 	pairs    *pairStore
+	presets  *presetStore
 	hub      *Hub
 }
 
@@ -78,9 +79,13 @@ func NewWithOptions(root string, opts Options) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	presets, err := newPresetStore(stateDir)
+	if err != nil {
+		return nil, err
+	}
 	return &App{
 		Root: abs, Token: opts.Token, StateDir: stateDir,
-		repos: repos, devices: devices, pairs: pairs, hub: newHub(),
+		repos: repos, devices: devices, pairs: pairs, presets: presets, hub: newHub(),
 	}, nil
 }
 
@@ -656,6 +661,57 @@ func (a *App) StashPop(ctx context.Context, id string) (OpResult, error) {
 	return OpResult{RepoID: repo.ID, RepoName: repo.Name, Status: "OK", Message: "已恢复 Stash"}, nil
 }
 
+func (a *App) resolveRepos(ids []string) ([]Repo, error) {
+	if len(ids) == 0 {
+		return a.repos, nil
+	}
+	repos := make([]Repo, 0, len(ids))
+	for _, id := range ids {
+		repo, err := a.repo(id)
+		if err != nil {
+			return nil, err
+		}
+		repos = append(repos, repo)
+	}
+	return repos, nil
+}
+
+// BatchStash shelves changes in every selected repository.
+func (a *App) BatchStash(ctx context.Context, ids []string, message string) ([]OpResult, error) {
+	repos, err := a.resolveRepos(ids)
+	if err != nil {
+		return nil, err
+	}
+	if len(repos) == 0 {
+		return nil, errors.New("没有仓库")
+	}
+	return runParallel(repos, 8, func(repo Repo) OpResult {
+		res, err := a.Stash(ctx, repo.ID, message)
+		if err != nil {
+			return OpResult{RepoID: repo.ID, RepoName: repo.Name, Status: "FAIL", Message: err.Error()}
+		}
+		return res
+	}), nil
+}
+
+// BatchStashPop restores the newest stash in every selected repository.
+func (a *App) BatchStashPop(ctx context.Context, ids []string) ([]OpResult, error) {
+	repos, err := a.resolveRepos(ids)
+	if err != nil {
+		return nil, err
+	}
+	if len(repos) == 0 {
+		return nil, errors.New("没有仓库")
+	}
+	return runParallel(repos, 8, func(repo Repo) OpResult {
+		res, err := a.StashPop(ctx, repo.ID)
+		if err != nil {
+			return OpResult{RepoID: repo.ID, RepoName: repo.Name, Status: "FAIL", Message: err.Error()}
+		}
+		return res
+	}), nil
+}
+
 // BatchCommit commits the given per-repository file selections with one message.
 func (a *App) BatchCommit(ctx context.Context, targets []CommitTarget, message string, push bool) ([]OpResult, error) {
 	if strings.TrimSpace(message) == "" {
@@ -928,13 +984,27 @@ func (a *App) CommitDetail(ctx context.Context, id, hash string) (CommitDetail, 
 	if err != nil {
 		return CommitDetail{}, err
 	}
+	stats := map[string][2]int{}
+	statsOut, _ := gitOK(ctx, repo.Path, inspectTimeout,
+		"show", "--numstat", "--format=", "--no-renames", hash)
+	for _, line := range strings.Split(statsOut, "\n") {
+		parts := strings.SplitN(line, "\t", 3)
+		if len(parts) != 3 {
+			continue
+		}
+		add, _ := strconv.Atoi(parts[0])
+		del, _ := strconv.Atoi(parts[1])
+		stats[parts[2]] = [2]int{add, del}
+	}
 	var files []CommitFile
 	for _, line := range strings.Split(filesOut, "\n") {
 		parts := strings.SplitN(line, "\t", 2)
 		if len(parts) != 2 {
 			continue
 		}
-		files = append(files, CommitFile{Status: strings.TrimSpace(parts[0]), Path: parts[1]})
+		path := parts[1]
+		stat := stats[path]
+		files = append(files, CommitFile{Status: strings.TrimSpace(parts[0]), Path: path, Added: stat[0], Deleted: stat[1]})
 	}
 	patch, err := gitOK(ctx, repo.Path, inspectTimeout,
 		"show", "--format=", "--no-color", "--no-ext-diff", "--no-renames", hash)

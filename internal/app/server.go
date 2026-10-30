@@ -35,9 +35,15 @@ func (a *App) APIHandler() http.Handler {
 	mux.HandleFunc("GET /api/repos/{id}/file", a.authed(a.handleFile))
 	mux.HandleFunc("GET /api/commits", a.authed(a.handleAllCommits))
 	mux.HandleFunc("GET /api/branches", a.authed(a.handleBranches))
+	mux.HandleFunc("GET /api/presets", a.authed(a.handlePresets))
+	mux.HandleFunc("POST /api/presets", a.authed(a.handleSavePreset))
+	mux.HandleFunc("POST /api/presets/delete", a.authed(a.handleDeletePreset))
+	mux.HandleFunc("POST /api/presets/apply", a.authed(a.handleApplyPreset))
 	mux.HandleFunc("GET /api/search", a.authed(a.handleSearch))
 	mux.HandleFunc("POST /api/batch", a.authed(a.handleBatch))
 	mux.HandleFunc("POST /api/batch/commit", a.authed(a.handleBatchCommit))
+	mux.HandleFunc("POST /api/batch/stash", a.authed(a.handleBatchStash))
+	mux.HandleFunc("POST /api/batch/stash/pop", a.authed(a.handleBatchStashPop))
 	mux.HandleFunc("GET /api/pair/code", a.authed(a.handlePairCode))
 	mux.HandleFunc("GET /api/devices", a.authed(a.handleDevices))
 	mux.HandleFunc("DELETE /api/devices/{id}", a.authed(a.handleRevokeDevice))
@@ -308,6 +314,66 @@ func (a *App) handleBranches(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, a.Branches(r.Context()))
 }
 
+func (a *App) handlePresets(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, a.Presets())
+}
+
+func (a *App) handleSavePreset(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Name     string            `json:"name"`
+		Branches map[string]string `json:"branches"`
+	}
+	if err := decode(r, &req); err != nil {
+		a.fail(w, err)
+		return
+	}
+	preset, err := a.SavePreset(req.Name, req.Branches)
+	if err != nil {
+		a.fail(w, err)
+		return
+	}
+	a.hub.notify()
+	writeJSON(w, http.StatusOK, preset)
+}
+
+func (a *App) handleDeletePreset(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := decode(r, &req); err != nil {
+		a.fail(w, err)
+		return
+	}
+	ok, err := a.DeletePreset(req.Name)
+	if err != nil {
+		a.fail(w, err)
+		return
+	}
+	if !ok {
+		writeError(w, http.StatusNotFound, "预设不存在")
+		return
+	}
+	a.hub.notify()
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (a *App) handleApplyPreset(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := decode(r, &req); err != nil {
+		a.fail(w, err)
+		return
+	}
+	results, err := a.ApplyPreset(r.Context(), req.Name)
+	if err != nil {
+		a.fail(w, err)
+		return
+	}
+	a.hub.notify()
+	writeJSON(w, http.StatusOK, map[string]any{"results": results})
+}
+
 func (a *App) handleCommitDetail(w http.ResponseWriter, r *http.Request) {
 	detail, err := a.CommitDetail(r.Context(), r.PathValue("id"), r.PathValue("hash"))
 	if err != nil {
@@ -353,6 +419,41 @@ func (a *App) handleBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	results, err := a.Batch(r.Context(), req.Action, req.Repos, req.Branch, req.Create)
+	if err != nil {
+		a.fail(w, err)
+		return
+	}
+	a.hub.notify()
+	writeJSON(w, http.StatusOK, map[string]any{"results": results})
+}
+
+func (a *App) handleBatchStash(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Repos   []string `json:"repos"`
+		Message string   `json:"message"`
+	}
+	if err := decode(r, &req); err != nil {
+		a.fail(w, err)
+		return
+	}
+	results, err := a.BatchStash(r.Context(), req.Repos, req.Message)
+	if err != nil {
+		a.fail(w, err)
+		return
+	}
+	a.hub.notify()
+	writeJSON(w, http.StatusOK, map[string]any{"results": results})
+}
+
+func (a *App) handleBatchStashPop(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Repos []string `json:"repos"`
+	}
+	if err := decode(r, &req); err != nil {
+		a.fail(w, err)
+		return
+	}
+	results, err := a.BatchStashPop(r.Context(), req.Repos)
 	if err != nil {
 		a.fail(w, err)
 		return

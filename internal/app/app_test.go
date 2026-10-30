@@ -795,3 +795,122 @@ func TestUndoAndAmendSafety(t *testing.T) {
 		t.Fatalf("amended subject = %+v", b.LastCommit)
 	}
 }
+
+func TestBatchStashAcrossRepos(t *testing.T) {
+	app, _ := newTestApp(t)
+	ctx := context.Background()
+	ws := app.Workspace(ctx)
+	a := findRepo(t, ws, "repo-a")
+	b := findRepo(t, ws, "repo-b")
+	writeFile(t, filepath.Join(b.Path, "b-stash.txt"), "b\n")
+	results, err := app.BatchStash(ctx, nil, "batch wip")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("results = %d", len(results))
+	}
+	for _, r := range results {
+		if r.Status != "OK" {
+			t.Fatalf("stash result = %+v", r)
+		}
+	}
+	ws = app.Workspace(ctx)
+	if len(findRepo(t, ws, "repo-a").Files) != 0 || len(findRepo(t, ws, "repo-b").Files) != 0 {
+		t.Fatal("stash did not clean both repositories")
+	}
+	results, err = app.BatchStashPop(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range results {
+		if r.Status != "OK" {
+			t.Fatalf("pop result = %+v", r)
+		}
+	}
+	if len(findRepo(t, app.Workspace(ctx), "repo-a").Files) == 0 {
+		t.Fatal("repo-a changes were not restored")
+	}
+	if len(findRepo(t, app.Workspace(ctx), "repo-b").Files) == 0 {
+		t.Fatal("repo-b changes were not restored")
+	}
+	_ = a
+}
+
+func TestBranchPresets(t *testing.T) {
+	app, root := newTestApp(t)
+	ctx := context.Background()
+	ws := app.Workspace(ctx)
+	a := findRepo(t, ws, "repo-a")
+	b := findRepo(t, ws, "repo-b")
+	if _, err := app.SavePreset("  main-all  ", map[string]string{a.ID: "main", b.ID: "main"}); err != nil {
+		t.Fatal(err)
+	}
+	presets := app.Presets()
+	if len(presets.Presets) != 1 || presets.Presets[0].Name != "main-all" {
+		t.Fatalf("presets = %+v", presets)
+	}
+	results, err := app.ApplyPreset(ctx, "main-all")
+	if err != nil || len(results) != 2 {
+		t.Fatalf("apply = %+v err=%v", results, err)
+	}
+	writeFile(t, filepath.Join(a.Path, "dirty.txt"), "dirty\n")
+	results, err = app.ApplyPreset(ctx, "main-all")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range results {
+		if r.RepoID == a.ID && r.Status != "SKIP" {
+			t.Fatalf("dirty repo should skip: %+v", r)
+		}
+	}
+	run(t, b.Path, "branch", "feature/preset")
+	if _, err := app.SavePreset("mixed", map[string]string{a.ID: "main", b.ID: "feature/preset"}); err != nil {
+		t.Fatal(err)
+	}
+	results, err = app.ApplyPreset(ctx, "mixed")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range results {
+		if r.RepoID == b.ID && r.Status != "OK" {
+			t.Fatalf("preset switch failed: %+v", r)
+		}
+	}
+	if state := findRepo(t, app.Workspace(ctx), "repo-b"); state.Branch != "feature/preset" {
+		t.Fatalf("repo-b branch = %q", state.Branch)
+	}
+	ok, err := app.DeletePreset("mixed")
+	if err != nil || !ok {
+		t.Fatalf("delete = %v err=%v", ok, err)
+	}
+	if len(app.Presets().Presets) != 1 {
+		t.Fatalf("presets after delete = %+v", app.Presets())
+	}
+
+	// Persistence across restart uses the same state directory.
+	stateDir := t.TempDir()
+	app1, err := NewWithOptions(root, Options{StateDir: stateDir, PairCode: "123456"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := app1.SavePreset("persisted", map[string]string{a.ID: "main"}); err != nil {
+		t.Fatal(err)
+	}
+	app2, err := NewWithOptions(root, Options{StateDir: stateDir, PairCode: "654321"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, p := range app2.Presets().Presets {
+		if p.Name == "persisted" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("preset did not survive restart")
+	}
+	if _, err := app.SavePreset("", map[string]string{a.ID: "main"}); err == nil {
+		t.Fatal("empty preset name accepted")
+	}
+}

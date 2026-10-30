@@ -106,8 +106,10 @@ type OpResult struct {
 
 // CommitFile is one changed file inside a commit.
 type CommitFile struct {
-	Path   string `json:"path"`
-	Status string `json:"status"`
+	Path    string `json:"path"`
+	Status  string `json:"status"`
+	Added   int    `json:"added"`
+	Deleted int    `json:"deleted"`
 }
 
 // CommitDetail is returned by GET /api/repos/{id}/commits/{hash}.
@@ -200,4 +202,16 @@ type UndoResult struct {
 	Hash    string `json:"hash"`
 	Short   string `json:"short"`
 	Subject string `json:"subject"`
+}
+
+// BranchPreset stores a per-repository branch combination for one workspace.
+type BranchPreset struct {
+	Name      string            `json:"name"`
+	Branches  map[string]string `json:"branches"`
+	UpdatedAt int64             `json:"updatedAt"`
+}
+
+// PresetsResponse is returned by GET /api/presets.
+type PresetsResponse struct {
+	Presets []BranchPreset `json:"presets"`
 }

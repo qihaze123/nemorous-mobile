@@ -58,7 +58,7 @@ Go 伴生服务 · React + Vite PWA · 单二进制内嵌前端 · 零运行时�
 - **Diff 路由正确**：点击已暂存文件对比 Index，点击未暂存文件对比 Worktree。
 - **跨仓统一提交**：勾选任意仓库的文件，一次提交说明批量提交；可选提交后立即推送。
 - **安全同步**：单仓拉取 / 推送；脏仓库的拉取与切分支会被安全跳过。
-- **Stash 往返**：单仓暂存改动（含未跟踪文件）与恢复 Stash，不触碰 ignored 文件。
+- **Stash 往返**：单仓或**全部仓库**暂存改动（含未跟踪文件）与恢复 Stash，不触碰 ignored 文件；统一切分支时可勾选“先 stash”。
 - 文件状态、增删行数、冲突标记与仓库 health 一目了然。
 
 ### 2. 代码：零索引检索与查看
@@ -77,6 +77,7 @@ Go 伴生服务 · React + Vite PWA · 单二进制内嵌前端 · 零运行时�
 - 提交详情：作者、时间、哈希、变更文件、完整补丁（统一 Diff）。
 - 全部拉取 / 全部推送 / 所有仓库统一切分支，逐仓展示 `OK / SKIP / FAIL`。
 - 单仓 `--amend`（仅未推送、单仓选择）与软撤销上一次未推送、非合并提交。
+- **分支预设**：在设置里保存“仓库 → 分支”组合，在“统一切分支”弹窗一键应用；脏仓库仍跳过，分支不存在时逐仓报告。
 
 ### 4. 设备与安全
 
@@ -186,6 +187,11 @@ npm run build                       # 生成类型 + 类型检查 + 生产构建
 | POST | `/api/repos/{id}/undo` | 软撤销上一次未推送、非合并提交 |
 | POST | `/api/batch` | `pull` / `push` / `fetch` / `checkout` 批量执行 |
 | POST | `/api/batch/commit` | 跨仓统一提交 |
+| POST | `/api/batch/stash` · `/api/batch/stash/pop` | 多仓批量 Stash / 恢复 |
+| GET | `/api/presets` | 当前工作区的分支预设 |
+| POST | `/api/presets` | 保存 / 覆盖“仓库 → 分支”组合 |
+| POST | `/api/presets/delete` | 删除预设 |
+| POST | `/api/presets/apply` | 应用预设（脏仓库跳过） |
 
 仓库 `id` 为绝对路径的 SHA-1 前 12 位，刷新后保持稳定。
 
@@ -230,7 +236,7 @@ npm run build                       # 生成类型 + 类型检查 + 生产构建
 
 - **不做手机端编辑保存**：代码查看器只读；行级微调、终端、AI 合并、`mani` 任务仍留在桌面端。
 - **不做 worktree 合并 / AI 冲突消解**：桌面端的合并与 6 项 `VerifyAIMerge` 校验属于重事务操作，移动端暂不提供。
-- 多仓批量 stash / amend 尚未提供；当前按单仓操作。
+- 多仓批量 amend 尚未提供；当前 amend 按单仓操作。分支预设只保存分支名，不保存 commit SHA。
 - 提交筛选最多扫描每仓 1000 条历史后再合并。
 - 拉取只使用 `--ff-only`，不做桌面端的 stash / pop 自动恢复。
 - Web Push 未实现：需要 HTTPS + 已安装 PWA + VAPID；当前仅提供 SSE 实时刷新。
