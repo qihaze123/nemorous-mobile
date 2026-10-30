@@ -149,7 +149,7 @@ tailscale serve --bg 8787
 
 - Android Chrome：地址栏右侧出现安装图标，或在「设置 → 安装到手机」点击安装；也可以 Chrome 菜单 →「安装应用 / 添加到主屏幕」
 - iPhone Safari：分享 →「添加到主屏幕」
-- 安装后以 standalone 独立窗口运行，不再显示地址栏；未安装时可在设置里使用「临时全屏显示」
+- 安装后以 standalone 独立窗口运行，不再显示地址栏，并可横竖屏旋转；未安装时可在设置里使用「临时全屏显示」
 
 HTTPS 下 Service Worker 会自动注册，用于离线壳与后续推送能力。
 

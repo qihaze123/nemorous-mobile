@@ -1,5 +1,5 @@
-const CACHE = 'nemorous-shell-v1'
-const SHELL = ['/', '/manifest.webmanifest', '/icon.svg']
+const CACHE = 'nemorous-shell-v3'
+const SHELL = ['/', '/icon.svg']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()))
@@ -15,17 +15,33 @@ self.addEventListener('fetch', (event) => {
   const req = event.request
   const url = new URL(req.url)
   if (req.method !== 'GET' || url.origin !== location.origin || url.pathname.startsWith('/api/')) return
+
   if (req.mode === 'navigate') {
     event.respondWith(fetch(req).catch(() => caches.match('/')))
     return
   }
+
+  if (url.pathname.startsWith('/assets/')) {
+    event.respondWith(
+      caches.match(req).then((hit) => hit || fetch(req).then((res) => {
+        if (res.ok) {
+          const copy = res.clone()
+          caches.open(CACHE).then((cache) => cache.put(req, copy))
+        }
+        return res
+      })),
+    )
+    return
+  }
+
+  // Manifest, icons and other shell files: network first so updates apply.
   event.respondWith(
-    caches.match(req).then((hit) => hit || fetch(req).then((res) => {
-      if (res.ok && url.pathname.startsWith('/assets/')) {
+    fetch(req).then((res) => {
+      if (res.ok) {
         const copy = res.clone()
         caches.open(CACHE).then((cache) => cache.put(req, copy))
       }
       return res
-    })),
+    }).catch(() => caches.match(req)),
   )
 })

@@ -25,6 +25,7 @@ const iconPaths: Record<string, string[]> = {
   left: ['M15 18l-6-6 6-6'],
   right: ['M9 6l6 6-6 6'],
   jump: ['M14 4h6v6', 'M20 4 9 15'],
+  panel: ['M4 5h16v14H4Z', 'M9 5v14'],
   copy: ['M9 9h11v11H9Z', 'M5 15H4V4h11v1'],
   warning: ['M12 4 2 20h20Z', 'M12 10v4M12 17h.01'],
   branch: ['M6 3v12', 'M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z', 'M18 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z', 'M6 15c0-3 6-4 12-5'],

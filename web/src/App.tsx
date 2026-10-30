@@ -18,7 +18,7 @@ const TABS = [
 
 function Shell({ children, tab }: { children: ReactNode; tab?: string }) {
   return (
-    <div className="app">
+    <div className={`app ${tab ? 'with-tab' : ''}`}>
       <div className="app-content">{children}</div>
       {tab ? (
         <nav className="tabbar" aria-label="主导航">

@@ -2,7 +2,83 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DiffResult, Workspace } from '../types'
 import { post, api } from '../api'
 import { back, go } from '../hooks'
-import { ConfirmSheet, DiffNavBar, Icon, PatchView, Spinner, StatusLetter, useToast, type PatchViewHandle } from '../components'
+import { ConfirmSheet, DiffNavBar, Icon, PatchView, Spinner, StatusLetter, repoColor, useToast, type PatchViewHandle } from '../components'
+
+function DiffSidebar({
+  ws,
+  repoId,
+  path,
+  staged,
+  open,
+}: {
+  ws: Workspace
+  repoId: string
+  path: string
+  staged: boolean
+  open: boolean
+}) {
+  const groups = [
+    {
+      key: 'staged' as const,
+      title: '已暂存',
+      repos: ws.repos
+        .map((repo) => ({ repo, files: repo.files.filter((f) => f.staged) }))
+        .filter((g) => g.files.length > 0),
+    },
+    {
+      key: 'unstaged' as const,
+      title: '未暂存',
+      repos: ws.repos
+        .map((repo) => ({ repo, files: repo.files.filter((f) => f.untracked || f.unstaged || !f.staged) }))
+        .filter((g) => g.files.length > 0),
+    },
+  ]
+  return (
+    <aside className={`diff-sidebar ${open ? 'open' : ''}`}>
+      <div className="diff-sidebar-head">文件</div>
+      {groups.map((group) => {
+        const count = group.repos.reduce((n, g) => n + g.files.length, 0)
+        return (
+          <div className="diff-sidebar-section" key={group.key}>
+            <div className="diff-sidebar-title">
+              <span className={group.key === 'staged' ? 'staged' : ''}>{group.title}</span>
+              <em>{count}</em>
+            </div>
+            {group.repos.map(({ repo, files }) => (
+              <div className="diff-sidebar-repo" key={repo.id}>
+                <div className="diff-sidebar-repo-name">
+                  <span className="repo-dot" style={{ background: repoColor(repo.name) }} />
+                  <span>{repo.name}</span>
+                  <em>{files.length}</em>
+                </div>
+                {files.map((file) => {
+                  const active =
+                    repo.id === repoId &&
+                    file.path === path &&
+                    (group.key === 'staged' ? staged : !staged)
+                  return (
+                    <button
+                      key={`${file.path}:${group.key}`}
+                      className={`diff-sidebar-file ${active ? 'active' : ''}`}
+                      onClick={() =>
+                        go(`#/diff?repo=${repo.id}&path=${encodeURIComponent(file.path)}&staged=${group.key === 'staged' ? 1 : 0}`)
+                      }
+                      title={file.path}
+                    >
+                      <StatusLetter file={file} />
+                      <span className="diff-sidebar-path">{file.path}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            ))}
+          </div>
+        )
+      })}
+      {groups.every((g) => g.repos.length === 0) ? <p className="hint">工作区没有改动。</p> : null}
+    </aside>
+  )
+}
 
 export function DiffScreen({
   ws,
@@ -25,6 +101,7 @@ export function DiffScreen({
   const patchRef = useRef<PatchViewHandle>(null)
   const boundary = useRef<{ direction: 1 | -1; at: number } | null>(null)
   const notify = useToast()
+  const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('nemorous.sidebar') !== 'closed')
 
   const repo = ws.repos.find((r) => r.id === repoId)
   const file = repo?.files.find((f) => f.path === path)
@@ -45,6 +122,13 @@ export function DiffScreen({
     if (!target) return false
     go(`#/diff?repo=${target.repoId}&path=${encodeURIComponent(target.path)}&staged=${target.staged ? 1 : 0}`)
     return true
+  }
+
+  const toggleSidebar = () => {
+    setSidebarOpen((prev) => {
+      localStorage.setItem('nemorous.sidebar', prev ? 'closed' : 'open')
+      return !prev
+    })
   }
 
   const stepChange = (direction: 1 | -1) => {
@@ -120,8 +204,14 @@ export function DiffScreen({
   }
 
   return (
-    <div className="screen diff-screen">
+    <div className="diff-page">
+      <DiffSidebar ws={ws} repoId={repoId} path={path} staged={staged} open={sidebarOpen} />
+      <div className="diff-main">
+        <div className="screen diff-screen fill-screen">
       <header className="topbar">
+        <button className="icon-btn sidebar-toggle" onClick={toggleSidebar} aria-label="文件栏">
+          <Icon name="panel" />
+        </button>
         <button className="icon-btn" onClick={() => back('#/changes')} aria-label="返回">
           <Icon name="back" />
         </button>
@@ -198,6 +288,8 @@ export function DiffScreen({
         onConfirm={() => void act('discard')}
       />
       <div className="screen-bottom-space" />
+        </div>
+      </div>
     </div>
   )
 }

@@ -405,7 +405,7 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
   }
 
   return (
-    <div className="screen file-screen">
+    <div className="screen file-screen fill-screen">
       <header className="topbar">
         <button className="icon-btn" onClick={() => back('#/code')} aria-label="返回">
           <Icon name="back" />
