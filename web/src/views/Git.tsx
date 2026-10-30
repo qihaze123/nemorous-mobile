@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
-import type { BranchList, BranchPreset, BranchesResponse, Commit, CommitDetail, OpResult, PresetsResponse, UndoResult, Workspace } from '../types'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import type { BranchList, BranchPreset, BranchesResponse, Commit, CommitDetail, CommitFile, OpResult, PresetsResponse, UndoResult, Workspace } from '../types'
 import { api, post } from '../api'
 import { back, go, useDebounced } from '../hooks'
-import { ConfirmSheet, Empty, Icon, PatchView, SectionTitle, Sheet, Spinner, ago, dayKey, repoColor, timeOf, useToast } from '../components'
+import { ConfirmSheet, Empty, Icon, PatchView, SectionTitle, Sheet, Spinner, ago, dayKey, repoColor, timeOf, useToast, type PatchViewHandle } from '../components'
 
 function ResultSheet({ results, onClose }: { results: OpResult[] | null; onClose: () => void }) {
   return (
@@ -671,20 +671,114 @@ function splitPatch(patch: string): Map<string, string> {
   return out
 }
 
+interface CommitTreeNode {
+  name: string
+  path: string
+  dir: boolean
+  children: CommitTreeNode[]
+  file?: CommitFile
+}
+
+function buildCommitTree(files: CommitFile[]): CommitTreeNode[] {
+  const root: CommitTreeNode[] = []
+  for (const file of files) {
+    const parts = file.path.split('/')
+    let level = root
+    let prefix = ''
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i]
+      const dir = i < parts.length - 1
+      prefix = prefix ? `${prefix}/${part}` : part
+      let node = level.find((n) => n.name === part && n.dir === dir)
+      if (!node) {
+        node = { name: part, path: prefix, dir, children: [] }
+        level.push(node)
+      }
+      if (dir) {
+        level = node.children
+      } else {
+        node.file = file
+      }
+    }
+  }
+  const sortLevel = (nodes: CommitTreeNode[]) => {
+    nodes.sort((a, b) => (a.dir === b.dir ? a.name.localeCompare(b.name) : a.dir ? -1 : 1))
+    for (const node of nodes) if (node.dir) sortLevel(node.children)
+  }
+  sortLevel(root)
+  return root
+}
+
+function CommitTreeRows({
+  nodes,
+  depth,
+  collapsed,
+  onToggle,
+  onOpen,
+}: {
+  nodes: CommitTreeNode[]
+  depth: number
+  collapsed: Set<string>
+  onToggle: (path: string) => void
+  onOpen: (path: string) => void
+}) {
+  return (
+    <>
+      {nodes.map((node) => (
+        <Fragment key={`${node.dir ? 'd' : 'f'}:${node.path}`}>
+          {node.dir ? (
+            <>
+              <button
+                className="commit-tree-row dir"
+                style={{ paddingLeft: 4 + depth * 14 }}
+                onClick={() => onToggle(node.path)}
+              >
+                <Icon name={collapsed.has(node.path) ? 'chevron' : 'down'} size={13} />
+                <Icon name="folder" size={15} />
+                <span className="tree-name">{node.name}</span>
+              </button>
+              {!collapsed.has(node.path) ? (
+                <CommitTreeRows nodes={node.children} depth={depth + 1} collapsed={collapsed} onToggle={onToggle} onOpen={onOpen} />
+              ) : null}
+            </>
+          ) : (
+            <button
+              className="commit-tree-row file"
+              style={{ paddingLeft: 8 + depth * 14 }}
+              onClick={() => onOpen(node.path)}
+            >
+              <span className={`status-letter s-${node.file?.status.slice(0, 1) === '?' ? 'untracked' : node.file?.status.slice(0, 1)}`}>
+                {node.file?.status.slice(0, 1)}
+              </span>
+              <span className="tree-name" title={node.path}>{node.name}</span>
+              <span className="file-stats">
+                {(node.file?.added ?? 0) > 0 ? <em className="plus">+{node.file?.added}</em> : null}
+                {(node.file?.deleted ?? 0) > 0 ? <em className="minus">−{node.file?.deleted}</em> : null}
+              </span>
+              <Icon name="chevron" size={14} />
+            </button>
+          )}
+        </Fragment>
+      ))}
+    </>
+  )
+}
+
 export function CommitScreen({ repoId, hash }: { repoId: string; hash: string }) {
   const [detail, setDetail] = useState<CommitDetail | null>(null)
-  const [selected, setSelected] = useState('')
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [showAll, setShowAll] = useState(false)
   const [error, setError] = useState('')
   useEffect(() => {
     setDetail(null)
-    setSelected('')
+    setCollapsed(new Set())
+    setShowAll(false)
     api<CommitDetail>(`/api/repos/${repoId}/commits/${hash}`)
       .then(setDetail)
       .catch((err) => setError(err instanceof Error ? err.message : '读取提交失败'))
   }, [repoId, hash])
 
-  const chunks = useMemo(() => splitPatch(detail?.patch ?? ''), [detail])
-  const patch = selected ? (chunks.get(selected) ?? '') : (detail?.patch ?? '')
+  const tree = useMemo(() => buildCommitTree(detail?.files ?? []), [detail])
 
   return (
     <div className="screen">
@@ -711,33 +805,134 @@ export function CommitScreen({ repoId, hash }: { repoId: string; hash: string })
           </div>
           <SectionTitle
             action={
-              selected ? (
-                <button className="mini-btn" onClick={() => setSelected('')}>全部文件</button>
-              ) : detail.files.length > 1 ? (
-                <span className="hint">点文件看单独 Diff</span>
-              ) : undefined
+              <button className="mini-btn" onClick={() => setShowAll((v) => !v)}>
+                {showAll ? '收起完整 Patch' : '查看完整 Patch'}
+              </button>
             }
           >
-            {selected ? <span className="commit-selected">{selected}</span> : `${detail.files.length} 个文件变更`}
+            {detail.files.length} 个文件变更
           </SectionTitle>
-          <div className="commit-files">
-            {detail.files.map((f) => (
-              <button
-                className={`commit-file ${selected === f.path ? 'active' : ''}`}
-                key={f.path}
-                onClick={() => setSelected((prev) => (prev === f.path ? '' : f.path))}
-              >
-                <span className={`status-letter s-${f.status.slice(0, 1) === '?' ? 'untracked' : f.status.slice(0, 1)}`}>{f.status.slice(0, 1)}</span>
-                <span className="file-path">{f.path}</span>
-                <span className="file-stats">
-                  {f.added > 0 ? <em className="plus">+{f.added}</em> : null}
-                  {f.deleted > 0 ? <em className="minus">−{f.deleted}</em> : null}
-                </span>
-                <Icon name={selected === f.path ? 'down' : 'chevron'} size={15} />
-              </button>
-            ))}
+          <div className="commit-tree">
+            <div className="commit-tree-root">
+              <Icon name="folder" size={15} />
+              <span>{detail.commit.repoName}</span>
+            </div>
+            <CommitTreeRows
+              nodes={tree}
+              depth={0}
+              collapsed={collapsed}
+              onToggle={(path) =>
+                setCollapsed((prev) => {
+                  const next = new Set(prev)
+                  if (next.has(path)) next.delete(path)
+                  else next.add(path)
+                  return next
+                })
+              }
+              onOpen={(path) =>
+                go(`#/commit-file?repo=${repoId}&hash=${hash}&path=${encodeURIComponent(path)}`)
+              }
+            />
           </div>
-          <PatchView patch={patch} />
+          {showAll ? <PatchView patch={detail.patch} /> : <p className="hint">点文件查看单独 Diff；目录可折叠。</p>}
+        </>
+      ) : null}
+      <div className="screen-bottom-space" />
+    </div>
+  )
+}
+
+export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash: string; path: string }) {
+  const [detail, setDetail] = useState<CommitDetail | null>(null)
+  const [error, setError] = useState('')
+  const patchRef = useRef<PatchViewHandle>(null)
+  useEffect(() => {
+    setDetail(null)
+    api<CommitDetail>(`/api/repos/${repoId}/commits/${hash}`)
+      .then(setDetail)
+      .catch((err) => setError(err instanceof Error ? err.message : '读取提交失败'))
+  }, [repoId, hash])
+
+  const chunks = useMemo(() => splitPatch(detail?.patch ?? ''), [detail])
+  const index = detail ? detail.files.findIndex((f) => f.path === path) : -1
+  const file = detail && index >= 0 ? detail.files[index] : null
+
+  const jump = (direction: 1 | -1): boolean => {
+    if (!detail) return false
+    const next = detail.files[index + direction]
+    if (!next) return false
+    go(`#/commit-file?repo=${repoId}&hash=${hash}&path=${encodeURIComponent(next.path)}`)
+    return true
+  }
+
+  const step = (direction: 1 | -1) => {
+    if (patchRef.current?.scrollToHunk(direction)) return
+    jump(direction)
+  }
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        step(1)
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        step(-1)
+      }
+    }
+    addEventListener('keydown', onKey)
+    return () => removeEventListener('keydown', onKey)
+  })
+
+  return (
+    <div className="screen">
+      <header className="topbar">
+        <button className="icon-btn" onClick={() => go(`#/commit?repo=${repoId}&hash=${hash}`)} aria-label="返回提交">
+          <Icon name="back" />
+        </button>
+        <div className="grow">
+          <div className="eyebrow">文件 Diff</div>
+          <h1 className="file-title">{path}</h1>
+        </div>
+        <button
+          className="icon-btn"
+          onClick={() => go(`#/file?repo=${repoId}&path=${encodeURIComponent(path)}&rev=${hash}`)}
+          aria-label="查看文件"
+        >
+          <Icon name="file" />
+        </button>
+      </header>
+      {error ? <div className="error-banner">{error}</div> : null}
+      {!detail && !error ? <Spinner label="读取提交…" /> : null}
+      {detail ? (
+        <>
+          <div className="commit-file-meta">
+            <span className={`status-letter s-${file?.status.slice(0, 1) === '?' ? 'untracked' : file?.status.slice(0, 1)}`}>{file?.status.slice(0, 1)}</span>
+            <span className="grow">{path}</span>
+            <span className="file-stats">
+              {(file?.added ?? 0) > 0 ? <em className="plus">+{file?.added}</em> : null}
+              {(file?.deleted ?? 0) > 0 ? <em className="minus">−{file?.deleted}</em> : null}
+            </span>
+          </div>
+          <div className="diff-nav-row">
+            <button className="mini-btn" onClick={() => step(-1)} aria-label="上一处">
+              <Icon name="up" size={14} /> 上一处
+            </button>
+            <button className="mini-btn" onClick={() => step(1)} aria-label="下一处">
+              <Icon name="down" size={14} /> 下一处
+            </button>
+            <span className="spacer" />
+            <button
+              className="mini-btn"
+              onClick={() => go(`#/file?repo=${repoId}&path=${encodeURIComponent(path)}&rev=${hash}`)}
+            >
+              查看此版本
+            </button>
+            <span className="diff-position">{index >= 0 ? `${index + 1}/${detail.files.length}` : ''}</span>
+          </div>
+          <PatchView ref={patchRef} patch={chunks.get(path) ?? ''} />
         </>
       ) : null}
       <div className="screen-bottom-space" />

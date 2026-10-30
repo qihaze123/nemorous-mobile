@@ -242,7 +242,8 @@ npm run build                       # 生成类型 + 类型检查 + 生产构建
 - Web Push 未实现：需要 HTTPS + 已安装 PWA + VAPID；当前仅提供 SSE 实时刷新。
 - Capacitor 原生壳未打包：同一套 `web/dist` 可包成 iOS / Android 应用，但需要 Xcode 签名、Android SDK 与商店配置。
 - 会话 Cookie 只支持同源；反向代理时需要 HTTPS + 同源部署。
-- 文件查看上限 1 MiB、文件树 20000 条、高亮 4000 行。
+- 文件查看上限 1 MiB、文件树 20000 条、高亮 4000 行；文件查看器只读，不支持手机端编辑保存。
+- Diff 只提供单栏 Unified 视图；Ovis 的 Unified/Split 切换中，Split 在手机宽度下不可读，因此未移植（横屏/平板并排留作后续）。
 - iOS 不允许后台常驻服务：手机是客户端，电脑端必须在线。
 
 ---

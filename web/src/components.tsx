@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createContext, forwardRef, useCallback, useContext, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 import type { FileChange, RepoHealth } from './types'
 
@@ -21,6 +21,7 @@ const iconPaths: Record<string, string[]> = {
   file: ['M6 3h8l4 4v14H6Z', 'M14 3v5h4'],
   chevron: ['M9 6l6 6-6 6'],
   down: ['M6 9l6 6 6-6'],
+  up: ['M18 15l-6-6-6 6'],
   copy: ['M9 9h11v11H9Z', 'M5 15H4V4h11v1'],
   warning: ['M12 4 2 20h20Z', 'M12 10v4M12 17h.01'],
   branch: ['M6 3v12', 'M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z', 'M18 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z', 'M6 15c0-3 6-4 12-5'],
@@ -277,13 +278,40 @@ const DIFF_LINE_HEIGHT = 20
 const DIFF_OVERSCAN = 12
 const DIFF_VIRTUAL_THRESHOLD = 200
 
-export function PatchView({ patch, binary }: { patch: string; binary?: boolean }) {
+export interface PatchViewHandle {
+  /** Scrolls to the next/previous hunk; false means the file boundary was reached. */
+  scrollToHunk(direction: 1 | -1): boolean
+}
+
+export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: boolean }>(function PatchView(
+  { patch, binary },
+  ref,
+) {
   const lines = useMemo(() => parsePatch(patch), [patch])
   const viewport = useRef<HTMLDivElement>(null)
   const [scrollTop, setScrollTop] = useState(0)
   const [height, setHeight] = useState(600)
   const settle = useRef<number | undefined>(undefined)
   const virtual = lines.length > DIFF_VIRTUAL_THRESHOLD
+  const hunkLines = useMemo(
+    () => lines.map((line, index) => (line.kind === 'hunk' ? index : -1)).filter((index) => index >= 0),
+    [lines],
+  )
+
+  useImperativeHandle(ref, () => ({
+    scrollToHunk(direction) {
+      const el = viewport.current
+      if (!el || hunkLines.length === 0) return false
+      const top = el.scrollTop
+      const target =
+        direction > 0
+          ? hunkLines.find((index) => index * DIFF_LINE_HEIGHT > top + 4)
+          : [...hunkLines].reverse().find((index) => index * DIFF_LINE_HEIGHT < top - 4)
+      if (target === undefined) return false
+      el.scrollTop = Math.max(0, target * DIFF_LINE_HEIGHT - 4)
+      return true
+    },
+  }), [hunkLines])
 
   useEffect(() => {
     const el = viewport.current
@@ -344,7 +372,7 @@ export function PatchView({ patch, binary }: { patch: string; binary?: boolean }
       </div>
     </div>
   )
-}
+})
 
 /* ---------- misc ---------- */
 

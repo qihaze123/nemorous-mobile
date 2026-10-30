@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DiffResult, Workspace } from '../types'
 import { post, api } from '../api'
 import { back, go } from '../hooks'
-import { ConfirmSheet, Icon, PatchView, Spinner, StatusLetter, useToast } from '../components'
+import { ConfirmSheet, Icon, PatchView, Spinner, StatusLetter, useToast, type PatchViewHandle } from '../components'
 
 export function DiffScreen({
   ws,
@@ -22,10 +22,50 @@ export function DiffScreen({
   const [busy, setBusy] = useState('')
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [version, setVersion] = useState(0)
+  const patchRef = useRef<PatchViewHandle>(null)
   const notify = useToast()
 
   const repo = ws.repos.find((r) => r.id === repoId)
   const file = repo?.files.find((f) => f.path === path)
+  const navFiles = useMemo(() => {
+    const out: { repoId: string; path: string; staged: boolean }[] = []
+    for (const r of ws.repos) {
+      for (const f of r.files.filter((item) => item.staged)) out.push({ repoId: r.id, path: f.path, staged: true })
+      for (const f of r.files.filter((item) => item.untracked || item.unstaged || !item.staged)) {
+        out.push({ repoId: r.id, path: f.path, staged: false })
+      }
+    }
+    return out
+  }, [ws])
+  const navIndex = navFiles.findIndex((f) => f.repoId === repoId && f.path === path && f.staged === staged)
+
+  const jumpFile = (direction: 1 | -1): boolean => {
+    const target = navFiles[navIndex + direction]
+    if (!target) return false
+    go(`#/diff?repo=${target.repoId}&path=${encodeURIComponent(target.path)}&staged=${target.staged ? 1 : 0}`)
+    return true
+  }
+
+  const stepChange = (direction: 1 | -1) => {
+    if (patchRef.current?.scrollToHunk(direction)) return
+    jumpFile(direction)
+  }
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        stepChange(1)
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        stepChange(-1)
+      }
+    }
+    addEventListener('keydown', onKey)
+    return () => removeEventListener('keydown', onKey)
+  })
 
   useEffect(() => {
     let cancelled = false
@@ -119,9 +159,26 @@ export function DiffScreen({
         <button className="mini-btn danger" disabled={!!busy} onClick={() => setConfirmDiscard(true)}>丢弃</button>
       </div>
 
+      <div className="diff-nav-row">
+        <button className="mini-btn" onClick={() => stepChange(-1)} aria-label="上一处">
+          <Icon name="up" size={14} /> 上一处
+        </button>
+        <button className="mini-btn" onClick={() => stepChange(1)} aria-label="下一处">
+          <Icon name="down" size={14} /> 下一处
+        </button>
+        <span className="spacer" />
+        <button
+          className="mini-btn"
+          onClick={() => go(`#/file?repo=${repoId}&path=${encodeURIComponent(path)}`)}
+        >
+          打开文件
+        </button>
+        <span className="diff-position">{navIndex >= 0 ? `${navIndex + 1}/${navFiles.length}` : ''}</span>
+      </div>
+
       {error ? <div className="error-banner"><Icon name="warning" size={15} /> {error}</div> : null}
       {!diff && !error ? <Spinner label="读取差异…" /> : null}
-      {diff ? <PatchView patch={diff.patch} binary={diff.binary} /> : null}
+      {diff ? <PatchView ref={patchRef} patch={diff.patch} binary={diff.binary} /> : null}
 
       <ConfirmSheet
         open={confirmDiscard}
