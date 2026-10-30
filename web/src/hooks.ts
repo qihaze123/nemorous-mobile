@@ -26,21 +26,38 @@ export function useRoute(): Route {
   return route
 }
 
+const DEPTH_KEY = 'nemorous.depth'
+
+function navDepth(): number {
+  const value = Number(sessionStorage.getItem(DEPTH_KEY) ?? '0')
+  return Number.isFinite(value) && value > 0 ? value : 0
+}
+
 export function go(target: string) {
   if (location.hash === target) return
-  sessionStorage.setItem('nemorous.depth', String(Number(sessionStorage.getItem('nemorous.depth') ?? '0') + 1))
+  sessionStorage.setItem(DEPTH_KEY, String(navDepth() + 1))
   location.hash = target
 }
 
 export function back(fallback = '#/changes') {
-  const depth = Number(sessionStorage.getItem('nemorous.depth') ?? '0')
-  if (depth > 0) {
-    sessionStorage.setItem('nemorous.depth', String(depth - 1))
-    history.back()
+  if (navDepth() <= 0) {
+    location.replace(fallback)
     return
   }
-  go(fallback)
+  const before = location.hash
+  history.back()
+  // A history entry that never arrives (e.g. the app was opened directly)
+  // must not trap the user on the same screen.
+  setTimeout(() => {
+    if (location.hash === before) location.replace(fallback)
+  }, 250)
 }
+
+// Browser back/forward also traverses app entries; keep the counter in sync.
+addEventListener('popstate', () => {
+  const depth = navDepth()
+  if (depth > 0) sessionStorage.setItem(DEPTH_KEY, String(depth - 1))
+})
 
 export function repoQuery(repoId: string, path: string, extra?: Record<string, string>): string {
   const q = new URLSearchParams({ repo: repoId, path })

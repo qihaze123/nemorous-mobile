@@ -890,7 +890,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
   return (
     <div className="screen">
       <header className="topbar">
-        <button className="icon-btn" onClick={() => go(`#/commit?repo=${repoId}&hash=${hash}`)} aria-label="返回提交">
+        <button className="icon-btn" onClick={() => back(`#/commit?repo=${repoId}&hash=${hash}`)} aria-label="返回提交">
           <Icon name="back" />
         </button>
         <div className="grow">
@@ -958,7 +958,7 @@ export function CommitPatchScreen({ repoId, hash }: { repoId: string; hash: stri
   return (
     <div className="screen">
       <header className="topbar">
-        <button className="icon-btn" onClick={() => go(`#/commit?repo=${repoId}&hash=${hash}`)} aria-label="返回提交">
+        <button className="icon-btn" onClick={() => back(`#/commit?repo=${repoId}&hash=${hash}`)} aria-label="返回提交">
           <Icon name="back" />
         </button>
         <div className="grow">
