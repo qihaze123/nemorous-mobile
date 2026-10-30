@@ -2247,3 +2247,12 @@ h1 {
 .mp-file-item:active {
   background: var(--surface);
 }
+
+.install-state {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--accent);
+  font-size: 13px;
+}

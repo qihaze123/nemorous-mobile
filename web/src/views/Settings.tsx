@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { BranchPreset, DevicesResponse, PairCodeResponse, PresetsResponse, Workspace } from '../types'
-import { api, clearPairing, getServer, getTheme, post, setTheme } from '../api'
+import { api, clearPairing, deviceName, getServer, getTheme, post, setTheme } from '../api'
+import { canFullscreen, canInstall, enterFullscreen, INSTALL_EVENT, installApp, isSecureContext, isStandalone } from '../pwa'
 import { Icon, SectionTitle, Spinner, ago, useToast } from '../components'
 
 const THEMES = [
@@ -14,6 +15,8 @@ export function SettingsScreen({ ws }: { ws: Workspace }) {
   const [pair, setPair] = useState<PairCodeResponse | null>(null)
   const [presets, setPresets] = useState<BranchPreset[]>([])
   const [presetName, setPresetName] = useState('')
+  const [installable, setInstallable] = useState(canInstall())
+  const [standalone, setStandalone] = useState(isStandalone())
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
@@ -43,6 +46,12 @@ export function SettingsScreen({ ws }: { ws: Workspace }) {
   useEffect(() => {
     void load()
     api<{ version: string }>('/api/health').then((h) => setVersion(h.version)).catch(() => {})
+    const syncInstall = () => {
+      setInstallable(canInstall())
+      setStandalone(isStandalone())
+    }
+    addEventListener(INSTALL_EVENT, syncInstall)
+    return () => removeEventListener(INSTALL_EVENT, syncInstall)
   }, [load])
 
   const revoke = async (id: string, current: boolean) => {
@@ -92,6 +101,23 @@ export function SettingsScreen({ ws }: { ws: Workspace }) {
     }
   }
 
+  const install = async () => {
+    try {
+      const accepted = await installApp()
+      notify(accepted ? '已开始安装' : '已取消安装', accepted ? 'ok' : 'info')
+    } catch {
+      notify('当前浏览器没有提供安装入口', 'error')
+    }
+  }
+
+  const fullscreen = async () => {
+    try {
+      await enterFullscreen()
+    } catch {
+      notify('当前浏览器不支持全屏', 'error')
+    }
+  }
+
   const changeTheme = (id: string) => {
     setThemeValue(id)
     setTheme(id)
@@ -120,6 +146,30 @@ export function SettingsScreen({ ws }: { ws: Workspace }) {
           <Icon name="refresh" />
         </button>
       </header>
+
+      <SectionTitle>安装到手机</SectionTitle>
+      <div className="panel">
+        {standalone ? (
+          <p className="install-state"><Icon name="check" size={15} /> 已作为独立应用运行</p>
+        ) : installable ? (
+          <button className="btn primary block" onClick={() => void install()}>
+            安装到手机
+          </button>
+        ) : (
+          <p className="hint">
+            {isSecureContext()
+              ? `${deviceName()}: ${deviceName().includes('iPhone') || deviceName().includes('iPad') ? 'Safari → 分享 → 添加到主屏幕' : deviceName().includes('Android') ? 'Chrome 菜单 → 安装应用 / 添加到主屏幕' : '浏览器菜单 → 安装应用 / 添加到主屏幕'}`
+              : '当前是 HTTP，浏览器不会提供安装入口。请改用 HTTPS 地址访问。'}
+          </p>
+        )}
+        <p className="hint">地址：{location.origin} · {isSecureContext() ? '安全上下文' : '非安全上下文'}</p>
+        {!standalone && canFullscreen() ? (
+          <button className="btn ghost block" onClick={() => void fullscreen()}>
+            临时全屏显示
+          </button>
+        ) : null}
+        <p className="hint">安装后会以独立窗口运行，不再显示浏览器地址栏。</p>
+      </div>
 
       <SectionTitle>配对码</SectionTitle>
       <div className="panel pair-panel">

@@ -3,10 +3,12 @@ import { createRoot } from 'react-dom/client'
 import App from './App'
 import { ToastProvider } from './components'
 import { absorbPairingLink, applyTheme, getTheme } from './api'
+import { initPWA } from './pwa'
 import './styles.css'
 
 absorbPairingLink()
 applyTheme(getTheme())
+initPWA()
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
   if (getTheme() === 'auto') applyTheme('auto')
 })
