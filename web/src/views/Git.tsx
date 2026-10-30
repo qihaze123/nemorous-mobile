@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { BranchList, Commit, CommitDetail, OpResult, Workspace } from '../types'
+import { useEffect, useMemo, useState } from 'react'
+import type { BranchList, BranchesResponse, Commit, CommitDetail, OpResult, Workspace } from '../types'
 import { api, post } from '../api'
-import { back, go } from '../hooks'
+import { back, go, useDebounced } from '../hooks'
 import { Empty, Icon, PatchView, SectionTitle, Sheet, Spinner, ago, dayKey, repoColor, timeOf, useToast } from '../components'
 
 function ResultSheet({ results, onClose }: { results: OpResult[] | null; onClose: () => void }) {
@@ -20,9 +20,41 @@ function ResultSheet({ results, onClose }: { results: OpResult[] | null; onClose
   )
 }
 
+interface CommitFilters {
+  repoId: string
+  branch: string
+  mine: boolean
+  path: string
+  days: number
+  regex: boolean
+  caseSensitive: boolean
+}
+
+const EMPTY_FILTERS: CommitFilters = {
+  repoId: '',
+  branch: '',
+  mine: false,
+  path: '',
+  days: 0,
+  regex: false,
+  caseSensitive: false,
+}
+
+function filterCount(f: CommitFilters): number {
+  return [f.repoId, f.branch, f.mine, f.path, f.days, f.regex, f.caseSensitive].filter(Boolean).length
+}
+
 export function GitScreen({ ws, refresh }: { ws: Workspace; refresh: () => Promise<void> }) {
   const [commits, setCommits] = useState<Commit[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [query, setQuery] = useState('')
+  const debouncedQuery = useDebounced(query, 250)
+  const [filters, setFilters] = useState<CommitFilters>(EMPTY_FILTERS)
+  const [draft, setDraft] = useState<CommitFilters>(EMPTY_FILTERS)
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [branches, setBranches] = useState<BranchesResponse | null>(null)
+  const [reload, setReload] = useState(0)
   const [results, setResults] = useState<OpResult[] | null>(null)
   const [repoSheet, setRepoSheet] = useState<string | null>(null)
   const [branchSheet, setBranchSheet] = useState(false)
@@ -31,19 +63,35 @@ export function GitScreen({ ws, refresh }: { ws: Workspace; refresh: () => Promi
   const [busy, setBusy] = useState(false)
   const notify = useToast()
 
-  const loadCommits = useCallback(async () => {
-    try {
-      setCommits(await api<Commit[]>('/api/commits?limit=150'))
-    } catch (err) {
-      notify(err instanceof Error ? err.message : '读取提交历史失败', 'error')
-    } finally {
-      setLoading(false)
-    }
-  }, [notify])
-
   useEffect(() => {
-    void loadCommits()
-  }, [loadCommits, ws.generatedAt])
+    let cancelled = false
+    setLoading(true)
+    const params = new URLSearchParams({ limit: '150' })
+    if (debouncedQuery.trim()) params.set('q', debouncedQuery.trim())
+    if (filters.repoId) params.append('repo', filters.repoId)
+    if (filters.branch) params.set('branch', filters.branch)
+    if (filters.mine) params.set('mine', '1')
+    if (filters.path.trim()) params.set('path', filters.path.trim())
+    if (filters.days > 0) params.set('days', String(filters.days))
+    if (filters.regex) params.set('regex', '1')
+    if (filters.caseSensitive) params.set('case', '1')
+    api<Commit[]>(`/api/commits?${params.toString()}`)
+      .then((res) => {
+        if (!cancelled) {
+          setCommits(res)
+          setError('')
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : '读取提交历史失败')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [debouncedQuery, filters, ws.generatedAt, reload])
 
   const batch = async (action: 'pull' | 'push') => {
     setBusy(true)
@@ -51,7 +99,7 @@ export function GitScreen({ ws, refresh }: { ws: Workspace; refresh: () => Promi
       const res = await post<{ results: OpResult[] }>('/api/batch', { action })
       setResults(res.results)
       await refresh()
-      await loadCommits()
+      setReload((v) => v + 1)
     } catch (err) {
       notify(err instanceof Error ? err.message : '操作失败', 'error')
     } finally {
@@ -71,6 +119,7 @@ export function GitScreen({ ws, refresh }: { ws: Workspace; refresh: () => Promi
       setResults(res.results)
       setBranchSheet(false)
       await refresh()
+      setReload((v) => v + 1)
     } catch (err) {
       notify(err instanceof Error ? err.message : '切换失败', 'error')
     } finally {
@@ -89,6 +138,20 @@ export function GitScreen({ ws, refresh }: { ws: Workspace; refresh: () => Promi
     return map
   }, [commits])
 
+  const active = filterCount(filters)
+  const repoName = ws.repos.find((r) => r.id === filters.repoId)?.name
+  const branchOptions = branches
+    ? (filters.repoId ? (branches.byRepo[filters.repoId] ?? []) : branches.branches).slice(0, 40)
+    : []
+
+  const openFilters = () => {
+    setDraft(filters)
+    setFilterOpen(true)
+    api<BranchesResponse>('/api/branches')
+      .then(setBranches)
+      .catch((err) => setError(err instanceof Error ? err.message : '读取分支失败'))
+  }
+
   return (
     <div className="screen">
       <header className="topbar">
@@ -96,7 +159,14 @@ export function GitScreen({ ws, refresh }: { ws: Workspace; refresh: () => Promi
           <div className="eyebrow">提交</div>
           <h1>统一提交森林</h1>
         </div>
-        <button className="icon-btn" onClick={() => void refresh().then(loadCommits)} aria-label="刷新">
+        <button
+          className="icon-btn"
+          onClick={() => {
+            void refresh()
+            setReload((v) => v + 1)
+          }}
+          aria-label="刷新"
+        >
           <Icon name="refresh" />
         </button>
       </header>
@@ -112,6 +182,40 @@ export function GitScreen({ ws, refresh }: { ws: Workspace; refresh: () => Promi
           <Icon name="git" size={16} /> 统一切分支
         </button>
       </div>
+
+      <div className="commit-search search-box">
+        <Icon name="search" size={18} />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="搜索提交信息 / 哈希 / 作者…"
+          autoCapitalize="off"
+          autoCorrect="off"
+          spellCheck={false}
+        />
+        {query ? (
+          <button className="icon-btn tiny" onClick={() => setQuery('')} aria-label="清空搜索">
+            <Icon name="close" size={16} />
+          </button>
+        ) : null}
+        <button className={`icon-btn tiny filter-toggle ${active ? 'on' : ''}`} onClick={openFilters} aria-label="筛选提交">
+          <Icon name="filter" size={17} />
+          {active ? <em>{active}</em> : null}
+        </button>
+      </div>
+
+      {active ? (
+        <div className="active-filters">
+          {repoName ? <span className="chip on">{repoName}</span> : null}
+          {filters.branch ? <span className="chip on">{filters.branch}</span> : null}
+          {filters.mine ? <span className="chip on">只看我</span> : null}
+          {filters.path ? <span className="chip on">路径 {filters.path}</span> : null}
+          {filters.days ? <span className="chip on">最近 {filters.days} 天</span> : null}
+          {filters.regex ? <span className="chip on">正则</span> : null}
+          {filters.caseSensitive ? <span className="chip on">区分大小写</span> : null}
+          <button className="chip clear" onClick={() => setFilters(EMPTY_FILTERS)}>清除</button>
+        </div>
+      ) : null}
 
       <SectionTitle>仓库</SectionTitle>
       <div className="repo-list">
@@ -133,9 +237,18 @@ export function GitScreen({ ws, refresh }: { ws: Workspace; refresh: () => Promi
         ))}
       </div>
 
-      <SectionTitle>{loading ? '提交历史' : `最近 ${commits.length} 次提交`}</SectionTitle>
+      <SectionTitle>
+        {loading ? '提交历史' : active || debouncedQuery.trim() ? `匹配 ${commits.length} 次提交` : `最近 ${commits.length} 次提交`}
+      </SectionTitle>
+      {error ? <div className="error-banner"><Icon name="warning" size={15} /> {error}</div> : null}
       {loading ? <Spinner label="汇总各仓库提交…" /> : null}
-      {!loading && commits.length === 0 ? <Empty title="还没有提交" icon="git" /> : null}
+      {!loading && commits.length === 0 ? (
+        <Empty
+          title={active || debouncedQuery.trim() ? '没有匹配的提交' : '还没有提交'}
+          hint={active || debouncedQuery.trim() ? '试试更短的关键词，或清除部分筛选条件。' : undefined}
+          icon="git"
+        />
+      ) : null}
       {grouped.map((group) => (
         <section className="commit-day" key={group.day}>
           <div className="commit-day-title">{group.day}</div>
@@ -157,6 +270,107 @@ export function GitScreen({ ws, refresh }: { ws: Workspace; refresh: () => Promi
           ))}
         </section>
       ))}
+
+      <Sheet
+        open={filterOpen}
+        title="筛选提交"
+        onClose={() => setFilterOpen(false)}
+        footer={
+          <>
+            <button
+              className="btn ghost"
+              onClick={() => {
+                setDraft(EMPTY_FILTERS)
+              }}
+            >
+              重置
+            </button>
+            <button
+              className="btn primary"
+              onClick={() => {
+                setFilters(draft)
+                setFilterOpen(false)
+              }}
+            >
+              应用
+            </button>
+          </>
+        }
+      >
+        <SectionTitle>仓库</SectionTitle>
+        <div className="repo-chips wrap">
+          <button className={`chip ${draft.repoId === '' ? 'on' : ''}`} onClick={() => setDraft({ ...draft, repoId: '', branch: '' })}>
+            全部仓库
+          </button>
+          {ws.repos.map((repo) => (
+            <button
+              key={repo.id}
+              className={`chip ${draft.repoId === repo.id ? 'on' : ''}`}
+              onClick={() => setDraft({ ...draft, repoId: repo.id, branch: '' })}
+            >
+              {repo.name}
+            </button>
+          ))}
+        </div>
+
+        <SectionTitle>分支</SectionTitle>
+        <div className="repo-chips wrap">
+          <button className={`chip ${draft.branch === '' ? 'on' : ''}`} onClick={() => setDraft({ ...draft, branch: '' })}>
+            全部分支
+          </button>
+          {branchOptions.map((branch) => (
+            <button
+              key={branch}
+              className={`chip ${draft.branch === branch ? 'on' : ''}`}
+              onClick={() => setDraft({ ...draft, branch })}
+            >
+              {branch}
+            </button>
+          ))}
+          {!branches ? <span className="hint">读取分支…</span> : null}
+        </div>
+
+        <label className="check-row">
+          <input type="checkbox" checked={draft.mine} onChange={(e) => setDraft({ ...draft, mine: e.target.checked })} />
+          <span>只看我的提交（按仓库 user.email）</span>
+        </label>
+
+        <label className="field">
+          <span>路径（可选，仓库相对路径或目录）</span>
+          <input
+            className="text-input"
+            value={draft.path}
+            onChange={(e) => setDraft({ ...draft, path: e.target.value })}
+            placeholder="例如 sms-api/src/main/java"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+          />
+        </label>
+
+        <SectionTitle>时间</SectionTitle>
+        <div className="segmented">
+          {[{ v: 0, label: '全部' }, { v: 7, label: '7 天' }, { v: 30, label: '30 天' }, { v: 90, label: '90 天' }].map((item) => (
+            <button
+              key={item.v}
+              className={draft.days === item.v ? 'on' : ''}
+              onClick={() => setDraft({ ...draft, days: item.v })}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="filter-row">
+          <button className={`chip ${draft.regex ? 'on' : ''}`} onClick={() => setDraft({ ...draft, regex: !draft.regex })}>
+            .* 正则
+          </button>
+          <button className={`chip ${draft.caseSensitive ? 'on' : ''}`} onClick={() => setDraft({ ...draft, caseSensitive: !draft.caseSensitive })}>
+            Aa 区分大小写
+          </button>
+        </div>
+        <p className="hint">文本匹配提交信息、完整/短哈希与作者；分支和路径由 Git 在历史中筛选，最多扫描每仓 1000 条。</p>
+      </Sheet>
 
       <RepoSheet
         repoId={repoSheet}

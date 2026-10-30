@@ -74,6 +74,8 @@
 ### 提交
 
 - 所有仓库的提交按时间合并成“统一提交森林”，按日分组
+- 提交搜索：提交信息 / 完整或短哈希 / 作者，含 RE2 正则与大小写开关
+- 提交筛选：仓库、分支、只看我的提交（按仓库 `user.email`）、路径、最近 7/30/90 天；分支与路径下推到 Git 历史
 - 提交详情：作者、时间、哈希、变更文件、完整补丁
 - 全部拉取 / 全部推送 / 所有仓库统一切分支（可新建）
 - 单仓分支列表、切换、新建、拉取、推送、刷新
@@ -179,7 +181,8 @@ npm run build                       # 类型检查 + 生产构建
 | GET | `/api/repos/{id}/file?path=&rev=` | 工作区或指定版本文件内容 |
 | GET | `/api/repos/{id}/commits?limit=` | 单仓提交 |
 | GET | `/api/repos/{id}/commits/{hash}` | 提交详情与补丁 |
-| GET | `/api/commits?limit=` | 全仓合并提交森林 |
+| GET | `/api/commits?limit=&q=&regex=&case=&repo=&branch=&author=&mine=&path=&days=` | 全仓合并提交森林，支持搜索与筛选 |
+| GET | `/api/branches` | 各仓库本地分支（提交筛选用） |
 | GET | `/api/search?q=&mode=files\|content&regex=&case=&repo=` | 跨仓搜索 |
 | POST | `/api/repos/{id}/stage` · `unstage` · `discard` | 文件操作 |
 | POST | `/api/repos/{id}/commit` | 单仓提交 |
@@ -220,6 +223,7 @@ npm run build                       # 类型检查 + 生产构建
 
 - **不提供手机端编辑保存**：代码查看器只读；行级微调、终端、AI 合并、`mani` 任务仍留在桌面端，手机键盘不适合这些操作。
 - 文件查看上限 1 MiB、文件树 20000 条、高亮 4000 行（超出仍可纯文本查看）。
+- 提交筛选最多扫描每仓 1000 条历史后再合并，避免手机端一次扫描全部历史。
 - 拉取只使用 `--ff-only`，不做桌面端的 stash / pop 自动恢复。
 - **Web Push 尚未实现**：需要 HTTPS（或 localhost）+ 已安装的 PWA + VAPID；当前只提供 SSE 实时刷新，手机在后台时不会收到通知。
 - **Capacitor 原生壳尚未打包**：同一套 `web/dist` 可以包成 iOS / Android 应用，但需要 Xcode 签名、Android SDK 与商店配置；仓库目前只交付 PWA。

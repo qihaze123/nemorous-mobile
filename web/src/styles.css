@@ -1752,3 +1752,53 @@ h1 {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ---------- commit search / filters ---------- */
+
+.commit-search {
+  margin-top: 2px;
+}
+
+.filter-toggle {
+  position: relative;
+  color: var(--muted);
+}
+
+.filter-toggle.on {
+  color: var(--accent);
+}
+
+.filter-toggle em {
+  position: absolute;
+  top: 2px;
+  right: 0;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+}
+
+.active-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+
+.chip.clear {
+  border-style: dashed;
+  color: var(--muted);
+}
+
+.repo-chips.wrap {
+  flex-wrap: wrap;
+  overflow: visible;
+  padding-bottom: 0;
+}

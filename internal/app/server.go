@@ -31,6 +31,7 @@ func (a *App) APIHandler() http.Handler {
 	mux.HandleFunc("GET /api/repos/{id}/files", a.authed(a.handleFiles))
 	mux.HandleFunc("GET /api/repos/{id}/file", a.authed(a.handleFile))
 	mux.HandleFunc("GET /api/commits", a.authed(a.handleAllCommits))
+	mux.HandleFunc("GET /api/branches", a.authed(a.handleBranches))
 	mux.HandleFunc("GET /api/search", a.authed(a.handleSearch))
 	mux.HandleFunc("POST /api/batch", a.authed(a.handleBatch))
 	mux.HandleFunc("POST /api/batch/commit", a.authed(a.handleBatchCommit))
@@ -221,14 +222,46 @@ func (a *App) handleCheckout(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, res)
 }
 
+func logFilterFromQuery(r *http.Request) LogFilter {
+	q := r.URL.Query()
+	limit, _ := strconv.Atoi(q.Get("limit"))
+	days, _ := strconv.Atoi(q.Get("days"))
+	return LogFilter{
+		Limit:         limit,
+		Repos:         q["repo"],
+		Query:         q.Get("q"),
+		Regex:         q.Get("regex") == "1",
+		CaseSensitive: q.Get("case") == "1",
+		Branch:        q.Get("branch"),
+		Author:        q.Get("author"),
+		Mine:          q.Get("mine") == "1",
+		Path:          q.Get("path"),
+		Days:          days,
+	}
+}
+
 func (a *App) handleAllCommits(w http.ResponseWriter, r *http.Request) {
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	writeJSON(w, http.StatusOK, a.Logs(r.Context(), limit))
+	commits, err := a.Logs(r.Context(), logFilterFromQuery(r))
+	if err != nil {
+		a.fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, commits)
 }
 
 func (a *App) handleCommits(w http.ResponseWriter, r *http.Request) {
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	writeJSON(w, http.StatusOK, a.Logs(r.Context(), limit))
+	f := logFilterFromQuery(r)
+	f.Repos = []string{r.PathValue("id")}
+	commits, err := a.Logs(r.Context(), f)
+	if err != nil {
+		a.fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, commits)
+}
+
+func (a *App) handleBranches(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, a.Branches(r.Context()))
 }
 
 func (a *App) handleCommitDetail(w http.ResponseWriter, r *http.Request) {

@@ -40,13 +40,14 @@ type FileChange struct {
 
 // Commit is a log entry, optionally attributed to a repository.
 type Commit struct {
-	Hash     string `json:"hash"`
-	Short    string `json:"short"`
-	Subject  string `json:"subject"`
-	Author   string `json:"author"`
-	Time     int64  `json:"time"`
-	RepoID   string `json:"repoId,omitempty"`
-	RepoName string `json:"repoName,omitempty"`
+	Hash        string `json:"hash"`
+	Short       string `json:"short"`
+	Subject     string `json:"subject"`
+	Author      string `json:"author"`
+	AuthorEmail string `json:"authorEmail,omitempty"`
+	Time        int64  `json:"time"`
+	RepoID      string `json:"repoId,omitempty"`
+	RepoName    string `json:"repoName,omitempty"`
 }
 
 // RepoState is the live snapshot rendered by the mobile client.
@@ -186,4 +187,10 @@ type PairCodeResponse struct {
 // PairResponse is returned by POST /api/pair.
 type PairResponse struct {
 	Device Device `json:"device"`
+}
+
+// BranchesResponse is returned by GET /api/branches.
+type BranchesResponse struct {
+	Branches []string            `json:"branches"`
+	ByRepo   map[string][]string `json:"byRepo"`
 }

@@ -29,6 +29,7 @@ export interface Commit {
   short: string
   subject: string
   author: string
+  authorEmail?: string
   time: number
   repoId?: string
   repoName?: string
@@ -153,5 +154,10 @@ export interface PairCodeResponse {
 
 export interface PairResponse {
   device: Device
+}
+
+export interface BranchesResponse {
+  branches: string[]
+  byRepo: Record<string, string[]>
 }
 

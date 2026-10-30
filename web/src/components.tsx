@@ -15,6 +15,7 @@ const iconPaths: Record<string, string[]> = {
   plus: ['M12 5v14M5 12h14'],
   minus: ['M5 12h14'],
   search: ['M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z', 'M20 20l-4-4'],
+  filter: ['M4 5h16l-6 7v6l-4 2v-8Z'],
   close: ['M6 6l12 12M18 6L6 18'],
   folder: ['M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z'],
   file: ['M6 3h8l4 4v14H6Z', 'M14 3v5h4'],

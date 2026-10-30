@@ -33,6 +33,21 @@ func run(t *testing.T, dir string, args ...string) string {
 	return string(out)
 }
 
+func runAs(t *testing.T, dir, name, email string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME="+name, "GIT_AUTHOR_EMAIL="+email,
+		"GIT_COMMITTER_NAME="+name, "GIT_COMMITTER_EMAIL="+email,
+		"GIT_TERMINAL_PROMPT=0",
+	)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+	return string(out)
+}
+
 func writeFile(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -262,7 +277,10 @@ func TestFilesSearchAndCommitDetail(t *testing.T) {
 		t.Fatalf("file search = %+v", files)
 	}
 
-	last := app.Logs(ctx, 10)
+	last, err := app.Logs(ctx, LogFilter{Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(last) == 0 {
 		t.Fatal("no commits")
 	}
@@ -645,5 +663,67 @@ func TestEventsStreamInvalidatesAfterMutation(t *testing.T) {
 		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("timed out waiting for invalidate")
+	}
+}
+
+func TestCommitFilters(t *testing.T) {
+	app, _ := newTestApp(t)
+	ctx := context.Background()
+	a := findRepo(t, app.Workspace(ctx), "repo-a")
+	writeFile(t, filepath.Join(a.Path, "billing.txt"), "export\n")
+	run(t, a.Path, "add", "billing.txt")
+	runAs(t, a.Path, "Alice", "alice@example.com", "commit", "-qm", "feat: billing export")
+	writeFile(t, filepath.Join(a.Path, "timeout.txt"), "timeout\n")
+	run(t, a.Path, "add", "timeout.txt")
+	runAs(t, a.Path, "Bob", "bob@example.com", "commit", "-qm", "fix: request timeout")
+
+	all, err := app.Logs(ctx, LogFilter{Limit: 50, Repos: []string{a.ID}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != 3 {
+		t.Fatalf("all = %d, want 3", len(all))
+	}
+	byQuery, err := app.Logs(ctx, LogFilter{Limit: 50, Query: "BILLING"})
+	if err != nil || len(byQuery) != 1 || byQuery[0].Subject != "feat: billing export" {
+		t.Fatalf("query = %+v err=%v", byQuery, err)
+	}
+	byHash, err := app.Logs(ctx, LogFilter{Limit: 50, Query: all[0].Short[:6]})
+	if err != nil || len(byHash) == 0 {
+		t.Fatalf("hash query = %+v err=%v", byHash, err)
+	}
+	byRegex, err := app.Logs(ctx, LogFilter{Limit: 50, Query: "^(feat|fix):", Regex: true})
+	if err != nil || len(byRegex) != 2 {
+		t.Fatalf("regex = %+v err=%v", byRegex, err)
+	}
+	if _, err := app.Logs(ctx, LogFilter{Regex: true, Query: "(["}); err == nil {
+		t.Fatal("invalid regex accepted")
+	}
+	byAuthor, err := app.Logs(ctx, LogFilter{Limit: 50, Author: "alice"})
+	if err != nil || len(byAuthor) != 1 {
+		t.Fatalf("author = %+v err=%v all=%+v", byAuthor, err, all)
+	}
+	mine, err := app.Logs(ctx, LogFilter{Limit: 50, Repos: []string{a.ID}, Mine: true})
+	if err != nil || len(mine) != 1 {
+		t.Fatalf("mine = %+v err=%v", mine, err)
+	}
+	byPath, err := app.Logs(ctx, LogFilter{Limit: 50, Repos: []string{a.ID}, Path: "docs"})
+	if err != nil || len(byPath) != 1 || byPath[0].Subject != "initial" {
+		t.Fatalf("path = %+v err=%v", byPath, err)
+	}
+	byDays, err := app.Logs(ctx, LogFilter{Limit: 50, Days: 1})
+	if err != nil || len(byDays) == 0 {
+		t.Fatalf("days = %+v err=%v", byDays, err)
+	}
+	byBranch, err := app.Logs(ctx, LogFilter{Limit: 50, Repos: []string{a.ID}, Branch: "main"})
+	if err != nil || len(byBranch) != 3 {
+		t.Fatalf("branch = %+v err=%v", byBranch, err)
+	}
+	if _, err := app.Logs(ctx, LogFilter{Branch: "bad..branch"}); err == nil {
+		t.Fatal("invalid branch accepted")
+	}
+	branches := app.Branches(ctx)
+	if len(branches.Branches) == 0 || len(branches.ByRepo[a.ID]) == 0 {
+		t.Fatalf("branches = %+v", branches)
 	}
 }

@@ -600,35 +600,184 @@ func (a *App) BatchCommit(ctx context.Context, targets []CommitTarget, message s
 	}), nil
 }
 
-// Logs returns the newest commits of every repository merged by time.
-func (a *App) Logs(ctx context.Context, limit int) []Commit {
-	if limit <= 0 || limit > 200 {
-		limit = 100
+// LogFilter narrows the merged commit list. Query matches subject, hash and
+// author; Regex switches it to RE2; the remaining fields use git's own pathspec
+// and branch selection.
+type LogFilter struct {
+	Limit         int
+	Repos         []string
+	Query         string
+	Regex         bool
+	CaseSensitive bool
+	Branch        string
+	Author        string
+	Mine          bool
+	Path          string
+	Days          int
+}
+
+// Branches lists local branches across the workspace for the commit filter.
+func (a *App) Branches(ctx context.Context) BranchesResponse {
+	byRepo := map[string][]string{}
+	union := map[string]bool{}
+	for _, repo := range a.repos {
+		out, err := gitOK(ctx, repo.Path, inspectTimeout,
+			"for-each-ref", "--sort=-committerdate", "--format=%(refname:short)", "refs/heads")
+		if err != nil {
+			continue
+		}
+		seen := map[string]bool{}
+		var branches []string
+		for _, line := range strings.Split(out, "\n") {
+			name := strings.TrimSpace(line)
+			if name == "" || seen[name] {
+				continue
+			}
+			seen[name] = true
+			branches = append(branches, name)
+			union[name] = true
+		}
+		byRepo[repo.ID] = branches
 	}
-	per := limit
+	var all []string
+	for name := range union {
+		all = append(all, name)
+	}
+	sort.Strings(all)
+	return BranchesResponse{Branches: all, ByRepo: byRepo}
+}
+
+// Logs returns the newest commits of every selected repository merged by time.
+// Query/author/time filters run in Go over up to 1000 commits per repository;
+// branch and path filters are pushed into git so older history stays reachable.
+func (a *App) Logs(ctx context.Context, f LogFilter) ([]Commit, error) {
+	limit := f.Limit
+	if limit <= 0 || limit > 500 {
+		limit = 150
+	}
+	var repos []Repo
+	if len(f.Repos) == 0 {
+		repos = a.repos
+	} else {
+		for _, id := range f.Repos {
+			repo, err := a.repo(id)
+			if err != nil {
+				return nil, err
+			}
+			repos = append(repos, repo)
+		}
+	}
+	if f.Branch != "" {
+		if err := validBranch(f.Branch); err != nil {
+			return nil, err
+		}
+	}
+	path := ""
+	if f.Path != "" {
+		clean, err := safeRel(f.Path)
+		if err != nil {
+			return nil, err
+		}
+		path = clean
+	}
+	query := strings.TrimSpace(f.Query)
+	var re *regexp.Regexp
+	if f.Regex && query != "" {
+		prefix := ""
+		if !f.CaseSensitive {
+			prefix = "(?i)"
+		}
+		compiled, err := regexp.Compile(prefix + query)
+		if err != nil {
+			return nil, errors.New("正则表达式无效")
+		}
+		re = compiled
+	}
+	lowerQuery := strings.ToLower(query)
+	authorQuery := strings.ToLower(strings.TrimSpace(f.Author))
+	fetchN := limit
+	if query != "" || authorQuery != "" || f.Mine || f.Days > 0 {
+		fetchN = 1000
+		if fetchN < limit {
+			fetchN = limit
+		}
+	}
+	cutoff := int64(0)
+	if f.Days > 0 {
+		cutoff = time.Now().Add(-time.Duration(f.Days) * 24 * time.Hour).Unix()
+	}
+	matches := func(c Commit, identity string) bool {
+		if cutoff > 0 && c.Time < cutoff {
+			return false
+		}
+		if f.Mine {
+			if identity == "" {
+				return false
+			}
+			haystack := strings.ToLower(c.Author + " " + c.AuthorEmail)
+			if !strings.Contains(haystack, strings.ToLower(identity)) {
+				return false
+			}
+		}
+		if authorQuery != "" && !strings.Contains(strings.ToLower(c.Author), authorQuery) {
+			return false
+		}
+		if query == "" {
+			return true
+		}
+		target := c.Subject + "\n" + c.Hash + "\n" + c.Short + "\n" + c.Author + "\n" + c.AuthorEmail
+		if re != nil {
+			return re.MatchString(target)
+		}
+		if f.CaseSensitive {
+			return strings.Contains(target, query)
+		}
+		return strings.Contains(strings.ToLower(target), lowerQuery)
+	}
+
 	var mu sync.Mutex
 	var all []Commit
 	var wg sync.WaitGroup
-	for _, repo := range a.repos {
+	for _, repo := range repos {
 		wg.Add(1)
 		go func(repo Repo) {
 			defer wg.Done()
-			out, err := gitOK(ctx, repo.Path, inspectTimeout,
-				"log", "-n", strconv.Itoa(per), "--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%at")
+			identity := ""
+			if f.Mine {
+				identity = repoIdentity(ctx, repo.Path)
+				if identity == "" {
+					return
+				}
+			}
+			args := []string{"log", "-n", strconv.Itoa(fetchN),
+				"--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%ae%x1f%at"}
+			if f.Branch != "" {
+				args = append(args, f.Branch)
+			}
+			if path != "" {
+				args = append(args, "--", path)
+			}
+			out, err := gitOK(ctx, repo.Path, inspectTimeout, args...)
 			if err != nil {
 				return
 			}
 			var commits []Commit
 			for _, line := range strings.Split(out, "\n") {
 				parts := strings.Split(line, "\x1f")
-				if len(parts) < 5 {
+				if len(parts) < 6 {
 					continue
 				}
-				ts, _ := strconv.ParseInt(parts[4], 10, 64)
-				commits = append(commits, Commit{
-					Hash: parts[0], Short: parts[1], Subject: parts[2], Author: parts[3], Time: ts,
+				ts, _ := strconv.ParseInt(parts[5], 10, 64)
+				c := Commit{
+					Hash: parts[0], Short: parts[1], Subject: parts[2], Author: parts[3], AuthorEmail: parts[4], Time: ts,
 					RepoID: repo.ID, RepoName: repo.Name,
-				})
+				}
+				if matches(c, identity) {
+					commits = append(commits, c)
+				}
+				if len(commits) >= limit {
+					break
+				}
 			}
 			mu.Lock()
 			all = append(all, commits...)
@@ -643,7 +792,19 @@ func (a *App) Logs(ctx context.Context, limit int) []Commit {
 	if all == nil {
 		all = []Commit{}
 	}
-	return all
+	return all, nil
+}
+
+func repoIdentity(ctx context.Context, repoPath string) string {
+	if out, err := gitOK(ctx, repoPath, inspectTimeout, "config", "user.email"); err == nil {
+		if email := strings.TrimSpace(out); email != "" {
+			return email
+		}
+	}
+	if out, err := gitOK(ctx, repoPath, inspectTimeout, "config", "user.name"); err == nil {
+		return strings.TrimSpace(out)
+	}
+	return ""
 }
 
 func (a *App) CommitDetail(ctx context.Context, id, hash string) (CommitDetail, error) {
