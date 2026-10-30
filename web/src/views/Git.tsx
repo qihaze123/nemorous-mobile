@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import type { BranchList, BranchPreset, BranchesResponse, Commit, CommitDetail, CommitFile, OpResult, PresetsResponse, UndoResult, Workspace } from '../types'
 import { api, post } from '../api'
 import { back, go, useDebounced } from '../hooks'
-import { ConfirmSheet, Empty, Icon, PatchView, SectionTitle, Sheet, Spinner, ago, dayKey, repoColor, timeOf, useToast, type PatchViewHandle } from '../components'
+import { ConfirmSheet, DiffNavBar, Empty, Icon, MultiPatchView, PatchView, SectionTitle, Sheet, Spinner, ago, dayKey, repoColor, timeOf, useToast, type PatchViewHandle } from '../components'
 
 function ResultSheet({ results, onClose }: { results: OpResult[] | null; onClose: () => void }) {
   return (
@@ -847,6 +847,8 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
   const [detail, setDetail] = useState<CommitDetail | null>(null)
   const [error, setError] = useState('')
   const patchRef = useRef<PatchViewHandle>(null)
+  const boundary = useRef<{ direction: 1 | -1; at: number } | null>(null)
+  const notify = useToast()
   useEffect(() => {
     setDetail(null)
     api<CommitDetail>(`/api/repos/${repoId}/commits/${hash}`)
@@ -867,8 +869,18 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
   }
 
   const step = (direction: 1 | -1) => {
-    if (patchRef.current?.scrollToHunk(direction)) return
-    jump(direction)
+    if (patchRef.current?.scrollToHunk(direction)) {
+      boundary.current = null
+      return
+    }
+    const now = Date.now()
+    if (boundary.current?.direction === direction && now - boundary.current.at < 1600) {
+      boundary.current = null
+      jump(direction)
+      return
+    }
+    boundary.current = { direction, at: now }
+    notify(direction > 0 ? '已到文件末尾，再按一次进入下一个文件' : '已到文件开头，再按一次进入上一个文件', 'info')
   }
 
   useEffect(() => {
@@ -917,22 +929,16 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
               {(file?.deleted ?? 0) > 0 ? <em className="minus">−{file?.deleted}</em> : null}
             </span>
           </div>
-          <div className="diff-nav-row">
-            <button className="mini-btn" onClick={() => step(-1)} aria-label="上一处">
-              <Icon name="up" size={14} /> 上一处
-            </button>
-            <button className="mini-btn" onClick={() => step(1)} aria-label="下一处">
-              <Icon name="down" size={14} /> 下一处
-            </button>
-            <span className="spacer" />
-            <button
-              className="mini-btn"
-              onClick={() => go(`#/file?repo=${repoId}&path=${encodeURIComponent(path)}&rev=${hash}`)}
-            >
-              查看此版本
-            </button>
-            <span className="diff-position">{index >= 0 ? `${index + 1}/${detail.files.length}` : ''}</span>
-          </div>
+          <DiffNavBar
+            position={index >= 0 ? `${index + 1}/${detail.files.length}` : ''}
+            canPrevFile={index > 0}
+            canNextFile={index >= 0 && index < detail.files.length - 1}
+            onPrevChange={() => step(-1)}
+            onNextChange={() => step(1)}
+            onPrevFile={() => jump(-1)}
+            onNextFile={() => jump(1)}
+            onOpen={() => go(`#/file?repo=${repoId}&path=${encodeURIComponent(path)}&rev=${hash}`)}
+          />
           <PatchView ref={patchRef} patch={chunks.get(path) ?? ''} />
         </>
       ) : null}
@@ -952,8 +958,13 @@ export function CommitPatchScreen({ repoId, hash }: { repoId: string; hash: stri
       .catch((err) => setError(err instanceof Error ? err.message : '读取提交失败'))
   }, [repoId, hash])
 
+  const chunks = useMemo(() => splitPatch(detail?.patch ?? ''), [detail])
   const added = detail?.files.reduce((n, f) => n + f.added, 0) ?? 0
   const deleted = detail?.files.reduce((n, f) => n + f.deleted, 0) ?? 0
+  const files = useMemo(
+    () => (detail?.files ?? []).map((f) => ({ ...f, patch: chunks.get(f.path) ?? '' })),
+    [detail, chunks],
+  )
 
   return (
     <div className="screen">
@@ -993,7 +1004,7 @@ export function CommitPatchScreen({ repoId, hash }: { repoId: string; hash: stri
             <span className="grow" />
             <code>{detail.commit.short}</code>
           </div>
-          <PatchView patch={detail.patch} />
+          <MultiPatchView key={detail.commit.hash} files={files} />
         </>
       ) : null}
       <div className="screen-bottom-space" />

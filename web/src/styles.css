@@ -2099,3 +2099,151 @@ h1 {
 .commit-patch-meta .grow {
   flex: 1;
 }
+
+.nav-icon {
+  width: 30px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--fg);
+}
+
+.nav-icon:disabled {
+  opacity: 0.35;
+}
+
+.diff-nav-row .diff-position {
+  margin-left: auto;
+}
+
+.multi-patch {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mp-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+}
+
+.mp-bar .mini-btn {
+  flex: none;
+}
+
+.mp-current {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--muted);
+}
+
+.mp-viewport {
+  max-height: 70vh;
+  overflow: auto;
+  border: 1px solid var(--border-soft);
+  border-radius: 9px;
+  background: var(--bg-elev);
+}
+
+.mp-inner {
+  position: relative;
+  min-width: 100%;
+}
+
+.mp-file-row {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border: 0;
+  border-top: 1px solid var(--border-soft);
+  background: var(--surface);
+  color: var(--fg);
+  text-align: left;
+  font-size: 12px;
+}
+
+.mp-file-row:active {
+  background: var(--surface-2);
+}
+
+.mp-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+}
+
+.mp-dir {
+  color: var(--muted);
+}
+
+.mp-file-row .file-stats {
+  font-size: 9.5px;
+}
+
+.mp-file-row svg {
+  flex: none;
+  color: var(--muted);
+}
+
+.mp-current {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  text-align: left;
+}
+
+.mp-current span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mp-current svg {
+  flex: none;
+}
+
+.mp-file-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.mp-file-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-height: 34px;
+  padding: 4px 2px;
+  border: 0;
+  border-bottom: 1px solid var(--border-soft);
+  background: none;
+  color: var(--fg);
+  text-align: left;
+}
+
+.mp-file-item:active {
+  background: var(--surface);
+}

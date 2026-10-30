@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DiffResult, Workspace } from '../types'
 import { post, api } from '../api'
 import { back, go } from '../hooks'
-import { ConfirmSheet, Icon, PatchView, Spinner, StatusLetter, useToast, type PatchViewHandle } from '../components'
+import { ConfirmSheet, DiffNavBar, Icon, PatchView, Spinner, StatusLetter, useToast, type PatchViewHandle } from '../components'
 
 export function DiffScreen({
   ws,
@@ -23,6 +23,7 @@ export function DiffScreen({
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [version, setVersion] = useState(0)
   const patchRef = useRef<PatchViewHandle>(null)
+  const boundary = useRef<{ direction: 1 | -1; at: number } | null>(null)
   const notify = useToast()
 
   const repo = ws.repos.find((r) => r.id === repoId)
@@ -47,8 +48,18 @@ export function DiffScreen({
   }
 
   const stepChange = (direction: 1 | -1) => {
-    if (patchRef.current?.scrollToHunk(direction)) return
-    jumpFile(direction)
+    if (patchRef.current?.scrollToHunk(direction)) {
+      boundary.current = null
+      return
+    }
+    const now = Date.now()
+    if (boundary.current?.direction === direction && now - boundary.current.at < 1600) {
+      boundary.current = null
+      jumpFile(direction)
+      return
+    }
+    boundary.current = { direction, at: now }
+    notify(direction > 0 ? '已到文件末尾，再按一次进入下一个文件' : '已到文件开头，再按一次进入上一个文件', 'info')
   }
 
   useEffect(() => {
@@ -159,22 +170,16 @@ export function DiffScreen({
         <button className="mini-btn danger" disabled={!!busy} onClick={() => setConfirmDiscard(true)}>丢弃</button>
       </div>
 
-      <div className="diff-nav-row">
-        <button className="mini-btn" onClick={() => stepChange(-1)} aria-label="上一处">
-          <Icon name="up" size={14} /> 上一处
-        </button>
-        <button className="mini-btn" onClick={() => stepChange(1)} aria-label="下一处">
-          <Icon name="down" size={14} /> 下一处
-        </button>
-        <span className="spacer" />
-        <button
-          className="mini-btn"
-          onClick={() => go(`#/file?repo=${repoId}&path=${encodeURIComponent(path)}`)}
-        >
-          打开文件
-        </button>
-        <span className="diff-position">{navIndex >= 0 ? `${navIndex + 1}/${navFiles.length}` : ''}</span>
-      </div>
+      <DiffNavBar
+        position={navIndex >= 0 ? `${navIndex + 1}/${navFiles.length}` : ''}
+        canPrevFile={navIndex > 0}
+        canNextFile={navIndex >= 0 && navIndex < navFiles.length - 1}
+        onPrevChange={() => stepChange(-1)}
+        onNextChange={() => stepChange(1)}
+        onPrevFile={() => jumpFile(-1)}
+        onNextFile={() => jumpFile(1)}
+        onOpen={() => go(`#/file?repo=${repoId}&path=${encodeURIComponent(path)}`)}
+      />
 
       {error ? <div className="error-banner"><Icon name="warning" size={15} /> {error}</div> : null}
       {!diff && !error ? <Spinner label="读取差异…" /> : null}

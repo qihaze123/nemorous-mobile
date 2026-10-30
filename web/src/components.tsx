@@ -22,6 +22,9 @@ const iconPaths: Record<string, string[]> = {
   chevron: ['M9 6l6 6-6 6'],
   down: ['M6 9l6 6 6-6'],
   up: ['M18 15l-6-6-6 6'],
+  left: ['M15 18l-6-6 6-6'],
+  right: ['M9 6l6 6-6 6'],
+  jump: ['M14 4h6v6', 'M20 4 9 15'],
   copy: ['M9 9h11v11H9Z', 'M5 15H4V4h11v1'],
   warning: ['M12 4 2 20h20Z', 'M12 10v4M12 17h.01'],
   branch: ['M6 3v12', 'M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z', 'M18 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z', 'M6 15c0-3 6-4 12-5'],
@@ -373,6 +376,240 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
     </div>
   )
 })
+
+export function DiffNavBar({
+  position,
+  canPrevFile,
+  canNextFile,
+  onPrevChange,
+  onNextChange,
+  onPrevFile,
+  onNextFile,
+  onOpen,
+}: {
+  position: string
+  canPrevFile: boolean
+  canNextFile: boolean
+  onPrevChange: () => void
+  onNextChange: () => void
+  onPrevFile: () => void
+  onNextFile: () => void
+  onOpen: () => void
+}) {
+  return (
+    <div className="diff-nav-row">
+      <button className="nav-icon" onClick={onPrevChange} title="上一处改动" aria-label="上一处改动">
+        <Icon name="up" size={15} />
+      </button>
+      <button className="nav-icon" onClick={onNextChange} title="下一处改动" aria-label="下一处改动">
+        <Icon name="down" size={15} />
+      </button>
+      <button className="nav-icon" onClick={onOpen} title="打开文件" aria-label="打开文件">
+        <Icon name="jump" size={15} />
+      </button>
+      <button className="nav-icon" onClick={onPrevFile} disabled={!canPrevFile} title="上一个文件" aria-label="上一个文件">
+        <Icon name="left" size={15} />
+      </button>
+      <button className="nav-icon" onClick={onNextFile} disabled={!canNextFile} title="下一个文件" aria-label="下一个文件">
+        <Icon name="right" size={15} />
+      </button>
+      <span className="diff-position">{position}</span>
+    </div>
+  )
+}
+
+export interface MultiPatchFile {
+  path: string
+  status: string
+  added: number
+  deleted: number
+  patch: string
+}
+
+type MultiRow =
+  | { kind: 'file'; file: MultiPatchFile; top: number; height: number }
+  | { kind: 'line'; line: DiffLine; file: MultiPatchFile; top: number; height: number }
+
+const MP_FILE_HEIGHT = 32
+const MP_LINE_HEIGHT = 20
+const MP_OVERSCAN = 10
+
+export function MultiPatchView({ files }: { files: MultiPatchFile[] }) {
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [picker, setPicker] = useState(false)
+  const [scrollTop, setScrollTop] = useState(0)
+  const [height, setHeight] = useState(600)
+  const [range, setRange] = useState({ start: 0, end: 40 })
+  const viewport = useRef<HTMLDivElement>(null)
+  const settle = useRef<number | undefined>(undefined)
+
+  const rows = useMemo<MultiRow[]>(() => {
+    const out: MultiRow[] = []
+    let top = 0
+    for (const file of files) {
+      out.push({ kind: 'file', file, top, height: MP_FILE_HEIGHT })
+      top += MP_FILE_HEIGHT
+      if (collapsed.has(file.path)) continue
+      for (const line of parsePatch(file.patch)) {
+        out.push({ kind: 'line', line, file, top, height: MP_LINE_HEIGHT })
+        top += MP_LINE_HEIGHT
+      }
+    }
+    return out
+  }, [files, collapsed])
+  const total = rows.length ? rows[rows.length - 1].top + rows[rows.length - 1].height : 0
+
+  useEffect(() => {
+    const el = viewport.current
+    if (!el) return
+    setHeight(el.clientHeight || 600)
+    const observer = new ResizeObserver(() => setHeight(el.clientHeight || 600))
+    observer.observe(el)
+    return () => {
+      observer.disconnect()
+      window.clearTimeout(settle.current)
+    }
+  }, [])
+
+  useEffect(() => {
+    const top = scrollTop
+    let lo = 0
+    let hi = rows.length
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (rows[mid].top + rows[mid].height < top) lo = mid + 1
+      else hi = mid
+    }
+    let start = Math.max(0, lo - MP_OVERSCAN)
+    let end = start
+    while (end < rows.length && rows[end].top < top + height) end++
+    end = Math.min(rows.length, end + MP_OVERSCAN)
+    setRange((prev) => (prev.start === start && prev.end === end ? prev : { start, end }))
+  }, [rows, scrollTop, height])
+
+  const current = useMemo(() => {
+    let file: MultiPatchFile | undefined = rows[0]?.kind === 'file' ? rows[0].file : rows[0]?.file
+    for (const row of rows) {
+      if (row.top > scrollTop) break
+      file = row.file
+    }
+    return file
+  }, [rows, scrollTop])
+
+  const toggle = (path: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  }
+
+  const allCollapsed = files.length > 0 && files.every((f) => collapsed.has(f.path))
+  const fileTops = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const row of rows) {
+      if (row.kind === 'file' && !map.has(row.file.path)) map.set(row.file.path, row.top)
+    }
+    return map
+  }, [rows])
+
+  const jumpTo = (path: string) => {
+    const top = fileTops.get(path)
+    if (top !== undefined && viewport.current) viewport.current.scrollTop = top
+    setPicker(false)
+  }
+
+  return (
+    <div className="multi-patch">
+      <div className="mp-bar">
+        <span className={`status-letter s-${current?.status.slice(0, 1) === '?' ? 'untracked' : current?.status.slice(0, 1)}`}>
+          {current?.status.slice(0, 1)}
+        </span>
+        <button className="mp-current" onClick={() => setPicker(true)} title="选择文件">
+          <span>{current?.path}</span>
+          <Icon name="chevron" size={12} />
+        </button>
+        <button
+          className="mini-btn"
+          onClick={() =>
+            setCollapsed(allCollapsed ? new Set() : new Set(files.map((f) => f.path)))
+          }
+        >
+          {allCollapsed ? '全部展开' : '全部收起'}
+        </button>
+      </div>
+      <div
+        className="mp-viewport"
+        ref={viewport}
+        onScroll={(e) => {
+          const top = e.currentTarget.scrollTop
+          setScrollTop(top)
+          window.clearTimeout(settle.current)
+          settle.current = window.setTimeout(() => {
+            if (viewport.current) setScrollTop(viewport.current.scrollTop)
+          }, 100)
+        }}
+      >
+        <div className="mp-inner" style={{ height: total }}>
+          {rows.slice(range.start, range.end).map((row) =>
+            row.kind === 'file' ? (
+              <button
+                key={`f:${row.file.path}`}
+                className="mp-file-row"
+                style={{ top: row.top, height: row.height }}
+                onClick={() => toggle(row.file.path)}
+                aria-expanded={!collapsed.has(row.file.path)}
+              >
+                <Icon name={collapsed.has(row.file.path) ? 'chevron' : 'down'} size={13} />
+                <span className={`status-letter s-${row.file.status.slice(0, 1) === '?' ? 'untracked' : row.file.status.slice(0, 1)}`}>
+                  {row.file.status.slice(0, 1)}
+                </span>
+                <span className="mp-path" title={row.file.path}>
+                  <span className="mp-dir">{row.file.path.slice(0, row.file.path.lastIndexOf('/') + 1)}</span>
+                  {row.file.path.slice(row.file.path.lastIndexOf('/') + 1)}
+                </span>
+                <span className="file-stats">
+                  {row.file.added > 0 ? <em className="plus">+{row.file.added}</em> : null}
+                  {row.file.deleted > 0 ? <em className="minus">−{row.file.deleted}</em> : null}
+                </span>
+              </button>
+            ) : (
+              <div
+                key={`l:${row.file.path}:${row.top}`}
+                className={`diff-line ${row.line.kind}`}
+                style={{ top: row.top, height: row.height, left: 0, minWidth: '100%', width: 'max-content' }}
+              >
+                <span className="gutter">{row.line.old ?? ''}</span>
+                <span className="gutter">{row.line.new ?? ''}</span>
+                <span className="code">
+                  {row.line.kind === 'add' ? '+' : row.line.kind === 'del' ? '-' : row.line.kind === 'ctx' ? ' ' : ''}
+                  {row.line.text}
+                </span>
+              </div>
+            ),
+          )}
+        </div>
+      </div>
+      <Sheet open={picker} title="文件" onClose={() => setPicker(false)}>
+        <div className="mp-file-list">
+          {files.map((file) => (
+            <button key={file.path} className="mp-file-item" onClick={() => jumpTo(file.path)}>
+              <span className={`status-letter s-${file.status.slice(0, 1) === '?' ? 'untracked' : file.status.slice(0, 1)}`}>
+                {file.status.slice(0, 1)}
+              </span>
+              <span className="file-path">{file.path}</span>
+              <span className="file-stats">
+                {file.added > 0 ? <em className="plus">+{file.added}</em> : null}
+                {file.deleted > 0 ? <em className="minus">−{file.deleted}</em> : null}
+              </span>
+            </button>
+          ))}
+        </div>
+      </Sheet>
+    </div>
+  )
+}
 
 /* ---------- misc ---------- */
 

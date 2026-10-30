@@ -1122,7 +1122,7 @@ func (a *App) File(ctx context.Context, id, rel, rev string) (FileContent, error
 
 var skipDirs = map[string]bool{
 	".git": true, "node_modules": true, "vendor": true, "dist": true, "build": true,
-	".next": true, ".nuxt": true, "target": true, ".idea": true, ".venv": true,
+	".next": true, ".nuxt": true, "target": true, ".venv": true,
 	"__pycache__": true, ".cache": true, "Pods": true, "DerivedData": true,
 }
 
