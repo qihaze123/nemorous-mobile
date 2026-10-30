@@ -1,0 +1,318 @@
+package app
+
+import (
+	"crypto/subtle"
+	"encoding/json"
+	"io"
+	"log"
+	"net/http"
+	"strconv"
+	"strings"
+)
+
+// Version is stamped into the health response and the UI footer.
+const Version = "0.1.0"
+
+// APIHandler returns the routed, authenticated JSON API.
+func (a *App) APIHandler() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/health", a.handleHealth)
+	mux.HandleFunc("GET /api/workspace", a.authed(a.handleWorkspace))
+	mux.HandleFunc("GET /api/repos/{id}", a.authed(a.handleRepo))
+	mux.HandleFunc("GET /api/repos/{id}/diff", a.authed(a.handleDiff))
+	mux.HandleFunc("POST /api/repos/{id}/stage", a.authed(a.handleStage))
+	mux.HandleFunc("POST /api/repos/{id}/unstage", a.authed(a.handleUnstage))
+	mux.HandleFunc("POST /api/repos/{id}/discard", a.authed(a.handleDiscard))
+	mux.HandleFunc("POST /api/repos/{id}/commit", a.authed(a.handleCommit))
+	mux.HandleFunc("POST /api/repos/{id}/push", a.authed(a.handlePush))
+	mux.HandleFunc("POST /api/repos/{id}/pull", a.authed(a.handlePull))
+	mux.HandleFunc("POST /api/repos/{id}/checkout", a.authed(a.handleCheckout))
+	mux.HandleFunc("GET /api/repos/{id}/commits", a.authed(a.handleCommits))
+	mux.HandleFunc("GET /api/repos/{id}/commits/{hash}", a.authed(a.handleCommitDetail))
+	mux.HandleFunc("GET /api/repos/{id}/files", a.authed(a.handleFiles))
+	mux.HandleFunc("GET /api/repos/{id}/file", a.authed(a.handleFile))
+	mux.HandleFunc("GET /api/commits", a.authed(a.handleAllCommits))
+	mux.HandleFunc("GET /api/search", a.authed(a.handleSearch))
+	mux.HandleFunc("POST /api/batch", a.authed(a.handleBatch))
+	mux.HandleFunc("POST /api/batch/commit", a.authed(a.handleBatchCommit))
+	return withCommon(mux)
+}
+
+// authed enforces the bearer token. The token is accepted as an
+// Authorization header or as a ?token= query parameter for first pairing.
+func (a *App) authed(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		got := ""
+		if h := r.Header.Get("Authorization"); strings.HasPrefix(h, "Bearer ") {
+			got = strings.TrimSpace(strings.TrimPrefix(h, "Bearer "))
+		}
+		if got == "" {
+			got = r.URL.Query().Get("token")
+		}
+		if subtle.ConstantTimeCompare([]byte(got), []byte(a.Token)) != 1 {
+			writeError(w, http.StatusUnauthorized, "访问令牌无效，请在设置中填写配对令牌")
+			return
+		}
+		next(w, r)
+	}
+}
+
+func withCommon(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		defer func() {
+			if rec := recover(); rec != nil {
+				log.Printf("panic: %v", rec)
+				writeError(w, http.StatusInternalServerError, "服务内部错误")
+			}
+		}()
+		next.ServeHTTP(w, r)
+	})
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+func writeError(w http.ResponseWriter, status int, msg string) {
+	writeJSON(w, status, map[string]string{"error": msg})
+}
+
+func (a *App) fail(w http.ResponseWriter, err error) {
+	writeError(w, http.StatusBadRequest, err.Error())
+}
+
+func decode(r *http.Request, v any) error {
+	defer r.Body.Close()
+	dec := json.NewDecoder(io.LimitReader(r.Body, 1<<20))
+	if err := dec.Decode(v); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (a *App) handleHealth(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "version": Version})
+}
+
+func (a *App) handleWorkspace(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, a.Workspace(r.Context()))
+}
+
+func (a *App) handleRepo(w http.ResponseWriter, r *http.Request) {
+	detail, err := a.RepoDetail(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, detail)
+}
+
+func (a *App) handleDiff(w http.ResponseWriter, r *http.Request) {
+	staged := r.URL.Query().Get("staged") == "1" || r.URL.Query().Get("staged") == "true"
+	res, err := a.Diff(r.Context(), r.PathValue("id"), r.URL.Query().Get("path"), staged)
+	if err != nil {
+		a.fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
+}
+
+func (a *App) handleStage(w http.ResponseWriter, r *http.Request) {
+	var req pathsReq
+	if err := decode(r, &req); err != nil {
+		a.fail(w, err)
+		return
+	}
+	if err := a.Stage(r.Context(), r.PathValue("id"), req.Paths); err != nil {
+		a.fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (a *App) handleUnstage(w http.ResponseWriter, r *http.Request) {
+	var req pathsReq
+	if err := decode(r, &req); err != nil {
+		a.fail(w, err)
+		return
+	}
+	if err := a.Unstage(r.Context(), r.PathValue("id"), req.Paths); err != nil {
+		a.fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (a *App) handleDiscard(w http.ResponseWriter, r *http.Request) {
+	var req pathsReq
+	if err := decode(r, &req); err != nil {
+		a.fail(w, err)
+		return
+	}
+	if err := a.Discard(r.Context(), r.PathValue("id"), req.Paths, req.Confirm); err != nil {
+		a.fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (a *App) handleCommit(w http.ResponseWriter, r *http.Request) {
+	var req commitReq
+	if err := decode(r, &req); err != nil {
+		a.fail(w, err)
+		return
+	}
+	hash, err := a.Commit(r.Context(), r.PathValue("id"), req.Message, req.Paths, req.Amend)
+	if err != nil {
+		a.fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "hash": hash})
+}
+
+func (a *App) handlePush(w http.ResponseWriter, r *http.Request) {
+	res, err := a.Push(r.Context(), r.PathValue("id"))
+	if err != nil {
+		a.fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
+}
+
+func (a *App) handlePull(w http.ResponseWriter, r *http.Request) {
+	res, err := a.Pull(r.Context(), r.PathValue("id"))
+	if err != nil {
+		a.fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
+}
+
+func (a *App) handleCheckout(w http.ResponseWriter, r *http.Request) {
+	var req checkoutReq
+	if err := decode(r, &req); err != nil {
+		a.fail(w, err)
+		return
+	}
+	res, err := a.Checkout(r.Context(), r.PathValue("id"), req.Branch, req.Create)
+	if err != nil {
+		a.fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
+}
+
+func (a *App) handleAllCommits(w http.ResponseWriter, r *http.Request) {
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	writeJSON(w, http.StatusOK, a.Logs(r.Context(), limit))
+}
+
+func (a *App) handleCommits(w http.ResponseWriter, r *http.Request) {
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	writeJSON(w, http.StatusOK, a.Logs(r.Context(), limit))
+}
+
+func (a *App) handleCommitDetail(w http.ResponseWriter, r *http.Request) {
+	detail, err := a.CommitDetail(r.Context(), r.PathValue("id"), r.PathValue("hash"))
+	if err != nil {
+		a.fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, detail)
+}
+
+func (a *App) handleFiles(w http.ResponseWriter, r *http.Request) {
+	files, err := a.Files(r.Context(), r.PathValue("id"))
+	if err != nil {
+		a.fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, files)
+}
+
+func (a *App) handleFile(w http.ResponseWriter, r *http.Request) {
+	fc, err := a.File(r.Context(), r.PathValue("id"), r.URL.Query().Get("path"), r.URL.Query().Get("rev"))
+	if err != nil {
+		a.fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, fc)
+}
+
+func (a *App) handleSearch(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	ids := q["repo"]
+	res, err := a.Search(r.Context(), q.Get("q"), q.Get("mode"), q.Get("regex") == "1", q.Get("case") == "1", ids)
+	if err != nil {
+		a.fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
+}
+
+func (a *App) handleBatch(w http.ResponseWriter, r *http.Request) {
+	var req batchReq
+	if err := decode(r, &req); err != nil {
+		a.fail(w, err)
+		return
+	}
+	results, err := a.Batch(r.Context(), req.Action, req.Repos, req.Branch, req.Create)
+	if err != nil {
+		a.fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"results": results})
+}
+
+func (a *App) handleBatchCommit(w http.ResponseWriter, r *http.Request) {
+	var req batchCommitReq
+	if err := decode(r, &req); err != nil {
+		a.fail(w, err)
+		return
+	}
+	results, err := a.BatchCommit(r.Context(), req.Repos, req.Message, req.Push)
+	if err != nil {
+		a.fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"results": results})
+}
+
+type pathsReq struct {
+	Paths   []string `json:"paths"`
+	Confirm bool     `json:"confirm"`
+}
+
+type commitReq struct {
+	Message string   `json:"message"`
+	Paths   []string `json:"paths"`
+	Amend   bool     `json:"amend"`
+}
+
+type checkoutReq struct {
+	Branch string `json:"branch"`
+	Create bool   `json:"create"`
+}
+
+type batchReq struct {
+	Action string   `json:"action"`
+	Repos  []string `json:"repos"`
+	Branch string   `json:"branch"`
+	Create bool     `json:"create"`
+}
+
+type batchCommitReq struct {
+	Message string         `json:"message"`
+	Push    bool           `json:"push"`
+	Repos   []CommitTarget `json:"repos"`
+}
