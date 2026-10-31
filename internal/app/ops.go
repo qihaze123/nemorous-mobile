@@ -1078,6 +1078,25 @@ func (a *App) CommitFileDetail(ctx context.Context, id, hash, path string) (Comm
 	return detail, nil
 }
 
+// CommitDetailFull is CommitDetail with every file's unchanged context expanded.
+func (a *App) CommitDetailFull(ctx context.Context, id, hash string) (CommitDetail, error) {
+	detail, err := a.CommitDetail(ctx, id, hash)
+	if err != nil {
+		return CommitDetail{}, err
+	}
+	repo, err := a.repo(id)
+	if err != nil {
+		return CommitDetail{}, err
+	}
+	patch, err := gitOK(ctx, repo.Path, inspectTimeout,
+		"show", "--format=", "--no-color", "--no-ext-diff", "--no-renames", "--unified=999999", hash)
+	if err != nil {
+		return CommitDetail{}, err
+	}
+	detail.Patch = patch
+	return detail, nil
+}
+
 const maxListedFiles = 20000
 
 // Files lists tracked and untracked repository-relative paths.

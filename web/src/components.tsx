@@ -427,7 +427,7 @@ function buildSplitRows(lines: DiffLine[]): SplitRow[] {
   return out
 }
 
-function foldContextRows(lines: DiffLine[], expanded: Set<string>, keep = 3): DiffLine[] {
+function foldContextRows(lines: DiffLine[], expanded: Set<string>, keep = 3, prefix = ''): DiffLine[] {
   const out: DiffLine[] = []
   let i = 0
   while (i < lines.length) {
@@ -447,7 +447,7 @@ function foldContextRows(lines: DiffLine[], expanded: Set<string>, keep = 3): Di
       out.push(...run)
       continue
     }
-    const id = `fold:${start}:${i}`
+    const id = `${prefix}fold:${start}:${i}`
     const isExpanded = expanded.has(id)
     if (isExpanded) {
       const [first, ...rest] = run
@@ -835,6 +835,7 @@ const MP_OVERSCAN = 10
 
 export function MultiPatchView({ files }: { files: MultiPatchFile[] }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [expandedFolds, setExpandedFolds] = useState<Set<string>>(new Set())
   const [picker, setPicker] = useState(false)
   const [scrollTop, setScrollTop] = useState(0)
   const [height, setHeight] = useState(600)
@@ -849,10 +850,11 @@ export function MultiPatchView({ files }: { files: MultiPatchFile[] }) {
       out.push({ kind: 'file', file, top, height: MP_FILE_HEIGHT })
       top += MP_FILE_HEIGHT
       if (collapsed.has(file.path)) continue
-      const lines = parsePatch(file.patch)
+      const rawLines = parsePatch(file.patch)
+      const lines = foldContextRows(rawLines, expandedFolds, 3, `${file.path}:`)
       const words = annotateWordChanges(lines)
-      const hasOld = lines.some((line) => line.old !== undefined)
-      const hasNew = lines.some((line) => line.new !== undefined)
+      const hasOld = rawLines.some((line) => line.old !== undefined)
+      const hasNew = rawLines.some((line) => line.new !== undefined)
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i]
         out.push({ kind: 'line', line, file, top, height: MP_LINE_HEIGHT, words: words[i], hasOld, hasNew })
@@ -860,7 +862,7 @@ export function MultiPatchView({ files }: { files: MultiPatchFile[] }) {
       }
     }
     return out
-  }, [files, collapsed])
+  }, [files, collapsed, expandedFolds])
   const total = rows.length ? rows[rows.length - 1].top + rows[rows.length - 1].height : 0
 
   useEffect(() => {
@@ -905,6 +907,15 @@ export function MultiPatchView({ files }: { files: MultiPatchFile[] }) {
       const next = new Set(prev)
       if (next.has(path)) next.delete(path)
       else next.add(path)
+      return next
+    })
+  }
+
+  const toggleFold = (id: string) => {
+    setExpandedFolds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
       return next
     })
   }
@@ -978,6 +989,16 @@ export function MultiPatchView({ files }: { files: MultiPatchFile[] }) {
                   {row.file.deleted > 0 ? <em className="minus">−{row.file.deleted}</em> : null}
                 </span>
               </button>
+            ) : row.line.kind === 'fold' ? (
+              <button
+                key={`l:${row.file.path}:${row.top}`}
+                className="diff-line fold-row"
+                style={{ top: row.top, height: row.height, left: 0, minWidth: '100%', width: 'max-content' }}
+                aria-label={`展开 ${row.line.foldCount ?? 0} 行未修改内容`}
+                onClick={() => row.line.foldId && toggleFold(row.line.foldId)}
+              >
+                <span className="fold-chevron">⌄</span>
+              </button>
             ) : (
               <div
                 key={`l:${row.file.path}:${row.top}`}
@@ -986,7 +1007,11 @@ export function MultiPatchView({ files }: { files: MultiPatchFile[] }) {
               >
                 {row.hasOld ? <span className={`gutter old ${row.line.kind === 'del' ? 'changed' : ''}`}>{row.line.old ?? ''}</span> : null}
                 {row.hasNew ? <span className={`gutter new ${row.line.kind === 'add' ? 'changed' : ''}`}>{row.line.new ?? ''}</span> : null}
-                <span className={`marker ${row.line.kind}`}>{row.line.kind === 'add' ? '+' : row.line.kind === 'del' ? '−' : ''}</span>
+                {row.line.foldExpanded && row.line.foldId ? (
+                  <button className="fold-gutter-toggle" aria-label="收起未修改内容" onClick={() => toggleFold(row.line.foldId!)}>⌃</button>
+                ) : (
+                  <span className={`marker ${row.line.kind}`}>{row.line.kind === 'add' ? '+' : row.line.kind === 'del' ? '−' : ''}</span>
+                )}
                 <span className="code">
                   {row.words
                     ? row.words.map((segment, j) => segment.changed ? <mark key={j} className={`word-${row.line.kind}`}>{segment.text}</mark> : segment.text)

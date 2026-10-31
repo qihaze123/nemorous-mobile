@@ -380,6 +380,8 @@ func (a *App) handleCommitDetail(w http.ResponseWriter, r *http.Request) {
 	var err error
 	if path != "" {
 		detail, err = a.CommitFileDetail(r.Context(), r.PathValue("id"), r.PathValue("hash"), path)
+	} else if r.URL.Query().Get("context") == "full" {
+		detail, err = a.CommitDetailFull(r.Context(), r.PathValue("id"), r.PathValue("hash"))
 	} else {
 		detail, err = a.CommitDetail(r.Context(), r.PathValue("id"), r.PathValue("hash"))
 	}

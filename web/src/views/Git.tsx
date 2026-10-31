@@ -871,7 +871,7 @@ export function CommitPatchScreen({ repoId, hash }: { repoId: string; hash: stri
   const notify = useToast()
   useEffect(() => {
     setDetail(null)
-    api<CommitDetail>(`/api/repos/${repoId}/commits/${hash}`)
+    api<CommitDetail>(`/api/repos/${repoId}/commits/${hash}?context=full`)
       .then(setDetail)
       .catch((err) => setError(err instanceof Error ? err.message : '读取提交失败'))
   }, [repoId, hash])
