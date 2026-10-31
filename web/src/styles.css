@@ -2558,7 +2558,7 @@ h1 {
   height: 38px;
   border: 0;
   background: transparent;
-  color: var(--muted);
+  color: var(--fg);
   border-radius: 10px;
 }
 
