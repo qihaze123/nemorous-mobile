@@ -145,13 +145,15 @@ export function GitScreen({ ws }: { ws: Workspace }) {
           <button className="repo-row" key={repo.id} onClick={() => setRepoSheet(repo.id)}>
             <span className="repo-avatar small" style={{ background: repoColor(repo.name) }}>{repo.name.slice(0, 2)}</span>
             <span className="repo-row-main">
-              <span className="repo-name">{repo.name}</span>
+              <span className="repo-row-title">
+                <span className="repo-name">{repo.name}</span>
+                {repo.files.length > 0 ? <em className="repo-change-count">{repo.files.length} 改动</em> : null}
+              </span>
               <span className="repo-sub">
                 <Icon name="branch" size={13} />
                 <code>{repo.branch || '(无分支)'}</code>
                 {repo.ahead > 0 ? <em className="ahead">↑{repo.ahead}</em> : null}
                 {repo.behind > 0 ? <em className="behind">↓{repo.behind}</em> : null}
-                {repo.files.length > 0 ? <em className="dirty-dot">{repo.files.length} 改动</em> : null}
               </span>
             </span>
             <Icon name="chevron" size={18} />
