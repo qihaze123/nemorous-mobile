@@ -3284,24 +3284,24 @@ h1 {
   text-overflow: ellipsis;
 }
 
-.commit-file-diff-page .diff-line .gutter {
+.idea-diff .diff-line .gutter {
   opacity: 0.8;
   font-variant-numeric: tabular-nums;
 }
 
-.commit-file-diff-page .diff-line .gutter.new.changed {
+.idea-diff .diff-line .gutter.new.changed {
   background: var(--add-bg);
   color: var(--add);
   box-shadow: inset -2px 0 var(--add);
 }
 
-.commit-file-diff-page .diff-line .gutter.old.changed {
+.idea-diff .diff-line .gutter.old.changed {
   background: var(--del-bg);
   color: var(--del);
   box-shadow: inset -2px 0 var(--del);
 }
 
-.commit-file-diff-page .diff-line .marker {
+.idea-diff .diff-line .marker {
   flex: none;
   width: 16px;
   color: var(--muted);
@@ -3309,44 +3309,44 @@ h1 {
   user-select: none;
 }
 
-.commit-file-diff-page .diff-line .marker.add { color: var(--add); }
-.commit-file-diff-page .diff-line .marker.del { color: var(--del); }
+.idea-diff .diff-line .marker.add { color: var(--add); }
+.idea-diff .diff-line .marker.del { color: var(--del); }
 
-.commit-file-diff-page .diff-line mark {
+.idea-diff .diff-line mark {
   border-radius: 2px;
   color: inherit;
 }
 
-.commit-file-diff-page .diff-line mark.word-add {
+.idea-diff .diff-line mark.word-add {
   background: color-mix(in srgb, var(--add) 30%, transparent);
 }
 
-.commit-file-diff-page .diff-line mark.word-del {
+.idea-diff .diff-line mark.word-del {
   background: color-mix(in srgb, var(--del) 30%, transparent);
 }
 
-.commit-file-diff-page .diff-line.split-row .split-gutter {
+.idea-diff .diff-line.split-row .split-gutter {
   font-variant-numeric: tabular-nums;
   opacity: 0.8;
 }
 
-.commit-file-diff-page .diff-line.split-row .split-gutter.del {
+.idea-diff .diff-line.split-row .split-gutter.del {
   background: var(--del-bg);
   color: var(--del);
   box-shadow: inset -2px 0 var(--del);
 }
 
-.commit-file-diff-page .diff-line.split-row .split-gutter.add {
+.idea-diff .diff-line.split-row .split-gutter.add {
   background: var(--add-bg);
   color: var(--add);
   box-shadow: inset -2px 0 var(--add);
 }
 
-.commit-file-diff-page .diff-line.split-row .split-gutter.blank {
+.idea-diff .diff-line.split-row .split-gutter.blank {
   background: color-mix(in srgb, var(--muted) 4%, transparent);
 }
 
-.commit-file-diff-page .diff-line.split-row .split-gutter:nth-child(3) {
+.idea-diff .diff-line.split-row .split-gutter:nth-child(3) {
   border-left: 1px solid var(--border-soft);
 }
 
@@ -3361,7 +3361,7 @@ h1 {
   white-space: nowrap;
 }
 
-.commit-file-diff-page .diff-line.hunk {
+.idea-diff .diff-line.hunk {
   border-top: 1px solid var(--border-soft);
   border-bottom: 1px solid var(--border-soft);
   border-left: 2px solid color-mix(in srgb, var(--blue) 45%, transparent);
@@ -3370,7 +3370,7 @@ h1 {
   font-size: 10px;
 }
 
-.commit-file-diff-page .diff-line.hunk.split-wide {
+.idea-diff .diff-line.hunk.split-wide {
   padding-left: 8px;
 }
 

@@ -818,7 +818,16 @@ export interface MultiPatchFile {
 
 type MultiRow =
   | { kind: 'file'; file: MultiPatchFile; top: number; height: number }
-  | { kind: 'line'; line: DiffLine; file: MultiPatchFile; top: number; height: number }
+  | {
+      kind: 'line'
+      line: DiffLine
+      file: MultiPatchFile
+      top: number
+      height: number
+      words?: WordSegment[]
+      hasOld: boolean
+      hasNew: boolean
+    }
 
 const MP_FILE_HEIGHT = 32
 const MP_LINE_HEIGHT = 20
@@ -840,8 +849,13 @@ export function MultiPatchView({ files }: { files: MultiPatchFile[] }) {
       out.push({ kind: 'file', file, top, height: MP_FILE_HEIGHT })
       top += MP_FILE_HEIGHT
       if (collapsed.has(file.path)) continue
-      for (const line of parsePatch(file.patch)) {
-        out.push({ kind: 'line', line, file, top, height: MP_LINE_HEIGHT })
+      const lines = parsePatch(file.patch)
+      const words = annotateWordChanges(lines)
+      const hasOld = lines.some((line) => line.old !== undefined)
+      const hasNew = lines.some((line) => line.new !== undefined)
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i]
+        out.push({ kind: 'line', line, file, top, height: MP_LINE_HEIGHT, words: words[i], hasOld, hasNew })
         top += MP_LINE_HEIGHT
       }
     }
@@ -911,7 +925,7 @@ export function MultiPatchView({ files }: { files: MultiPatchFile[] }) {
   }
 
   return (
-    <div className="multi-patch">
+    <div className="multi-patch idea-diff">
       <div className="mp-bar">
         <span className={`status-letter s-${current?.status.slice(0, 1) === '?' ? 'untracked' : current?.status.slice(0, 1)}`}>
           {current?.status.slice(0, 1)}
@@ -970,11 +984,13 @@ export function MultiPatchView({ files }: { files: MultiPatchFile[] }) {
                 className={`diff-line ${row.line.kind}`}
                 style={{ top: row.top, height: row.height, left: 0, minWidth: '100%', width: 'max-content' }}
               >
-                <span className="gutter">{row.line.old ?? ''}</span>
-                <span className="gutter">{row.line.new ?? ''}</span>
+                {row.hasOld ? <span className={`gutter old ${row.line.kind === 'del' ? 'changed' : ''}`}>{row.line.old ?? ''}</span> : null}
+                {row.hasNew ? <span className={`gutter new ${row.line.kind === 'add' ? 'changed' : ''}`}>{row.line.new ?? ''}</span> : null}
+                <span className={`marker ${row.line.kind}`}>{row.line.kind === 'add' ? '+' : row.line.kind === 'del' ? '−' : ''}</span>
                 <span className="code">
-                  {row.line.kind === 'add' ? '+' : row.line.kind === 'del' ? '-' : row.line.kind === 'ctx' ? ' ' : ''}
-                  {row.line.text}
+                  {row.words
+                    ? row.words.map((segment, j) => segment.changed ? <mark key={j} className={`word-${row.line.kind}`}>{segment.text}</mark> : segment.text)
+                    : row.line.text}
                 </span>
               </div>
             ),

@@ -855,7 +855,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
               </button>
             </div>
           ) : null}
-          <div className="commit-file-diff-page" ref={diffRoot}>
+          <div className="commit-file-diff-page idea-diff" ref={diffRoot}>
             <PatchView ref={patchRef} patch={chunks.get(path) ?? ''} style={diffStyle} idea folded={folded} focusChange={atLast ? 'last' : 'first'} />
           </div>
         </>
