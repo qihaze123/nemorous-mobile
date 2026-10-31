@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { BranchList, BranchPreset, BranchesResponse, Commit, CommitDetail, CommitFile, OpResult, PresetsResponse, UndoResult, Workspace } from '../types'
 import { api, post } from '../api'
 import { back, go, useDebounced } from '../hooks'
@@ -713,12 +713,16 @@ function CommitTreeRows({
   nodes,
   depth,
   collapsed,
+  dots,
+  registerRow,
   onToggle,
   onOpen,
 }: {
   nodes: CommitTreeNode[]
   depth: number
   collapsed: Set<string>
+  dots: Set<string>
+  registerRow: (key: string, el: HTMLElement | null) => void
   onToggle: (path: string) => void
   onOpen: (path: string) => void
 }) {
@@ -729,6 +733,7 @@ function CommitTreeRows({
           {node.dir ? (
             <>
               <button
+                ref={(el) => registerRow(`d:${node.path}`, el)}
                 className="commit-tree-row dir"
                 style={{ paddingLeft: 4 + depth * 14 }}
                 onClick={() => onToggle(node.path)}
@@ -736,13 +741,15 @@ function CommitTreeRows({
                 <Icon name={collapsed.has(node.path) ? 'chevron' : 'down'} size={13} />
                 <Icon name="folder" size={15} />
                 <span className="tree-name">{node.name}</span>
+                {dots.has(`d:${node.path}`) ? <span className="tree-dots" aria-hidden="true">…</span> : null}
               </button>
               {!collapsed.has(node.path) ? (
-                <CommitTreeRows nodes={node.children} depth={depth + 1} collapsed={collapsed} onToggle={onToggle} onOpen={onOpen} />
+                <CommitTreeRows nodes={node.children} depth={depth + 1} collapsed={collapsed} dots={dots} registerRow={registerRow} onToggle={onToggle} onOpen={onOpen} />
               ) : null}
             </>
           ) : (
             <button
+              ref={(el) => registerRow(`f:${node.path}`, el)}
               className="commit-tree-row file"
               style={{ paddingLeft: 8 + depth * 14 }}
               onClick={() => onOpen(node.path)}
@@ -751,11 +758,14 @@ function CommitTreeRows({
                 {node.file?.status.slice(0, 1)}
               </span>
               <span className="tree-name" title={node.path}>{node.name}</span>
-              <span className="file-stats">
-                {(node.file?.added ?? 0) > 0 ? <em className="plus">+{node.file?.added}</em> : null}
-                {(node.file?.deleted ?? 0) > 0 ? <em className="minus">−{node.file?.deleted}</em> : null}
+              <span className="tree-tail">
+                {dots.has(`f:${node.path}`) ? <span className="tree-dots" aria-hidden="true">…</span> : null}
+                <span className="file-stats">
+                  {(node.file?.added ?? 0) > 0 ? <em className="plus">+{node.file?.added}</em> : null}
+                  {(node.file?.deleted ?? 0) > 0 ? <em className="minus">−{node.file?.deleted}</em> : null}
+                </span>
+                <Icon name="chevron" size={14} />
               </span>
-              <Icon name="chevron" size={14} />
             </button>
           )}
         </Fragment>
@@ -767,7 +777,39 @@ function CommitTreeRows({
 export function CommitScreen({ repoId, hash }: { repoId: string; hash: string }) {
   const [detail, setDetail] = useState<CommitDetail | null>(null)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [dots, setDots] = useState<Set<string>>(new Set())
   const [error, setError] = useState('')
+  const treeRef = useRef<HTMLDivElement>(null)
+  const rowEls = useRef(new Map<string, HTMLElement>())
+  const registerRow = useCallback((key: string, el: HTMLElement | null) => {
+    if (el) rowEls.current.set(key, el)
+    else rowEls.current.delete(key)
+  }, [])
+  const updateDots = useCallback(() => {
+    const container = treeRef.current
+    if (!container) return
+    const rect = container.getBoundingClientRect()
+    const next = new Set<string>()
+    rowEls.current.forEach((el, key) => {
+      if (el.getBoundingClientRect().right > rect.right - 1) next.add(key)
+    })
+    setDots((prev) => {
+      if (prev.size === next.size && [...next].every((key) => prev.has(key))) return prev
+      return next
+    })
+  }, [])
+  useEffect(() => {
+    const frame = requestAnimationFrame(updateDots)
+    const observer = new ResizeObserver(updateDots)
+    if (treeRef.current) observer.observe(treeRef.current)
+    return () => {
+      cancelAnimationFrame(frame)
+      observer.disconnect()
+    }
+  }, [detail, collapsed, updateDots])
+  const onTreeScroll = () => {
+    updateDots()
+  }
   useEffect(() => {
     setDetail(null)
     setCollapsed(new Set())
@@ -813,7 +855,8 @@ export function CommitScreen({ repoId, hash }: { repoId: string; hash: string })
           >
             {detail.files.length} 个文件变更
           </SectionTitle>
-          <div className="commit-tree">
+          <div className="commit-tree" ref={treeRef} onScroll={onTreeScroll}>
+            <div className="commit-tree-inner">
             <div className="commit-tree-root">
               <Icon name="folder" size={15} />
               <span>{detail.commit.repoName}</span>
@@ -822,6 +865,8 @@ export function CommitScreen({ repoId, hash }: { repoId: string; hash: string })
               nodes={tree}
               depth={0}
               collapsed={collapsed}
+              dots={dots}
+              registerRow={registerRow}
               onToggle={(path) =>
                 setCollapsed((prev) => {
                   const next = new Set(prev)
@@ -834,6 +879,7 @@ export function CommitScreen({ repoId, hash }: { repoId: string; hash: string })
                 go(`#/commit-file?repo=${repoId}&hash=${hash}&path=${encodeURIComponent(path)}`)
               }
             />
+            </div>
           </div>
           <p className="hint">点文件查看单独 Diff；目录可折叠；完整 Patch 在右上角。</p>
         </>

@@ -2431,3 +2431,70 @@ h1 {
     padding-right: max(14px, env(safe-area-inset-right));
   }
 }
+
+/* Commit tree: swipe horizontally to reveal truncated names. */
+.commit-tree {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.commit-tree::-webkit-scrollbar {
+  display: none;
+}
+
+.commit-tree-inner {
+  width: 100%;
+}
+
+.commit-tree .commit-tree-row {
+  width: max-content;
+  min-width: 100%;
+}
+
+.commit-tree .commit-tree-row .tree-name {
+  flex: 1 0 auto;
+  min-width: 0;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.tree-dots {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  flex: none;
+  margin-left: -2px;
+  padding: 0 4px;
+  background: var(--bg-elev);
+  color: var(--muted);
+  font: 700 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.tree-tail {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-left: 4px;
+  background: var(--bg-elev);
+}
+
+.tree-tail .tree-dots {
+  position: static;
+  margin: 0;
+  padding: 0 2px;
+}
+
+.tree-tail .file-stats {
+  background: var(--bg-elev);
+}
+
+.tree-tail svg {
+  background: var(--bg-elev);
+}
