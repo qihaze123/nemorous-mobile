@@ -134,6 +134,8 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
   const [mode, setModeState] = useState<Mode>(() => (localStorage.getItem('nemorous.changesMode') === 'tree' ? 'tree' : 'list'))
   const [collapsedDirs, setCollapsedDirs] = useState<Set<string>>(new Set())
   const [collapsedRepos, setCollapsedRepos] = useState<Set<string>>(new Set())
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [menuBusy, setMenuBusy] = useState(false)
   const notify = useToast()
 
   const sections = useMemo<Section[]>(() => {
@@ -185,6 +187,31 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
   const changeMode = (next: Mode) => {
     setModeState(next)
     localStorage.setItem('nemorous.changesMode', next)
+    setMenuOpen(false)
+  }
+
+  const runBatch = async (action: 'pull' | 'push' | 'stash') => {
+    setMenuBusy(true)
+    const label = action === 'pull' ? '拉取' : action === 'push' ? '推送' : 'Stash'
+    try {
+      const res =
+        action === 'stash'
+          ? await post<{ results: OpResult[] }>('/api/batch/stash', { repos: [] })
+          : await post<{ results: OpResult[] }>('/api/batch', { action })
+      const failed = res.results.filter((r) => r.status === 'FAIL')
+      if (failed.length) {
+        notify(`${failed.length} 个仓库失败：${failed[0].repoName} ${failed[0].message}`, 'error')
+      } else {
+        const skipped = res.results.filter((r) => r.status === 'SKIP').length
+        notify(`${label}完成${skipped > 0 ? `（${skipped} 个跳过）` : ''}`, 'ok')
+        setMenuOpen(false)
+      }
+      await refresh()
+    } catch (err) {
+      notify(err instanceof Error ? err.message : `${label}失败`, 'error')
+    } finally {
+      setMenuBusy(false)
+    }
   }
 
   const toggleFile = (repoId: string, file: FileChange) => {
@@ -400,10 +427,9 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
     <div className="screen">
       <header className="topbar">
         <h1>{ws.name}</h1>
-        <div className="segmented mode-seg">
-          <button className={mode === 'list' ? 'on' : ''} onClick={() => changeMode('list')}>列表</button>
-          <button className={mode === 'tree' ? 'on' : ''} onClick={() => changeMode('tree')}>树</button>
-        </div>
+        <button className="icon-btn menu-btn" aria-label="更多" onClick={() => setMenuOpen(true)}>
+          <Icon name="more" />
+        </button>
       </header>
 
       <div className="summary-strip">
@@ -422,6 +448,35 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
         </div>
       ) : null}
 
+      <Sheet open={menuOpen} title="更多" onClose={() => setMenuOpen(false)}>
+        <div className="menu-section">
+          <div className="menu-label">视图</div>
+          <button className="menu-row" onClick={() => changeMode('list')}>
+            <span className="menu-check">{mode === 'list' ? <Icon name="check" size={16} /> : null}</span>
+            <span>列表</span>
+          </button>
+          <button className="menu-row" onClick={() => changeMode('tree')}>
+            <span className="menu-check">{mode === 'tree' ? <Icon name="check" size={16} /> : null}</span>
+            <span>树</span>
+          </button>
+        </div>
+        <div className="menu-section">
+          <div className="menu-label">Git 操作（全部仓库）</div>
+          <button className="menu-row" disabled={menuBusy} onClick={() => void runBatch('pull')}>
+            <span className="menu-check"><Icon name="sync" size={16} /></span>
+            <span>拉取</span>
+          </button>
+          <button className="menu-row" disabled={menuBusy} onClick={() => void runBatch('push')}>
+            <span className="menu-check"><Icon name="branch" size={16} /></span>
+            <span>推送</span>
+          </button>
+          <button className="menu-row" disabled={menuBusy} onClick={() => void runBatch('stash')}>
+            <span className="menu-check"><Icon name="folder" size={16} /></span>
+            <span>Stash 全部改动</span>
+          </button>
+          <p className="menu-hint">Stash 会收起所有仓库的未提交改动（含未跟踪文件），不会删除。</p>
+        </div>
+      </Sheet>
       <Sheet
         open={commitOpen}
         title="统一提交"

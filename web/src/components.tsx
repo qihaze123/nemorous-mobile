@@ -32,6 +32,7 @@ const iconPaths: Record<string, string[]> = {
   sync: ['M4 12a8 8 0 0 1 13.7-5.7L20 8', 'M20 3v5h-5', 'M20 12a8 8 0 0 1-13.7 5.7L4 16', 'M4 21v-5h5'],
   power: ['M12 3v9', 'M6.6 6.6a8 8 0 1 0 10.8 0'],
   trash: ['M4 7h16', 'M9 7V4h6v3', 'M6 7l1 14h10l1-14'],
+  more: ['M5 12h.01', 'M12 12h.01', 'M19 12h.01'],
 }
 
 export function Icon({ name, size = 20, className }: { name: string; size?: number; className?: string }) {
