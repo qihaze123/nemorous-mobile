@@ -458,7 +458,17 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
   return (
     <div className="screen file-screen fill-screen">
       <header className="topbar">
-        <button className="icon-btn" onClick={() => back('#/code')} aria-label="返回">
+        <button
+          className="icon-btn"
+          onClick={() => {
+            if (repoId && rev) {
+              location.replace(`#/commit-file?repo=${encodeURIComponent(repoId)}&hash=${encodeURIComponent(rev)}&path=${encodeURIComponent(path)}`)
+            } else {
+              back('#/code')
+            }
+          }}
+          aria-label="返回"
+        >
           <Icon name="back" />
         </button>
         <div className="grow file-head">
