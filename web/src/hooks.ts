@@ -64,6 +64,27 @@ let lastRoute = parseHash(location.hash)
 let exiting = false
 let exitTimer = 0
 
+// When the app is opened directly on a deep screen, synthesize the parent
+// history entries so the system back button still walks up the hierarchy.
+;(function seedDeepLinkHistory() {
+  const chain: string[] = []
+  let cursor: Route = lastRoute
+  const seen = new Set<string>()
+  while (true) {
+    const parent = parentOf(cursor)
+    if (!parent) break
+    if (seen.has(parent)) break
+    seen.add(parent)
+    chain.unshift(parent)
+    cursor = parseHash(parent)
+  }
+  if (chain.length === 0) return
+  const current = location.hash || '#/changes'
+  history.replaceState(null, '', chain[0])
+  for (let i = 1; i < chain.length; i++) history.pushState(null, '', chain[i])
+  history.pushState(null, '', current)
+})()
+
 addEventListener('hashchange', () => {
   if (!exiting) lastRoute = parseHash(location.hash)
 })
