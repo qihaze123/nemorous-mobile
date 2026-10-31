@@ -647,14 +647,6 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
   }, [repoId, hash, path])
 
   useEffect(() => {
-    if (!detail) return
-    const frame = requestAnimationFrame(() => {
-      patchRef.current?.scrollToFirstChange()
-    })
-    return () => cancelAnimationFrame(frame)
-  }, [detail, path])
-
-  useEffect(() => {
     const root = diffRoot.current
     const highlights = (CSS as unknown as { highlights?: { delete: (name: string) => void; set: (name: string, value: unknown) => void } }).highlights
     const HighlightCtor = (window as unknown as { Highlight?: new (...ranges: Range[]) => unknown }).Highlight
@@ -718,18 +710,22 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
   }
 
   const chunks = useMemo(() => splitPatch(detail?.patch ?? ''), [detail])
+  const atLast = new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('change') === 'last'
   const index = detail ? detail.files.findIndex((f) => f.path === path) : -1
 
-  const jump = (direction: 1 | -1): boolean => {
+  const jump = (direction: 1 | -1, edge?: 'last'): boolean => {
     if (!detail) return false
     const next = detail.files[index + direction]
     if (!next) return false
-    go(`#/commit-file?repo=${repoId}&hash=${hash}&path=${encodeURIComponent(next.path)}`)
+    const query = new URLSearchParams({ repo: repoId, hash, path: next.path })
+    if (edge === 'last') query.set('change', 'last')
+    go(`#/commit-file?${query.toString()}`)
     return true
   }
 
   const step = (direction: 1 | -1) => {
-    patchRef.current?.scrollToHunk(direction)
+    if (patchRef.current?.scrollToChange(direction)) return
+    jump(direction, direction < 0 ? 'last' : undefined)
   }
 
   useEffect(() => {
@@ -831,7 +827,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
             }}
           />
           <div className="commit-file-diff-page" ref={diffRoot}>
-            <PatchView ref={patchRef} patch={chunks.get(path) ?? ''} style={diffStyle} idea folded={folded} />
+            <PatchView ref={patchRef} patch={chunks.get(path) ?? ''} style={diffStyle} idea folded={folded} focusChange={atLast ? 'last' : 'first'} />
           </div>
         </>
       ) : null}

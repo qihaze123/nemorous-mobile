@@ -452,14 +452,18 @@ const DIFF_VIRTUAL_THRESHOLD = 200
 export interface PatchViewHandle {
   /** Scrolls to the next/previous hunk; false means the file boundary was reached. */
   scrollToHunk(direction: 1 | -1): boolean
+  /** Scrolls to the next/previous change block; false means the file edge was reached. */
+  scrollToChange(direction: 1 | -1): boolean
   /** Scrolls to the first added/deleted line. */
   scrollToFirstChange(): boolean
+  /** Scrolls to the last added/deleted line. */
+  scrollToLastChange(): boolean
   /** New-file line number at the top of the current viewport. */
   currentLine(): number | undefined
 }
 
-export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: boolean; style?: 'unified' | 'split'; idea?: boolean; folded?: boolean }>(function PatchView(
-  { patch, binary, style = 'unified', idea = false, folded = false },
+export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: boolean; style?: 'unified' | 'split'; idea?: boolean; folded?: boolean; focusChange?: 'first' | 'last' }>(function PatchView(
+  { patch, binary, style = 'unified', idea = false, folded = false, focusChange = 'first' },
   ref,
 ) {
   const rawLines = useMemo(() => parsePatch(patch), [patch])
@@ -488,16 +492,50 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
     () => rows.map((row, index) => (row.kind === 'hunk' ? index : -1)).filter((index) => index >= 0),
     [rows],
   )
-  const firstChangeRow = useMemo(
-    () => rows.findIndex((row) => row.kind === 'add' || row.kind === 'del' || (row.kind === 'split' && (row.left?.kind === 'del' || row.right?.kind === 'add'))),
-    [rows],
-  )
+  const changeRows = useMemo(() => {
+    const out: number[] = []
+    let inChange = false
+    for (let index = 0; index < rows.length; index++) {
+      const row = rows[index]
+      const changed = row.kind === 'add' || row.kind === 'del' ||
+        (row.kind === 'split' && (row.left?.kind === 'del' || row.right?.kind === 'add'))
+      if (changed && !inChange) out.push(index)
+      inChange = changed
+    }
+    return out
+  }, [rows])
+  const firstChangeRow = changeRows[0] ?? -1
 
   useImperativeHandle(ref, () => ({
+    scrollToChange(direction) {
+      const el = viewport.current
+      if (!el || changeRows.length === 0) return false
+      const top = el.scrollTop
+      const atBottom = top + el.clientHeight >= el.scrollHeight - 2
+      if (direction > 0 && atBottom) return false
+      let active = -1
+      for (const index of changeRows) {
+        if (index * DIFF_LINE_HEIGHT <= top + 48) active = index
+        else break
+      }
+      const target = direction > 0
+        ? changeRows.find((index) => index > active)
+        : [...changeRows].reverse().find((index) => index < active)
+      if (target === undefined) return false
+      el.scrollTop = Math.max(0, target * DIFF_LINE_HEIGHT - 32)
+      return true
+    },
     scrollToFirstChange() {
       const el = viewport.current
       if (!el || firstChangeRow < 0) return false
       el.scrollTop = Math.max(0, firstChangeRow * DIFF_LINE_HEIGHT - 32)
+      return true
+    },
+    scrollToLastChange() {
+      const el = viewport.current
+      const last = changeRows[changeRows.length - 1]
+      if (!el || last === undefined) return false
+      el.scrollTop = Math.max(0, last * DIFF_LINE_HEIGHT - 32)
       return true
     },
     scrollToHunk(direction) {
@@ -543,7 +581,7 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
       }
       return undefined
     },
-  }), [firstChangeRow, hunkRows, rows])
+  }), [changeRows, firstChangeRow, hunkRows, rows])
 
   useEffect(() => {
     const el = viewport.current
@@ -563,6 +601,15 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
       window.clearTimeout(settle.current)
     }
   }, [patch, style, hasOldLines, hasNewLines])
+
+  useEffect(() => {
+    if (!idea) return
+    const el = viewport.current
+    if (!el) return
+    const target = focusChange === 'last' ? changeRows[changeRows.length - 1] : changeRows[0]
+    if (target === undefined) return
+    el.scrollTop = Math.max(0, target * DIFF_LINE_HEIGHT - 32)
+  }, [focusChange, idea, patch])
 
   if (binary) return <Empty icon="warning" title="二进制文件" hint="手机端不展示二进制差异，请在桌面端查看。" />
   if (!patch.trim()) return <Empty title="没有差异" hint="文件内容与对比版本一致。" />
