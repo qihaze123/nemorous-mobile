@@ -510,7 +510,9 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
     el.scrollTop = 0
     // Split is a wider canvas; start at its middle so both sides are in view
     // instead of landing on an empty left edge.
-    el.scrollLeft = style === 'split' ? Math.max(0, (el.scrollWidth - el.clientWidth) / 2) : 0
+    el.scrollLeft = style === 'split' && hasOldLines && hasNewLines
+      ? Math.max(0, (el.scrollWidth - el.clientWidth) / 2)
+      : 0
     setHeight(el.clientHeight || 600)
     const observer = new ResizeObserver(() => setHeight(el.clientHeight || 600))
     observer.observe(el)
@@ -518,7 +520,7 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
       observer.disconnect()
       window.clearTimeout(settle.current)
     }
-  }, [patch, style])
+  }, [patch, style, hasOldLines, hasNewLines])
 
   if (binary) return <Empty icon="warning" title="二进制文件" hint="手机端不展示二进制差异，请在桌面端查看。" />
   if (!patch.trim()) return <Empty title="没有差异" hint="文件内容与对比版本一致。" />

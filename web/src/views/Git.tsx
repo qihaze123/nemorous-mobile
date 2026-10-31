@@ -621,6 +621,10 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
   const [detail, setDetail] = useState<CommitDetail | null>(null)
   const [error, setError] = useState('')
   const [diffStyle, setDiffStyle] = useState<'unified' | 'split'>('unified')
+
+  useEffect(() => {
+    setDiffStyle('unified')
+  }, [path])
   const patchRef = useRef<PatchViewHandle>(null)
   const boundary = useRef<{ direction: 1 | -1; at: number } | null>(null)
   const notify = useToast()
