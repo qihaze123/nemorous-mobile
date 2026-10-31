@@ -3604,3 +3604,11 @@ h1 {
   position: absolute;
   left: 0;
 }
+
+.mp-viewport {
+  font: 12px/20px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.mp-inner .diff-line {
+  font: 11.5px/20px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
