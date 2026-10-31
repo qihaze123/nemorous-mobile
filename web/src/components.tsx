@@ -851,47 +851,6 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
   )
 })
 
-export function DiffNavBar({
-  position,
-  canPrevFile,
-  canNextFile,
-  onPrevChange,
-  onNextChange,
-  onPrevFile,
-  onNextFile,
-  onOpen,
-}: {
-  position: string
-  canPrevFile: boolean
-  canNextFile: boolean
-  onPrevChange: () => void
-  onNextChange: () => void
-  onPrevFile: () => void
-  onNextFile: () => void
-  onOpen: () => void
-}) {
-  return (
-    <div className="diff-nav-row">
-      <button className="nav-icon" onClick={onPrevChange} title="上一处改动" aria-label="上一处改动">
-        <Icon name="up" size={15} />
-      </button>
-      <button className="nav-icon" onClick={onNextChange} title="下一处改动" aria-label="下一处改动">
-        <Icon name="down" size={15} />
-      </button>
-      <button className="nav-icon" onClick={onOpen} title="打开文件" aria-label="打开文件">
-        <Icon name="jump" size={15} />
-      </button>
-      <button className="nav-icon" onClick={onPrevFile} disabled={!canPrevFile} title="上一个文件" aria-label="上一个文件">
-        <Icon name="left" size={15} />
-      </button>
-      <button className="nav-icon" onClick={onNextFile} disabled={!canNextFile} title="下一个文件" aria-label="下一个文件">
-        <Icon name="right" size={15} />
-      </button>
-      <span className="diff-position">{position}</span>
-    </div>
-  )
-}
-
 export interface MultiPatchFile {
   path: string
   status: string

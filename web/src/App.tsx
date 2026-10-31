@@ -229,7 +229,7 @@ export default function App() {
   switch (route.screen) {
     case 'diff':
       screen = path && repoId
-        ? <DiffScreen ws={ws} repoId={repoId} path={path} staged={p.get('staged') === '1'} refresh={refresh} />
+        ? <DiffScreen ws={ws} repoId={repoId} path={path} staged={p.get('staged') === '1'} />
         : <div className="screen"><p className="hint">缺少文件参数。</p></div>
       break
     case 'file':

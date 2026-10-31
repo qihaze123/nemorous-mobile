@@ -131,7 +131,7 @@ func (a *App) handleRepo(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) handleDiff(w http.ResponseWriter, r *http.Request) {
 	staged := r.URL.Query().Get("staged") == "1" || r.URL.Query().Get("staged") == "true"
-	res, err := a.Diff(r.Context(), r.PathValue("id"), r.URL.Query().Get("path"), staged)
+	res, err := a.Diff(r.Context(), r.PathValue("id"), r.URL.Query().Get("path"), staged, r.URL.Query().Get("context") == "full")
 	if err != nil {
 		a.fail(w, err)
 		return

@@ -182,7 +182,7 @@ func repoPath(repo Repo, rel string) (string, error) {
 }
 
 // Diff returns a unified patch for one file.
-func (a *App) Diff(ctx context.Context, id, rel string, staged bool) (DiffResult, error) {
+func (a *App) Diff(ctx context.Context, id, rel string, staged bool, full ...bool) (DiffResult, error) {
 	repo, err := a.repo(id)
 	if err != nil {
 		return DiffResult{}, err
@@ -208,6 +208,9 @@ func (a *App) Diff(ctx context.Context, id, rel string, staged bool) (DiffResult
 		}
 	} else {
 		args := []string{"diff", "--no-color", "--no-ext-diff", "--no-renames"}
+		if len(full) > 0 && full[0] {
+			args = append(args, "--unified=999999")
+		}
 		if staged {
 			args = append(args, "--cached")
 		}
