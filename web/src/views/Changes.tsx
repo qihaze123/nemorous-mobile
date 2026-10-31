@@ -378,7 +378,6 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
             </div>
           )
         })}
-        {section.files.length === 0 ? <div className="section-empty">{section.key === 'staged' ? '无已暂存改动' : '无未暂存改动'}</div> : null}
       </section>
     )
   }
@@ -399,7 +398,7 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
         {totalConflicts > 0 ? <span className="danger-text"><b>{totalConflicts}</b> 处冲突</span> : null}
       </div>
 
-      {sections.map(renderSection)}
+      {sections.filter((section) => section.files.length > 0).map(renderSection)}
       {totalFiles === 0 ? <Empty title="工作区干净" hint="所有仓库都没有未提交改动。" icon="check" /> : null}
 
       {selected.size > 0 ? (
@@ -450,6 +449,7 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
         ) : null}
         <p className="hint">提交会先把所选文件加入暂存区。推送永不使用 --force；已推送或已打标签的提交不能 amend。</p>
       </Sheet>
+      <div className={`screen-bottom-space ${selected.size > 0 ? 'action' : ''}`} />
     </div>
   )
 }

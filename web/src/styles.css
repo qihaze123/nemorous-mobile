@@ -2711,3 +2711,7 @@ h1 {
   font-size: 9.5px;
   color: var(--muted);
 }
+
+.app.with-tab .screen-bottom-space.action {
+  height: calc(156px + env(safe-area-inset-bottom));
+}
