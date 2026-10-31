@@ -1,24 +1,8 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { BranchList, BranchPreset, BranchesResponse, Commit, CommitDetail, CommitFile, OpResult, PresetsResponse, UndoResult, Workspace } from '../types'
-import { api, post } from '../api'
+import type { BranchList, BranchesResponse, Commit, CommitDetail, CommitFile, Workspace } from '../types'
+import { api } from '../api'
 import { back, go, useDebounced } from '../hooks'
-import { ConfirmSheet, DiffNavBar, Empty, Icon, MultiPatchView, PatchView, SectionTitle, Sheet, Spinner, ago, dayKey, repoColor, timeOf, useToast, type PatchViewHandle } from '../components'
-
-function ResultSheet({ results, onClose }: { results: OpResult[] | null; onClose: () => void }) {
-  return (
-    <Sheet open={!!results} title="操作结果" onClose={onClose}>
-      <div className="result-list">
-        {(results ?? []).map((r) => (
-          <div className="op-result" key={`${r.repoId}:${r.message}`}>
-            <span className={`op-status ${r.status.toLowerCase()}`}>{r.status}</span>
-            <span className="repo-name">{r.repoName}</span>
-            <span className="op-message">{r.message}</span>
-          </div>
-        ))}
-      </div>
-    </Sheet>
-  )
-}
+import { DiffNavBar, Empty, Icon, MultiPatchView, PatchView, SectionTitle, Sheet, Spinner, ago, dayKey, repoColor, timeOf, useToast, type PatchViewHandle } from '../components'
 
 interface CommitFilters {
   repoId: string
@@ -55,14 +39,7 @@ export function GitScreen({ ws, refresh }: { ws: Workspace; refresh: () => Promi
   const [filterOpen, setFilterOpen] = useState(false)
   const [branches, setBranches] = useState<BranchesResponse | null>(null)
   const [reload, setReload] = useState(0)
-  const [results, setResults] = useState<OpResult[] | null>(null)
   const [repoSheet, setRepoSheet] = useState<string | null>(null)
-  const [branchSheet, setBranchSheet] = useState(false)
-  const [branchInput, setBranchInput] = useState('')
-  const [createBranch, setCreateBranch] = useState(false)
-  const [stashFirst, setStashFirst] = useState(false)
-  const [presets, setPresets] = useState<BranchPreset[]>([])
-  const [busy, setBusy] = useState(false)
   const notify = useToast()
 
   useEffect(() => {
@@ -94,80 +71,6 @@ export function GitScreen({ ws, refresh }: { ws: Workspace; refresh: () => Promi
       cancelled = true
     }
   }, [debouncedQuery, filters, ws.generatedAt, reload])
-
-  const batch = async (action: 'pull' | 'push') => {
-    setBusy(true)
-    try {
-      const res = await post<{ results: OpResult[] }>('/api/batch', { action })
-      setResults(res.results)
-      await refresh()
-      setReload((v) => v + 1)
-    } catch (err) {
-      notify(err instanceof Error ? err.message : '操作失败', 'error')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const openBranchSheet = () => {
-    setBranchSheet(true)
-    api<PresetsResponse>('/api/presets').then((res) => setPresets(res.presets)).catch(() => {})
-  }
-
-  const applyPreset = async (name: string) => {
-    setBusy(true)
-    try {
-      const res = await post<{ results: OpResult[] }>('/api/presets/apply', { name })
-      setResults(res.results)
-      setBranchSheet(false)
-      await refresh()
-      setReload((v) => v + 1)
-    } catch (err) {
-      notify(err instanceof Error ? err.message : '应用预设失败', 'error')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const batchStash = async (pop: boolean) => {
-    setBusy(true)
-    try {
-      const res = await post<{ results: OpResult[] }>(pop ? '/api/batch/stash/pop' : '/api/batch/stash', { repos: [] })
-      setResults(res.results)
-      await refresh()
-      setReload((v) => v + 1)
-    } catch (err) {
-      notify(err instanceof Error ? err.message : '操作失败', 'error')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const switchAll = async () => {
-    if (!branchInput.trim()) return
-    setBusy(true)
-    try {
-      let stashResults: OpResult[] = []
-      if (stashFirst) {
-        const stashed = await post<{ results: OpResult[] }>('/api/batch/stash', { repos: [] })
-        stashResults = stashed.results
-      }
-      const res = await post<{ results: OpResult[] }>('/api/batch', {
-        action: 'checkout',
-        branch: branchInput.trim(),
-        create: createBranch,
-      })
-      setResults([...stashResults, ...res.results])
-      setBranchSheet(false)
-      setStashFirst(false)
-      await refresh()
-      setReload((v) => v + 1)
-    } catch (err) {
-      notify(err instanceof Error ? err.message : '切换失败', 'error')
-    } finally {
-      setBusy(false)
-    }
-  }
 
   const grouped = useMemo(() => {
     const map: { day: string; items: Commit[] }[] = []
@@ -212,26 +115,6 @@ export function GitScreen({ ws, refresh }: { ws: Workspace; refresh: () => Promi
           <Icon name="refresh" />
         </button>
       </header>
-
-      <div className="action-row">
-        <button className="btn subtle" disabled={busy} onClick={() => void batch('pull')}>
-          <Icon name="sync" size={16} /> 全部拉取
-        </button>
-        <button className="btn subtle" disabled={busy} onClick={() => void batch('push')}>
-          <Icon name="branch" size={16} /> 全部推送
-        </button>
-        <button className="btn subtle" disabled={busy} onClick={openBranchSheet}>
-          <Icon name="git" size={16} /> 统一切分支
-        </button>
-      </div>
-      <div className="action-row">
-        <button className="btn subtle" disabled={busy} onClick={() => void batchStash(false)}>
-          <Icon name="folder" size={16} /> 全部 Stash
-        </button>
-        <button className="btn subtle" disabled={busy} onClick={() => void batchStash(true)}>
-          <Icon name="refresh" size={16} /> 恢复全部 Stash
-        </button>
-      </div>
 
       <div className="commit-search search-box">
         <Icon name="search" size={18} />
@@ -426,55 +309,8 @@ export function GitScreen({ ws, refresh }: { ws: Workspace; refresh: () => Promi
         repoId={repoSheet}
         onClose={() => setRepoSheet(null)}
         notify={notify}
-        refresh={refresh}
       />
 
-      <Sheet
-        open={branchSheet}
-        title="所有仓库统一切分支"
-        onClose={() => setBranchSheet(false)}
-        footer={
-          <>
-            <button className="btn ghost" onClick={() => setBranchSheet(false)}>取消</button>
-            <button className="btn primary" disabled={busy || !branchInput.trim()} onClick={() => void switchAll()}>
-              执行
-            </button>
-          </>
-        }
-      >
-        {presets.length > 0 ? (
-          <>
-            <SectionTitle>已保存的组合</SectionTitle>
-            <div className="repo-chips wrap">
-              {presets.map((preset) => (
-                <button key={preset.name} className="chip" disabled={busy} onClick={() => void applyPreset(preset.name)}>
-                  {preset.name}
-                </button>
-              ))}
-            </div>
-          </>
-        ) : null}
-        <input
-          className="text-input"
-          value={branchInput}
-          onChange={(e) => setBranchInput(e.target.value)}
-          placeholder="分支名，例如 feature/login"
-          autoCapitalize="off"
-          autoCorrect="off"
-          spellCheck={false}
-        />
-        <label className="check-row">
-          <input type="checkbox" checked={createBranch} onChange={(e) => setCreateBranch(e.target.checked)} />
-          <span>不存在时基于当前提交新建</span>
-        </label>
-        <label className="check-row">
-          <input type="checkbox" checked={stashFirst} onChange={(e) => setStashFirst(e.target.checked)} />
-          <span>先 stash 有改动的仓库（不自动恢复）</span>
-        </label>
-        <p className="hint">有未提交改动的仓库默认会被安全跳过；勾选 stash 后会先收起改动再切换，恢复需手动操作。</p>
-      </Sheet>
-
-      <ResultSheet results={results} onClose={() => setResults(null)} />
       <div className="screen-bottom-space" />
     </div>
   )
@@ -484,18 +320,13 @@ function RepoSheet({
   repoId,
   onClose,
   notify,
-  refresh,
 }: {
   repoId: string | null
   onClose: () => void
   notify: (text: string, kind?: 'ok' | 'error' | 'info') => void
-  refresh: () => Promise<void>
 }) {
   const [detail, setDetail] = useState<BranchList | null>(null)
-  const [busy, setBusy] = useState('')
-  const [newBranch, setNewBranch] = useState('')
   const [loading, setLoading] = useState(false)
-  const [confirmUndo, setConfirmUndo] = useState(false)
 
   useEffect(() => {
     if (!repoId) {
@@ -508,48 +339,6 @@ function RepoSheet({
       .catch((err) => notify(err instanceof Error ? err.message : '读取仓库失败', 'error'))
       .finally(() => setLoading(false))
   }, [repoId, notify])
-
-  const act = async (path: string, body: unknown, label: string) => {
-    if (!repoId) return
-    setBusy(path)
-    try {
-      const res = await post<OpResult>(`/api/repos/${repoId}${path}`, body)
-      notify(`${detail?.repo.name ?? ''}: ${res.message}`, res.status === 'FAIL' ? 'error' : res.status === 'SKIP' ? 'info' : 'ok')
-      await refresh()
-      const fresh = await api<BranchList>(`/api/repos/${repoId}`)
-      setDetail(fresh)
-    } catch (err) {
-      notify(err instanceof Error ? err.message : `${label}失败`, 'error')
-    } finally {
-      setBusy('')
-    }
-  }
-
-  const reload = async () => {
-    if (!repoId) return
-    try {
-      setDetail(await api<BranchList>(`/api/repos/${repoId}`))
-      await refresh()
-    } catch (err) {
-      notify(err instanceof Error ? err.message : '刷新失败', 'error')
-    }
-  }
-
-  const undo = async () => {
-    if (!repoId) return
-    setBusy('undo')
-    try {
-      const res = await post<UndoResult>(`/api/repos/${repoId}/undo`, {})
-      notify(`已撤销 ${res.short} ${res.subject}`, 'ok')
-      setConfirmUndo(false)
-      await refresh()
-      setDetail(await api<BranchList>(`/api/repos/${repoId}`))
-    } catch (err) {
-      notify(err instanceof Error ? err.message : '撤销失败', 'error')
-    } finally {
-      setBusy('')
-    }
-  }
 
   const branches = detail?.branches ?? []
   const remotes = (detail?.remotes ?? []).filter((r) => !r.endsWith('/HEAD'))
@@ -566,83 +355,33 @@ function RepoSheet({
             {detail.repo.ahead > 0 ? <span className="pill">待推送 {detail.repo.ahead}</span> : null}
             {detail.repo.behind > 0 ? <span className="pill">落后 {detail.repo.behind}</span> : null}
           </div>
-          <div className="action-row">
-            <button className="btn subtle" disabled={!!busy} onClick={() => void act('/pull', {}, '拉取')}>拉取</button>
-            <button className="btn subtle" disabled={!!busy} onClick={() => void act('/push', {}, '推送')}>推送</button>
-            <button className="btn subtle" disabled={!!busy} onClick={() => void reload()}>刷新</button>
-          </div>
-          <div className="action-row">
-            <button className="btn subtle" disabled={!!busy} onClick={() => void act('/stash', { message: '' }, '暂存改动')}>暂存改动</button>
-            <button className="btn subtle" disabled={!!busy} onClick={() => void act('/stash/pop', {}, '恢复 Stash')}>恢复 Stash</button>
-            <button className="btn subtle" disabled={!!busy} onClick={() => setConfirmUndo(true)}>撤销提交</button>
-          </div>
 
           <SectionTitle>本地分支</SectionTitle>
           <div className="branch-list">
             {branches.map((b) => (
-              <button
-                key={b}
-                className={`branch-row ${b === detail.repo.branch ? 'current' : ''}`}
-                disabled={!!busy}
-                onClick={() => void act('/checkout', { branch: b }, '切换分支')}
-              >
+              <div key={b} className={`branch-row ${b === detail.repo.branch ? 'current' : ''}`}>
                 <Icon name="branch" size={15} />
                 <span>{b}</span>
                 {b === detail.repo.branch ? <em>当前</em> : null}
-              </button>
+              </div>
             ))}
             {branches.length === 0 ? <p className="hint">没有本地分支。</p> : null}
-          </div>
-
-          <div className="inline-form">
-            <input
-              className="text-input"
-              value={newBranch}
-              onChange={(e) => setNewBranch(e.target.value)}
-              placeholder="新建分支…"
-              autoCapitalize="off"
-              spellCheck={false}
-            />
-            <button
-              className="btn primary"
-              disabled={!!busy || !newBranch.trim()}
-              onClick={() => void act('/checkout', { branch: newBranch.trim(), create: true }, '新建分支')}
-            >
-              新建
-            </button>
           </div>
 
           {remotes.length > 0 ? (
             <>
               <SectionTitle>远端分支</SectionTitle>
               <div className="branch-list">
-                {remotes.map((r) => {
-                  const short = r.includes('/') ? r.slice(r.indexOf('/') + 1) : r
-                  return (
-                    <button
-                      key={r}
-                      className="branch-row remote"
-                      disabled={!!busy}
-                      onClick={() => void act('/checkout', { branch: short }, '切换分支')}
-                    >
-                      <Icon name="branch" size={15} />
-                      <span>{r}</span>
-                    </button>
-                  )
-                })}
+                {remotes.map((r) => (
+                  <div key={r} className="branch-row remote">
+                    <Icon name="branch" size={15} />
+                    <span>{r}</span>
+                  </div>
+                ))}
               </div>
             </>
           ) : null}
-          <p className="hint">切换分支遇到未提交改动会被安全跳过。推送永不使用 --force。</p>
-          <ConfirmSheet
-            open={confirmUndo}
-            title="撤销上一次提交"
-            body={`将对 ${detail.repo.name} 执行 git reset --soft HEAD~1：提交回到暂存区，工作区文件不变。仅允许撤销未推送、非合并的提交。`}
-            confirmText="确认撤销"
-            danger
-            onCancel={() => setConfirmUndo(false)}
-            onConfirm={() => void undo()}
-          />
+          <p className="hint">此处只读展示分支与远端信息。拉取、推送与切换分支请到改动页的「Git 操作」中执行（作用于全部仓库）。</p>
         </>
       ) : null}
     </Sheet>

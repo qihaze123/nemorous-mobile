@@ -431,9 +431,14 @@ func pullRepo(ctx context.Context, repo Repo) OpResult {
 		res.Message = st.Error
 		return res
 	}
-	if len(st.Files) > 0 {
+	if st.ConflictCount > 0 {
 		res.Status = "SKIP"
-		res.Message = "有未提交改动，已跳过"
+		res.Message = "有未解决的冲突，已跳过"
+		return res
+	}
+	if st.StagedCount > 0 {
+		res.Status = "SKIP"
+		res.Message = "有已暂存改动，已跳过"
 		return res
 	}
 	if st.Upstream == "" {
@@ -441,15 +446,38 @@ func pullRepo(ctx context.Context, repo Repo) OpResult {
 		res.Message = "没有远端上游，已跳过"
 		return res
 	}
-	out, errOut, err := git(ctx, repo.Path, writeTimeout, "pull", "--ff-only")
+	args := []string{"pull", "--ff-only"}
+	if st.ModifiedCount > 0 {
+		// Unstaged tracked edits do not block a fast-forward pull; stash them
+		// around the merge and re-apply them afterwards.
+		args = append(args, "--autostash")
+	}
+	out, errOut, err := git(ctx, repo.Path, writeTimeout, args...)
 	if err != nil {
 		res.Status = "FAIL"
 		res.Message = firstLine(firstNonEmptyLine(errOut, err.Error()))
 		return res
 	}
+	if msg := autostashConflictMessage(errOut); msg != "" {
+		// git pull exits 0 when the autostash re-apply conflicts, leaving the
+		// edit in the stash; surface the git warning instead of a false OK.
+		res.Status = "FAIL"
+		res.Message = msg
+		return res
+	}
 	res.Status = "OK"
 	res.Message = firstNonEmptyLine(out, "已快进同步")
 	return res
+}
+
+func autostashConflictMessage(errOut string) string {
+	for _, line := range strings.Split(errOut, "\n") {
+		lower := strings.ToLower(line)
+		if strings.Contains(lower, "autostash") && strings.Contains(lower, "conflict") {
+			return strings.TrimSpace(line)
+		}
+	}
+	return ""
 }
 
 var branchNameRe = regexp.MustCompile(`^[A-Za-z0-9._/-]+$`)

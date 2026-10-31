@@ -374,25 +374,115 @@ func TestBatchCommitAcrossRepos(t *testing.T) {
 	}
 }
 
-func TestPullSkipsDirtyAndNoUpstream(t *testing.T) {
+func TestPullAllowsUnstagedAndSkipsStaged(t *testing.T) {
 	app, _ := newTestApp(t)
 	ctx := context.Background()
-	ws := app.Workspace(ctx)
-	a := findRepo(t, ws, "repo-a")
+	a := findRepo(t, app.Workspace(ctx), "repo-a")
 	res, err := app.Pull(ctx, a.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Status != "SKIP" || !strings.Contains(res.Message, "未提交") {
-		t.Fatalf("dirty pull = %+v", res)
+	if res.Status != "OK" {
+		t.Fatalf("unstaged pull = %+v, want OK", res)
 	}
-	b := findRepo(t, ws, "repo-b")
+	data, err := os.ReadFile(filepath.Join(a.Path, "a.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "line two changed") {
+		t.Fatalf("unstaged edit was lost: %q", data)
+	}
+	if _, err := os.Stat(filepath.Join(a.Path, "new.txt")); err != nil {
+		t.Fatalf("untracked file was lost: %v", err)
+	}
+	if err := app.Stage(ctx, a.ID, []string{"a.txt"}); err != nil {
+		t.Fatal(err)
+	}
+	res, err = app.Pull(ctx, a.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Status != "SKIP" || !strings.Contains(res.Message, "已暂存") {
+		t.Fatalf("staged pull = %+v, want SKIP 已暂存", res)
+	}
+	b := findRepo(t, app.Workspace(ctx), "repo-b")
 	res, err = app.Pull(ctx, b.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if res.Status != "SKIP" || !strings.Contains(res.Message, "上游") {
 		t.Fatalf("no-upstream pull = %+v", res)
+	}
+}
+
+func TestPullFastForwardAutostashReappliesUnstagedEdit(t *testing.T) {
+	root := t.TempDir()
+	dir := newRepo(t, root, "repo-a", true)
+	app, err := NewWithOptions(root, Options{Token: "t", StateDir: t.TempDir(), PairCode: "123456"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	a := findRepo(t, app.Workspace(ctx), "repo-a")
+
+	base := "l1\nl2\nl3\nl4\nl5\nl6\nl7\nl8\nl9\nl10\n"
+	writeFile(t, filepath.Join(dir, "a.txt"), base)
+	run(t, dir, "commit", "-qam", "base")
+	run(t, dir, "push", "-q", "origin", "main")
+
+	upstream := filepath.Join(t.TempDir(), "work")
+	run(t, root, "clone", "-q", filepath.Join(root, "repo-a-remote.git"), upstream)
+	writeFile(t, filepath.Join(upstream, "a.txt"), "l1 upstream\nl2\nl3\nl4\nl5\nl6\nl7\nl8\nl9\nl10\n")
+	run(t, upstream, "commit", "-qam", "upstream change")
+	run(t, upstream, "push", "-q", "origin", "main")
+	want := strings.TrimSpace(run(t, upstream, "rev-parse", "HEAD"))
+
+	writeFile(t, filepath.Join(dir, "a.txt"), "l1\nl2\nl3\nl4\nl5\nl6\nl7\nl8\nl9\nl10 local\n")
+	res, err := app.Pull(ctx, a.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Status != "OK" {
+		t.Fatalf("pull = %+v, want OK", res)
+	}
+	if got := strings.TrimSpace(run(t, dir, "rev-parse", "HEAD")); got != want {
+		t.Fatalf("HEAD = %s, want %s", got, want)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "a.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "l1 upstream") || !strings.Contains(string(data), "l10 local") {
+		t.Fatalf("autostash did not re-apply the local edit: %q", data)
+	}
+	if stash := strings.TrimSpace(run(t, dir, "stash", "list")); stash != "" {
+		t.Fatalf("autostash left stash entries: %q", stash)
+	}
+}
+
+func TestPullAutostashConflictFailsWithGitMessage(t *testing.T) {
+	root := t.TempDir()
+	dir := newRepo(t, root, "repo-a", true)
+	app, err := NewWithOptions(root, Options{Token: "t", StateDir: t.TempDir(), PairCode: "123456"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	a := findRepo(t, app.Workspace(ctx), "repo-a")
+
+	upstream := filepath.Join(t.TempDir(), "work")
+	run(t, root, "clone", "-q", filepath.Join(root, "repo-a-remote.git"), upstream)
+	writeFile(t, filepath.Join(upstream, "a.txt"), "line one\nline two upstream\n")
+	run(t, upstream, "commit", "-qam", "upstream change")
+	run(t, upstream, "push", "-q", "origin", "main")
+
+	writeFile(t, filepath.Join(dir, "a.txt"), "line one\nline two local\n")
+	res, err := app.Pull(ctx, a.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Status != "FAIL" || !strings.Contains(strings.ToLower(res.Message), "autostash") {
+		t.Fatalf("autostash conflict pull = %+v, want FAIL with git stderr", res)
 	}
 }
 

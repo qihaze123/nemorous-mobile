@@ -3,6 +3,7 @@ import type { FileChange, OpResult, RepoState, Workspace } from '../types'
 import { post } from '../api'
 import { go } from '../hooks'
 import { Empty, Icon, Sheet, repoColor, useToast } from '../components'
+import { BranchSwitchSheet, summarizeResults } from './BranchSwitchSheet'
 
 type SectionKey = 'staged' | 'unstaged'
 type Mode = 'list' | 'tree'
@@ -138,7 +139,7 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
   const [menuPage, setMenuPage] = useState<'root' | 'view' | 'git'>('root')
   const [subAnchor, setSubAnchor] = useState<{ top: number; right: number } | null>(null)
   const [menuBusy, setMenuBusy] = useState(false)
-  const [actionRepoId, setActionRepoId] = useState(ws.repos[0]?.id ?? '')
+  const [branchOpen, setBranchOpen] = useState(false)
   const notify = useToast()
 
   useEffect(() => {
@@ -209,7 +210,7 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
     }
     const rect = event.currentTarget.getBoundingClientRect()
     const root = event.currentTarget.closest('.menu-card')?.getBoundingClientRect()
-    const estimatedHeight = page === 'git' ? 280 : 160
+    const estimatedHeight = page === 'git' ? 360 : 160
     setSubAnchor({
       top: Math.max(76, Math.min(rect.bottom + 6, innerHeight - estimatedHeight)),
       right: innerWidth - (root?.left ?? rect.left) + 6,
@@ -217,22 +218,39 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
     setMenuPage(page)
   }
 
-  const actionRepo = ws.repos.find((repo) => repo.id === actionRepoId) ?? ws.repos[0]
-
-  const runRepoAction = async (action: 'pull' | 'push' | 'stash') => {
-    const repo = actionRepo
-    if (!repo) return
+  const runBatch = async (action: 'pull' | 'push') => {
     setMenuBusy(true)
     try {
-      const res = await post<OpResult>(`/api/repos/${repo.id}/${action}`, action === 'stash' ? { message: '' } : {})
-      notify(`${repo.name}: ${res.message}`, res.status === 'FAIL' ? 'error' : res.status === 'SKIP' ? 'info' : 'ok')
-      if (res.status !== 'FAIL') setMenuOpen(false)
+      const res = await post<{ results: OpResult[] }>('/api/batch', { action })
+      const summary = summarizeResults(res.results)
+      notify(summary.text, summary.kind)
+      if (summary.kind !== 'error') setMenuOpen(false)
       await refresh()
     } catch (err) {
       notify(err instanceof Error ? err.message : '操作失败', 'error')
     } finally {
       setMenuBusy(false)
     }
+  }
+
+  const runStash = async (pop: boolean) => {
+    setMenuBusy(true)
+    try {
+      const res = await post<{ results: OpResult[] }>(pop ? '/api/batch/stash/pop' : '/api/batch/stash', { repos: [] })
+      const summary = summarizeResults(res.results)
+      notify(summary.text, summary.kind)
+      if (summary.kind !== 'error') setMenuOpen(false)
+      await refresh()
+    } catch (err) {
+      notify(err instanceof Error ? err.message : '操作失败', 'error')
+    } finally {
+      setMenuBusy(false)
+    }
+  }
+
+  const openBranchSwitch = () => {
+    setMenuOpen(false)
+    setBranchOpen(true)
   }
 
   const toggleFile = (repoId: string, file: FileChange) => {
@@ -505,7 +523,7 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
                 <Icon name="git" size={17} />
                 <span className="menu-option-main">
                   <span className="menu-option-title">Git 操作</span>
-                  <span className="menu-option-sub">{actionRepo?.name ?? '无仓库'}</span>
+                  <span className="menu-option-sub">{ws.repos.length} 个仓库</span>
                 </span>
                 <Icon name={menuPage === 'git' ? 'down' : 'chevron'} size={15} />
               </button>
@@ -529,35 +547,27 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
                   </>
                 ) : (
                   <>
-                    {ws.repos.length > 1 ? (
-                      <label className="menu-select">
-                        <span>仓库</span>
-                        <select value={actionRepo?.id ?? ''} onChange={(e) => setActionRepoId(e.target.value)}>
-                          {ws.repos.map((repo) => (
-                            <option key={repo.id} value={repo.id}>{repo.name}</option>
-                          ))}
-                        </select>
-                      </label>
-                    ) : (
-                      <div className="menu-repo">
-                        <span className="repo-dot" style={{ background: repoColor(actionRepo?.name ?? '') }} />
-                        <span>{actionRepo?.name}</span>
-                        <code>{actionRepo?.branch}</code>
-                      </div>
-                    )}
-                    <button className="menu-option" disabled={menuBusy || !actionRepo} onClick={() => void runRepoAction('pull')}>
+                    <button className="menu-option" disabled={menuBusy} onClick={() => void runBatch('pull')}>
                       <Icon name="sync" size={16} />
-                      <span>拉取</span>
+                      <span>拉取全部</span>
                     </button>
-                    <button className="menu-option" disabled={menuBusy || !actionRepo} onClick={() => void runRepoAction('push')}>
+                    <button className="menu-option" disabled={menuBusy} onClick={() => void runBatch('push')}>
                       <Icon name="branch" size={16} />
-                      <span>推送</span>
+                      <span>推送全部</span>
                     </button>
-                    <button className="menu-option" disabled={menuBusy || !actionRepo} onClick={() => void runRepoAction('stash')}>
+                    <button className="menu-option" disabled={menuBusy} onClick={openBranchSwitch}>
+                      <Icon name="git" size={16} />
+                      <span>统一切分支</span>
+                    </button>
+                    <button className="menu-option" disabled={menuBusy} onClick={() => void runStash(false)}>
                       <Icon name="folder" size={16} />
-                      <span>Stash 当前改动</span>
+                      <span>Stash 全部</span>
                     </button>
-                    <p className="menu-hint">Stash 会收起当前仓库的未提交改动（含未跟踪文件），不会删除。</p>
+                    <button className="menu-option" disabled={menuBusy} onClick={() => void runStash(true)}>
+                      <Icon name="refresh" size={16} />
+                      <span>恢复全部 Stash</span>
+                    </button>
+                    <p className="menu-hint">操作作用于整个工作区的全部仓库，结果会汇总提示。Stash 会收起未提交改动（含未跟踪文件），不会删除。</p>
                   </>
                 )}
               </div>
@@ -606,6 +616,7 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
         ) : null}
         <p className="hint">提交会先把所选文件加入暂存区。推送永不使用 --force；已推送或已打标签的提交不能 amend。</p>
       </Sheet>
+      <BranchSwitchSheet open={branchOpen} ws={ws} onClose={() => setBranchOpen(false)} refresh={refresh} notify={notify} />
       <div className={`screen-bottom-space changes-bottom-space ${selected.size > 0 ? 'action' : ''}`} />
     </div>
   )
