@@ -135,9 +135,19 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
   const [collapsedDirs, setCollapsedDirs] = useState<Set<string>>(new Set())
   const [collapsedRepos, setCollapsedRepos] = useState<Set<string>>(new Set())
   const [menuOpen, setMenuOpen] = useState(false)
+  const [menuPage, setMenuPage] = useState<'root' | 'view' | 'git'>('root')
   const [menuBusy, setMenuBusy] = useState(false)
   const [actionRepoId, setActionRepoId] = useState(ws.repos[0]?.id ?? '')
   const notify = useToast()
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false)
+    }
+    addEventListener('keydown', onKey)
+    return () => removeEventListener('keydown', onKey)
+  }, [menuOpen])
 
   const sections = useMemo<Section[]>(() => {
     const make = (key: SectionKey, title: string, filter: (file: FileChange) => boolean): Section => {
@@ -422,7 +432,16 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
     <div className="screen">
       <header className="topbar">
         <h1>{ws.name}</h1>
-        <button className="icon-btn menu-btn" aria-label="更多" onClick={() => setMenuOpen(true)}>
+        <button
+          className="icon-btn menu-btn"
+          aria-label="更多"
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          onClick={() => {
+            setMenuPage('root')
+            setMenuOpen((open) => !open)
+          }}
+        >
           <Icon name="more" />
         </button>
       </header>
@@ -443,51 +462,87 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
         </div>
       ) : null}
 
-      <Sheet open={menuOpen} title="更多" onClose={() => setMenuOpen(false)}>
-        <div className="menu-section">
-          <div className="menu-label">视图</div>
-          <button className="menu-row" onClick={() => changeMode('list')}>
-            <span className="menu-check">{mode === 'list' ? <Icon name="check" size={16} /> : null}</span>
-            <span>列表</span>
-          </button>
-          <button className="menu-row" onClick={() => changeMode('tree')}>
-            <span className="menu-check">{mode === 'tree' ? <Icon name="check" size={16} /> : null}</span>
-            <span>树</span>
-          </button>
-        </div>
-        <div className="menu-section">
-          <div className="menu-label">Git 操作</div>
-          {ws.repos.length > 1 ? (
-            <label className="menu-select">
-              <span>仓库</span>
-              <select value={actionRepo?.id ?? ''} onChange={(e) => setActionRepoId(e.target.value)}>
-                {ws.repos.map((repo) => (
-                  <option key={repo.id} value={repo.id}>{repo.name}</option>
-                ))}
-              </select>
-            </label>
-          ) : (
-            <div className="menu-repo">
-              <span className="repo-dot" style={{ background: repoColor(actionRepo?.name ?? '') }} />
-              <span>{actionRepo?.name}</span>
-              <code>{actionRepo?.branch}</code>
+      {menuOpen ? (
+        <>
+          <div className="menu-backdrop" onClick={() => setMenuOpen(false)} />
+          <div className="menu-popover" role="menu" aria-label="更多">
+            <div className="menu-card" key={menuPage}>
+              {menuPage === 'root' ? (
+                <>
+                  <button className="menu-option" onClick={() => setMenuPage('view')}>
+                    <Icon name="panel" size={17} />
+                    <span className="menu-option-main">
+                      <span className="menu-option-title">视图</span>
+                      <span className="menu-option-sub">{mode === 'list' ? '列表' : '树'}</span>
+                    </span>
+                    <Icon name="chevron" size={15} />
+                  </button>
+                  <button className="menu-option" onClick={() => setMenuPage('git')}>
+                    <Icon name="git" size={17} />
+                    <span className="menu-option-main">
+                      <span className="menu-option-title">Git 操作</span>
+                      <span className="menu-option-sub">{actionRepo?.name ?? '无仓库'}</span>
+                    </span>
+                    <Icon name="chevron" size={15} />
+                  </button>
+                </>
+              ) : menuPage === 'view' ? (
+                <>
+                  <button className="menu-back" onClick={() => setMenuPage('root')}>
+                    <Icon name="back" size={15} />
+                    <span>视图</span>
+                  </button>
+                  {([
+                    ['list', '列表'],
+                    ['tree', '树'],
+                  ] as const).map(([value, label]) => (
+                    <button key={value} className={`menu-option ${mode === value ? 'on' : ''}`} onClick={() => changeMode(value)}>
+                      <span className="menu-option-check">{mode === value ? <Icon name="check" size={15} /> : null}</span>
+                      <span>{label}</span>
+                    </button>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <button className="menu-back" onClick={() => setMenuPage('root')}>
+                    <Icon name="back" size={15} />
+                    <span>Git 操作</span>
+                  </button>
+                  {ws.repos.length > 1 ? (
+                    <label className="menu-select">
+                      <span>仓库</span>
+                      <select value={actionRepo?.id ?? ''} onChange={(e) => setActionRepoId(e.target.value)}>
+                        {ws.repos.map((repo) => (
+                          <option key={repo.id} value={repo.id}>{repo.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : (
+                    <div className="menu-repo">
+                      <span className="repo-dot" style={{ background: repoColor(actionRepo?.name ?? '') }} />
+                      <span>{actionRepo?.name}</span>
+                      <code>{actionRepo?.branch}</code>
+                    </div>
+                  )}
+                  <button className="menu-option" disabled={menuBusy || !actionRepo} onClick={() => void runRepoAction('pull')}>
+                    <Icon name="sync" size={16} />
+                    <span>拉取</span>
+                  </button>
+                  <button className="menu-option" disabled={menuBusy || !actionRepo} onClick={() => void runRepoAction('push')}>
+                    <Icon name="branch" size={16} />
+                    <span>推送</span>
+                  </button>
+                  <button className="menu-option" disabled={menuBusy || !actionRepo} onClick={() => void runRepoAction('stash')}>
+                    <Icon name="folder" size={16} />
+                    <span>Stash 当前改动</span>
+                  </button>
+                  <p className="menu-hint">Stash 会收起当前仓库的未提交改动（含未跟踪文件），不会删除。</p>
+                </>
+              )}
             </div>
-          )}
-          <button className="menu-row" disabled={menuBusy || !actionRepo} onClick={() => void runRepoAction('pull')}>
-            <span className="menu-check"><Icon name="sync" size={16} /></span>
-            <span>拉取</span>
-          </button>
-          <button className="menu-row" disabled={menuBusy || !actionRepo} onClick={() => void runRepoAction('push')}>
-            <span className="menu-check"><Icon name="branch" size={16} /></span>
-            <span>推送</span>
-          </button>
-          <button className="menu-row" disabled={menuBusy || !actionRepo} onClick={() => void runRepoAction('stash')}>
-            <span className="menu-check"><Icon name="folder" size={16} /></span>
-            <span>Stash 当前改动</span>
-          </button>
-          <p className="menu-hint">Stash 会收起当前仓库的未提交改动（含未跟踪文件），不会删除。</p>
-        </div>
-      </Sheet>
+          </div>
+        </>
+      ) : null}
       <Sheet
         open={commitOpen}
         title="统一提交"
