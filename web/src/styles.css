@@ -1904,6 +1904,7 @@ h1 {
 }
 
 .repo-block-head {
+  cursor: pointer;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -1916,17 +1917,6 @@ h1 {
   flex: 1;
   min-width: 0;
   gap: 2px;
-}
-
-.repo-sync {
-  display: flex;
-  gap: 2px;
-  flex: none;
-}
-
-.repo-sync .icon-btn.tiny {
-  width: 26px;
-  height: 26px;
 }
 
 .file-list .file-row:last-child {
@@ -2078,16 +2068,6 @@ h1 {
 .repo-block-head .repo-sub {
   font-size: 10px;
   line-height: 1.2;
-}
-
-.repo-block-head .pill {
-  padding: 1px 5px;
-  font-size: 9px;
-}
-
-.repo-sync .icon-btn.tiny {
-  width: 24px;
-  height: 24px;
 }
 
 .commit-patch-meta {
@@ -2595,6 +2575,12 @@ h1 {
 
 .change-section-head .section-name {
   flex: 1;
+}
+
+.repo-toggle {
+  display: flex;
+  flex: none;
+  color: var(--muted);
 }
 
 .repo-block-head .checkbox {

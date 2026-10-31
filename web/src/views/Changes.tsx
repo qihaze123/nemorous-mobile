@@ -131,9 +131,9 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
   const [pushAfter, setPushAfter] = useState(false)
   const [amend, setAmend] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [busyKey, setBusyKey] = useState('')
   const [mode, setModeState] = useState<Mode>(() => (localStorage.getItem('nemorous.changesMode') === 'tree' ? 'tree' : 'list'))
   const [collapsedDirs, setCollapsedDirs] = useState<Set<string>>(new Set())
+  const [collapsedRepos, setCollapsedRepos] = useState<Set<string>>(new Set())
   const notify = useToast()
 
   const sections = useMemo<Section[]>(() => {
@@ -216,19 +216,6 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
     return count === files.length ? 'all' : 'some'
   }
 
-  const pushRepo = async (repo: RepoState) => {
-    setBusyKey(`${repo.id}:push`)
-    try {
-      const res = await post<OpResult>(`/api/repos/${repo.id}/push`, {})
-      notify(`${repo.name}: ${res.message}`, res.status === 'FAIL' ? 'error' : res.status === 'SKIP' ? 'info' : 'ok')
-      await refresh()
-    } catch (err) {
-      notify(err instanceof Error ? err.message : '操作失败', 'error')
-    } finally {
-      setBusyKey('')
-    }
-  }
-
   const submit = async () => {
     if (!message.trim() || groups.length === 0) return
     setBusy(true)
@@ -256,6 +243,16 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
 
   const openDiff = (repo: RepoState, file: FileChange, section: SectionKey) => {
     go(`#/diff?repo=${repo.id}&path=${encodeURIComponent(file.path)}&staged=${section === 'staged' ? 1 : 0}`)
+  }
+
+  const toggleRepo = (section: SectionKey, repoId: string) => {
+    const key = `${section}:${repoId}`
+    setCollapsedRepos((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
   }
 
   const toggleDir = (key: string) => {
@@ -314,10 +311,24 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
         {section.repos.map(({ repo, files }) => {
           const repoState = stateOf(repo, files)
           const tree = mode === 'tree' ? buildTree(files) : []
+          const repoKey = `${section.key}:${repo.id}`
+          const repoCollapsed = collapsedRepos.has(repoKey)
           return (
-            <div className="repo-block" key={`${section.key}:${repo.id}`}>
-              <div className="repo-block-head">
+            <div className="repo-block" key={repoKey}>
+              <div
+                className="repo-block-head"
+                role="button"
+                tabIndex={0}
+                aria-expanded={!repoCollapsed}
+                onClick={() => toggleRepo(section.key, repo.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') toggleRepo(section.key, repo.id)
+                }}
+              >
                 <TriCheckbox state={repoState} label={`选择 ${repo.name} 的全部文件`} onToggle={() => setFiles(repo, files, repoState !== 'all')} />
+                <span className="repo-toggle" aria-hidden="true">
+                  <Icon name={repoCollapsed ? 'chevron' : 'down'} size={12} />
+                </span>
                 <span className="repo-avatar small" style={{ background: repoColor(repo.name) }}>
                   {repo.name.slice(0, 2)}
                 </span>
@@ -330,14 +341,9 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
                     {repo.behind > 0 ? <em className="behind">↓{repo.behind}</em> : null}
                   </span>
                 </span>
-                <span className="repo-sync">
-                  <button className="icon-btn tiny" aria-label={`推送 ${repo.name}`} disabled={busyKey === `${repo.id}:push` || repo.ahead === 0} onClick={() => void pushRepo(repo)}>
-                    <Icon name="branch" size={15} />
-                  </button>
-                </span>
               </div>
 
-              {mode === 'list' ? (
+              {repoCollapsed ? null : mode === 'list' ? (
                 <div className="list-scroll">
                   <div className="list-inner">
                     {files.map((file) => (
