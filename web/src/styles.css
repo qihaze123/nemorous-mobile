@@ -2749,3 +2749,157 @@ h1 {
 .menu-option.active {
   background: var(--surface);
 }
+
+.checkbox.some {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.tri-dash {
+  display: block;
+  width: 8px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+}
+
+.change-section-head .checkbox {
+  margin-left: 1px;
+}
+
+.change-section-head .section-name {
+  flex: 1;
+}
+
+.repo-toggle {
+  display: flex;
+  flex: none;
+  color: var(--muted);
+}
+
+.repo-block-head .checkbox {
+  margin-right: 1px;
+}
+
+.list-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.list-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.list-inner {
+  width: 100%;
+}
+
+.list-row {
+  width: max-content;
+  min-width: 100%;
+  gap: 5px;
+}
+
+.list-row .file-name {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+.list-row .file-dir {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9.5px;
+}
+
+.status-untracked {
+  color: var(--del);
+}
+
+.status-add {
+  color: var(--add);
+}
+
+.status-mod {
+  color: var(--blue);
+}
+
+.status-del {
+  color: var(--muted);
+}
+
+.status-rename {
+  color: #c586c0;
+}
+
+.status-conflict {
+  color: var(--del);
+}
+
+.change-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  min-height: 30px;
+  padding-right: 8px;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  text-align: left;
+  font-size: 12px;
+}
+
+.change-tree-row.dir {
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.change-tree-row.file {
+  cursor: pointer;
+}
+
+.change-tree-row:active {
+  background: var(--surface);
+}
+
+.change-tree-row .tree-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.change-tree-row .file-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+}
+
+.tree-count {
+  flex: none;
+  font-size: 9.5px;
+  color: var(--muted);
+}
+
+.app.with-tab .screen-bottom-space.action {
+  height: calc(156px + env(safe-area-inset-bottom));
+}
+
+.app.with-tab .screen-bottom-space.changes-bottom-space {
+  height: calc(56px + env(safe-area-inset-bottom));
+}
+
+.app.with-tab .screen-bottom-space.changes-bottom-space.action {
+  height: calc(140px + env(safe-area-inset-bottom));
+}
