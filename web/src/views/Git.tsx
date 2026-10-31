@@ -626,8 +626,6 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
     setDiffStyle('unified')
   }, [path])
   const patchRef = useRef<PatchViewHandle>(null)
-  const boundary = useRef<{ direction: 1 | -1; at: number } | null>(null)
-  const notify = useToast()
   useEffect(() => {
     setDetail(null)
     api<CommitDetail>(`/api/repos/${repoId}/commits/${hash}`)
@@ -647,18 +645,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
   }
 
   const step = (direction: 1 | -1) => {
-    if (patchRef.current?.scrollToHunk(direction)) {
-      boundary.current = null
-      return
-    }
-    const now = Date.now()
-    if (boundary.current?.direction === direction && now - boundary.current.at < 1600) {
-      boundary.current = null
-      jump(direction)
-      return
-    }
-    boundary.current = { direction, at: now }
-    notify(direction > 0 ? '已到文件末尾，再按一次进入下一个文件' : '已到文件开头，再按一次进入上一个文件', 'info')
+    patchRef.current?.scrollToHunk(direction)
   }
 
   useEffect(() => {
