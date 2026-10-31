@@ -396,6 +396,9 @@ function buildSplitRows(lines: DiffLine[]): SplitRow[] {
         kind: 'split',
         left: { kind: 'ctx', text: line.text, no: line.old },
         right: { kind: 'ctx', text: line.text, no: line.new },
+        foldId: line.foldId,
+        foldExpanded: line.foldExpanded,
+        foldCount: line.foldCount,
       })
       i++
       continue
@@ -446,8 +449,8 @@ function foldContextRows(lines: DiffLine[], expanded: Set<string>, keep = 3): Di
     const id = `fold:${start}:${i}`
     const isExpanded = expanded.has(id)
     if (isExpanded) {
-      out.push({ kind: 'fold', text: '', foldId: id, foldCount: run.length, foldExpanded: true })
-      out.push(...run)
+      const [first, ...rest] = run
+      out.push({ ...first, foldId: id, foldExpanded: true, foldCount: run.length }, ...rest)
     } else {
       const hidden = run.length - head - tail
       out.push(...run.slice(0, head))
@@ -484,6 +487,14 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
   useEffect(() => {
     setExpandedFolds(new Set())
   }, [patch, folded])
+  const toggleFold = (id: string) => {
+    setExpandedFolds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
   const lines = useMemo(() => (folded ? foldContextRows(rawLines, expandedFolds) : rawLines), [folded, rawLines, expandedFolds])
   const hasOldLines = useMemo(() => lines.some((line) => line.old !== undefined), [lines])
   const hasNewLines = useMemo(() => lines.some((line) => line.new !== undefined), [lines])
@@ -670,21 +681,12 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
                 return (
                   <button
                     key={index}
-                    className={`diff-line fold-row ${split.foldExpanded ? 'open' : ''}`}
+                    className="diff-line fold-row"
                     style={rowStyle(index)}
-                    onClick={() => {
-                      const id = split.foldId
-                      if (!id) return
-                      setExpandedFolds((prev) => {
-                        const next = new Set(prev)
-                        if (next.has(id)) next.delete(id)
-                        else next.add(id)
-                        return next
-                      })
-                    }}
+                    aria-label={`展开 ${split.foldCount ?? 0} 行未修改内容`}
+                    onClick={() => split.foldId && toggleFold(split.foldId)}
                   >
-                    <span className="fold-chevron">{split.foldExpanded ? '⌃' : '⌄'}</span>
-                    <span className="fold-text">{split.foldExpanded ? `${split.foldCount} 行已展开` : `${split.foldCount} 行未显示`}</span>
+                    <span className="fold-chevron">⌄</span>
                   </button>
                 )
               }
@@ -714,7 +716,12 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
             }
             return (
               <div key={index} className="diff-line split-row" style={rowStyle(index)}>
-                <span className={`split-gutter ${left.kind}`}>{left.no ?? ''}</span>
+                <span className={`split-gutter ${left.kind}`}>
+                  {split.foldExpanded && split.foldId ? (
+                    <button className="fold-gutter-toggle" aria-label="收起未修改内容" onClick={() => toggleFold(split.foldId!)}>⌃</button>
+                  ) : null}
+                  {left.no ?? ''}
+                </span>
                 <span className={`split-code ${left.kind}`}>{left.kind === 'del' ? '-' : left.kind === 'ctx' ? ' ' : ''}{idea && left.segments ? left.segments.map((segment, j) => segment.changed ? <mark key={j} className="word-del">{segment.text}</mark> : segment.text) : left.text}</span>
                 <span className={`split-gutter ${right.kind}`}>{right.no ?? ''}</span>
                 <span className={`split-code ${right.kind}`}>{right.kind === 'add' ? '+' : right.kind === 'ctx' ? ' ' : ''}{idea && right.segments ? right.segments.map((segment, j) => segment.changed ? <mark key={j} className="word-add">{segment.text}</mark> : segment.text) : right.text}</span>
@@ -726,21 +733,12 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
             return (
               <button
                 key={index}
-                className={`diff-line fold-row ${line.foldExpanded ? 'open' : ''}`}
+                className="diff-line fold-row"
                 style={rowStyle(index)}
-                onClick={() => {
-                  const id = line.foldId
-                  if (!id) return
-                  setExpandedFolds((prev) => {
-                    const next = new Set(prev)
-                    if (next.has(id)) next.delete(id)
-                    else next.add(id)
-                    return next
-                  })
-                }}
+                aria-label={`展开 ${line.foldCount ?? 0} 行未修改内容`}
+                onClick={() => line.foldId && toggleFold(line.foldId)}
               >
-                <span className="fold-chevron">{line.foldExpanded ? '⌃' : '⌄'}</span>
-                <span className="fold-text">{line.foldExpanded ? `${line.foldCount} 行已展开` : `${line.foldCount} 行未显示`}</span>
+                <span className="fold-chevron">⌄</span>
               </button>
             )
           }
@@ -748,7 +746,13 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
             <div key={index} className={`diff-line ${line.kind}`} style={rowStyle(index)}>
               {(idea ? hasOldLines : true) ? <span className={`gutter old ${line.kind === 'del' ? 'changed' : ''}`}>{line.old ?? ''}</span> : null}
               {(idea ? hasNewLines : true) ? <span className={`gutter new ${line.kind === 'add' ? 'changed' : ''}`}>{line.new ?? ''}</span> : null}
-              {idea ? <span className={`marker ${line.kind}`}>{line.kind === 'add' ? '+' : line.kind === 'del' ? '−' : ''}</span> : null}
+              {idea ? (
+                line.foldExpanded && line.foldId ? (
+                  <button className="fold-gutter-toggle" aria-label="收起未修改内容" onClick={() => toggleFold(line.foldId!)}>⌃</button>
+                ) : (
+                  <span className={`marker ${line.kind}`}>{line.kind === 'add' ? '+' : line.kind === 'del' ? '−' : ''}</span>
+                )
+              ) : null}
               <span className="code">
                 {idea && wordChanges[index]
                   ? wordChanges[index]!.map((segment, j) => segment.changed ? <mark key={j} className={`word-${line.kind}`}>{segment.text}</mark> : segment.text)
