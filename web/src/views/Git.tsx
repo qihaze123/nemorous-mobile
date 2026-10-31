@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { BranchList, BranchesResponse, Commit, CommitDetail, CommitFile, Workspace } from '../types'
 import { api } from '../api'
-import { back, go, useDebounced } from '../hooks'
+import { back, go, replace, useDebounced } from '../hooks'
 import { Empty, Icon, MultiPatchView, PatchView, SectionTitle, Sheet, Spinner, ago, dayKey, repoColor, timeOf, useToast, type PatchViewHandle } from '../components'
 
 interface CommitFilters {
@@ -732,7 +732,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
     if (!next) return false
     const query = new URLSearchParams({ repo: repoId, hash, path: next.path })
     if (edge === 'last') query.set('change', 'last')
-    go(`#/commit-file?${query.toString()}`)
+    replace(`#/commit-file?${query.toString()}`)
     return true
   }
 
@@ -760,7 +760,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
   return (
     <div className="screen fill-screen">
       <header className="topbar commit-diff-header">
-        <button className="icon-btn" onClick={() => go(`#/commit?repo=${repoId}&hash=${hash}`)} aria-label="返回提交">
+        <button className="icon-btn" onClick={() => back(`#/commit?repo=${repoId}&hash=${hash}`)} aria-label="返回提交">
           <Icon name="back" />
         </button>
         <div className="grow commit-diff-title">

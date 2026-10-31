@@ -462,7 +462,7 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
           className="icon-btn"
           onClick={() => {
             if (repoId && rev) {
-              location.replace(`#/commit-file?repo=${encodeURIComponent(repoId)}&hash=${encodeURIComponent(rev)}&path=${encodeURIComponent(path)}`)
+              back(`#/commit-file?repo=${encodeURIComponent(repoId)}&hash=${encodeURIComponent(rev)}&path=${encodeURIComponent(path)}`)
             } else {
               back('#/code')
             }

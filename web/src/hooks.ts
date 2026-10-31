@@ -26,6 +26,76 @@ export function useRoute(): Route {
   return route
 }
 
+
+const TOP_LEVEL: Screen[] = ['changes', 'code', 'git', 'settings']
+
+function topLevel(screen: Screen) {
+  return TOP_LEVEL.includes(screen)
+}
+
+function parentOf(route: Route): string | null {
+  const p = route.params
+  const repo = p.get('repo')
+  const hash = p.get('hash')
+  const path = p.get('path')
+  const rev = p.get('rev')
+  switch (route.screen) {
+    case 'commit-file':
+      return repo && hash ? `#/commit?repo=${encodeURIComponent(repo)}&hash=${encodeURIComponent(hash)}` : '#/git'
+    case 'commit-patch':
+      return repo && hash ? `#/commit?repo=${encodeURIComponent(repo)}&hash=${encodeURIComponent(hash)}` : '#/git'
+    case 'commit':
+      return '#/git'
+    case 'file':
+      if (repo && rev && path) {
+        return `#/commit-file?repo=${encodeURIComponent(repo)}&hash=${encodeURIComponent(rev)}&path=${encodeURIComponent(path)}`
+      }
+      return '#/code'
+    case 'tree':
+      return '#/code'
+    case 'diff':
+      return '#/changes'
+    default:
+      return null
+  }
+}
+
+let lastRoute = parseHash(location.hash)
+let exiting = false
+let exitTimer = 0
+
+addEventListener('hashchange', () => {
+  if (!exiting) lastRoute = parseHash(location.hash)
+})
+
+addEventListener('popstate', () => {
+  if (internalNav) {
+    lastRoute = parseHash(location.hash)
+    return
+  }
+  const before = lastRoute
+  const after = parseHash(location.hash)
+  lastRoute = after
+
+  // Once the user backs out from a top-level screen, skip any in-app history
+  // entries behind it and let the browser leave the PWA.
+  if (exiting) {
+    if (location.hash) window.setTimeout(() => history.back(), 30)
+    return
+  }
+  if (topLevel(before.screen)) {
+    exiting = true
+    window.clearTimeout(exitTimer)
+    exitTimer = window.setTimeout(() => { exiting = false }, 900)
+    history.back()
+    return
+  }
+
+  // Back must move up the screen hierarchy, never to an older sibling screen.
+  const parent = parentOf(before)
+  if (parent && location.hash !== parent) location.replace(parent)
+})
+
 const DEPTH_KEY = 'nemorous.depth'
 
 function navDepth(): number {
@@ -33,10 +103,27 @@ function navDepth(): number {
   return Number.isFinite(value) && value > 0 ? value : 0
 }
 
+let internalNav = false
+let internalTimer = 0
+
+function markInternalNav() {
+  internalNav = true
+  window.clearTimeout(internalTimer)
+  internalTimer = window.setTimeout(() => { internalNav = false }, 200)
+}
+
 export function go(target: string) {
   if (location.hash === target) return
+  markInternalNav()
   sessionStorage.setItem(DEPTH_KEY, String(navDepth() + 1))
   location.hash = target
+}
+
+export function replace(target: string) {
+  if (location.hash !== target) {
+    markInternalNav()
+    location.replace(target)
+  }
 }
 
 export function back(fallback = '#/changes') {
