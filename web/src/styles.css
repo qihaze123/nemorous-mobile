@@ -3599,3 +3599,8 @@ h1 {
   align-items: center;
   justify-content: center;
 }
+
+.mp-inner > .diff-line {
+  position: absolute;
+  left: 0;
+}
