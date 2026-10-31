@@ -2914,3 +2914,73 @@ h1 {
   display: block;
   fill: currentColor;
 }
+
+.scope-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.scope-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--fg);
+  text-align: left;
+}
+
+.scope-row.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+}
+
+.scope-row:disabled {
+  opacity: 0.6;
+}
+
+.scope-radio {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--muted);
+  border-radius: 50%;
+}
+
+.scope-row.on .scope-radio {
+  border-color: var(--accent);
+}
+
+.scope-radio i {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.scope-main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.scope-name {
+  font-size: 13px;
+}
+
+.scope-sub {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

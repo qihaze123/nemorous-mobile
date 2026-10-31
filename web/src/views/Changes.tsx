@@ -4,6 +4,7 @@ import { post } from '../api'
 import { go } from '../hooks'
 import { Empty, Icon, Sheet, repoColor, useToast } from '../components'
 import { BranchSwitchSheet, summarizeResults } from './BranchSwitchSheet'
+import { SyncSheet } from './SyncSheet'
 
 type SectionKey = 'staged' | 'unstaged'
 type Mode = 'list' | 'tree'
@@ -140,6 +141,7 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
   const [subAnchor, setSubAnchor] = useState<{ top: number; right: number } | null>(null)
   const [menuBusy, setMenuBusy] = useState(false)
   const [branchOpen, setBranchOpen] = useState(false)
+  const [syncMode, setSyncMode] = useState<'pull' | 'push' | null>(null)
   const notify = useToast()
 
   useEffect(() => {
@@ -218,19 +220,9 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
     setMenuPage(page)
   }
 
-  const runBatch = async (action: 'pull' | 'push') => {
-    setMenuBusy(true)
-    try {
-      const res = await post<{ results: OpResult[] }>('/api/batch', { action })
-      const summary = summarizeResults(res.results)
-      notify(summary.text, summary.kind)
-      if (summary.kind !== 'error') setMenuOpen(false)
-      await refresh()
-    } catch (err) {
-      notify(err instanceof Error ? err.message : '操作失败', 'error')
-    } finally {
-      setMenuBusy(false)
-    }
+  const openSync = (mode: 'pull' | 'push') => {
+    setMenuOpen(false)
+    setSyncMode(mode)
   }
 
   const runStash = async (pop: boolean) => {
@@ -547,13 +539,13 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
                   </>
                 ) : (
                   <>
-                    <button className="menu-option" disabled={menuBusy} onClick={() => void runBatch('pull')}>
+                    <button className="menu-option" disabled={menuBusy} onClick={() => openSync('pull')}>
                       <Icon name="sync" size={16} />
-                      <span>拉取全部</span>
+                      <span>拉取</span>
                     </button>
-                    <button className="menu-option" disabled={menuBusy} onClick={() => void runBatch('push')}>
+                    <button className="menu-option" disabled={menuBusy} onClick={() => openSync('push')}>
                       <Icon name="branch" size={16} />
-                      <span>推送全部</span>
+                      <span>推送</span>
                     </button>
                     <button className="menu-option" disabled={menuBusy} onClick={openBranchSwitch}>
                       <Icon name="git" size={16} />
@@ -567,7 +559,7 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
                       <Icon name="refresh" size={16} />
                       <span>恢复全部 Stash</span>
                     </button>
-                    <p className="menu-hint">操作作用于整个工作区的全部仓库，结果会汇总提示。Stash 会收起未提交改动（含未跟踪文件），不会删除。</p>
+                    <p className="menu-hint">拉取、推送可选择全部或单个项目；切分支、Stash 作用于全部仓库。</p>
                   </>
                 )}
               </div>
@@ -617,6 +609,14 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
         <p className="hint">提交会先把所选文件加入暂存区。推送永不使用 --force；已推送或已打标签的提交不能 amend。</p>
       </Sheet>
       <BranchSwitchSheet open={branchOpen} ws={ws} onClose={() => setBranchOpen(false)} refresh={refresh} notify={notify} />
+      <SyncSheet
+        open={syncMode !== null}
+        mode={syncMode ?? 'pull'}
+        ws={ws}
+        onClose={() => setSyncMode(null)}
+        refresh={refresh}
+        notify={notify}
+      />
       <div className={`screen-bottom-space changes-bottom-space ${selected.size > 0 ? 'action' : ''}`} />
     </div>
   )
