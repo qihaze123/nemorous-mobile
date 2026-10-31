@@ -452,6 +452,8 @@ const DIFF_VIRTUAL_THRESHOLD = 200
 export interface PatchViewHandle {
   /** Scrolls to the next/previous hunk; false means the file boundary was reached. */
   scrollToHunk(direction: 1 | -1): boolean
+  /** Scrolls to the first added/deleted line. */
+  scrollToFirstChange(): boolean
   /** New-file line number at the top of the current viewport. */
   currentLine(): number | undefined
 }
@@ -486,8 +488,18 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
     () => rows.map((row, index) => (row.kind === 'hunk' ? index : -1)).filter((index) => index >= 0),
     [rows],
   )
+  const firstChangeRow = useMemo(
+    () => rows.findIndex((row) => row.kind === 'add' || row.kind === 'del' || (row.kind === 'split' && (row.left?.kind === 'del' || row.right?.kind === 'add'))),
+    [rows],
+  )
 
   useImperativeHandle(ref, () => ({
+    scrollToFirstChange() {
+      const el = viewport.current
+      if (!el || firstChangeRow < 0) return false
+      el.scrollTop = Math.max(0, firstChangeRow * DIFF_LINE_HEIGHT - 32)
+      return true
+    },
     scrollToHunk(direction) {
       const el = viewport.current
       if (!el || hunkRows.length === 0) return false
@@ -531,7 +543,7 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
       }
       return undefined
     },
-  }), [hunkRows, rows])
+  }), [firstChangeRow, hunkRows, rows])
 
   useEffect(() => {
     const el = viewport.current

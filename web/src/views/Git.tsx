@@ -647,6 +647,14 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
   }, [repoId, hash, path])
 
   useEffect(() => {
+    if (!detail) return
+    const frame = requestAnimationFrame(() => {
+      patchRef.current?.scrollToFirstChange()
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [detail, path])
+
+  useEffect(() => {
     const root = diffRoot.current
     const highlights = (CSS as unknown as { highlights?: { delete: (name: string) => void; set: (name: string, value: unknown) => void } }).highlights
     const HighlightCtor = (window as unknown as { Highlight?: new (...ranges: Range[]) => unknown }).Highlight
