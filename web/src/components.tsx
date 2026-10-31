@@ -446,6 +446,9 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
     if (!el) return
     setScrollTop(0)
     el.scrollTop = 0
+    // Split is a wider canvas; start at its middle so both sides are in view
+    // instead of landing on an empty left edge.
+    el.scrollLeft = style === 'split' ? Math.max(0, (el.scrollWidth - el.clientWidth) / 2) : 0
     setHeight(el.clientHeight || 600)
     const observer = new ResizeObserver(() => setHeight(el.clientHeight || 600))
     observer.observe(el)
@@ -503,9 +506,9 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
             const right = split.right ?? { kind: 'blank', text: '' }
             return (
               <div key={index} className="diff-line split-row" style={rowStyle(index)}>
-                <span className="split-gutter">{left.no ?? ''}</span>
+                <span className={`split-gutter ${left.kind}`}>{left.no ?? ''}</span>
                 <span className={`split-code ${left.kind}`}>{left.kind === 'del' ? '-' : left.kind === 'ctx' ? ' ' : ''}{left.text}</span>
-                <span className="split-gutter">{right.no ?? ''}</span>
+                <span className={`split-gutter ${right.kind}`}>{right.no ?? ''}</span>
                 <span className={`split-code ${right.kind}`}>{right.kind === 'add' ? '+' : right.kind === 'ctx' ? ' ' : ''}{right.text}</span>
               </div>
             )

@@ -3285,3 +3285,41 @@ h1 {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.commit-file-diff-page .diff-line .gutter {
+  opacity: 0.8;
+  font-variant-numeric: tabular-nums;
+}
+
+.commit-file-diff-page .diff-line.add .gutter:nth-child(2) {
+  background: var(--add-bg);
+  color: var(--add);
+}
+
+.commit-file-diff-page .diff-line.del .gutter:nth-child(1) {
+  background: var(--del-bg);
+  color: var(--del);
+}
+
+.commit-file-diff-page .diff-line.split-row .split-gutter {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
+.commit-file-diff-page .diff-line.split-row .split-gutter.del {
+  background: var(--del-bg);
+  color: var(--del);
+}
+
+.commit-file-diff-page .diff-line.split-row .split-gutter.add {
+  background: var(--add-bg);
+  color: var(--add);
+}
+
+.commit-file-diff-page .diff-line.split-row .split-gutter.blank {
+  background: color-mix(in srgb, var(--muted) 4%, transparent);
+}
+
+.commit-file-diff-page .diff-line.split-row .split-gutter:nth-child(3) {
+  border-left: 1px solid var(--border-soft);
+}

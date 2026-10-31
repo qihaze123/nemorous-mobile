@@ -617,28 +617,6 @@ export function CommitScreen({ repoId, hash }: { repoId: string; hash: string })
   )
 }
 
-function commitFileStatus(status: string | undefined): string {
-  switch (status) {
-    case 'A': return '新增'
-    case 'D': return '删除'
-    case 'R': return '重命名'
-    case '?': return '未跟踪'
-    case 'U': return '冲突'
-    default: return '修改'
-  }
-}
-
-function commitFileStatusClass(status: string | undefined): string {
-  switch (status) {
-    case 'A': return 'added'
-    case 'D': return 'deleted'
-    case 'R': return 'renamed'
-    case '?': return 'untracked'
-    case 'U': return 'conflict'
-    default: return 'modified'
-  }
-}
-
 export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash: string; path: string }) {
   const [detail, setDetail] = useState<CommitDetail | null>(null)
   const [error, setError] = useState('')
@@ -708,20 +686,11 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
             {(() => { const name = path.slice(path.lastIndexOf('/') + 1); const dot = name.lastIndexOf('.'); return dot > 0 ? name.slice(dot) : '' })()}
           </h1>
           <div className="commit-diff-meta">
-            <span className={`diff-status ${commitFileStatusClass(file?.status)}`}>{commitFileStatus(file?.status)}</span>
             {(file?.added ?? 0) > 0 ? <span className="diff-added">+{file?.added}</span> : null}
             {(file?.deleted ?? 0) > 0 ? <span className="diff-deleted">−{file?.deleted}</span> : null}
-            <span className="diff-compare">{hash.slice(0, 7)}</span>
             <span className="diff-path">{path.slice(0, path.lastIndexOf('/') + 1) || './'}</span>
           </div>
         </div>
-        <button
-          className="icon-btn"
-          onClick={() => go(`#/file?repo=${repoId}&path=${encodeURIComponent(path)}&rev=${hash}`)}
-          aria-label="查看文件"
-        >
-          <Icon name="file" />
-        </button>
       </header>
       {error ? <div className="error-banner">{error}</div> : null}
       {!detail && !error ? <Spinner label="读取提交…" /> : null}
@@ -752,7 +721,9 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
               go(`#/file?repo=${repoId}&path=${encodeURIComponent(path)}&rev=${hash}${line ? `&line=${line}` : ''}`)
             }}
           />
-          <PatchView ref={patchRef} patch={chunks.get(path) ?? ''} style={diffStyle} />
+          <div className="commit-file-diff-page">
+            <PatchView ref={patchRef} patch={chunks.get(path) ?? ''} style={diffStyle} />
+          </div>
         </>
       ) : null}
       <div className="screen-bottom-space" />
