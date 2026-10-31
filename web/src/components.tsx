@@ -71,6 +71,29 @@ export function HealthPill({ health }: { health: RepoHealth }) {
   return <span className={`pill health-${health}`}>{healthLabel[health]}</span>
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  '?': '未跟踪',
+  A: '新增',
+  M: '修改',
+  D: '删除',
+  R: '重命名',
+  U: '冲突',
+}
+
+const STATUS_CLASSES: Record<string, string> = {
+  '?': 'untracked',
+  A: 'add',
+  M: 'mod',
+  D: 'del',
+  R: 'rename',
+  U: 'conflict',
+}
+
+export function FileTag({ status }: { status: string }) {
+  const kind = status.slice(0, 1)
+  return <span className={`file-tag tag-${STATUS_CLASSES[kind] ?? 'mod'}`}>{STATUS_LABELS[kind] ?? kind}</span>
+}
+
 export function StatusLetter({ file }: { file: FileChange }) {
   return <span className={`status-letter s-${file.status === '?' ? 'untracked' : file.status}`}>{file.status}</span>
 }

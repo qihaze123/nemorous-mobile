@@ -2498,3 +2498,69 @@ h1 {
 .tree-tail svg {
   background: var(--bg-elev);
 }
+
+.file-tag {
+  flex: none;
+  display: inline-block;
+  padding: 0 4px;
+  border-radius: 4px;
+  font-size: 9px;
+  line-height: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tag-untracked {
+  color: var(--blue);
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
+}
+
+.tag-add {
+  color: var(--add);
+  background: color-mix(in srgb, var(--add) 12%, transparent);
+}
+
+.tag-mod {
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+}
+
+.tag-del,
+.tag-conflict {
+  color: var(--del);
+  background: color-mix(in srgb, var(--del) 12%, transparent);
+}
+
+.tag-rename {
+  color: var(--blue);
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
+}
+
+.file-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+}
+
+.file-info .file-name {
+  flex: 0 0 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.file-info .file-dir {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+  font-size: 9.5px;
+}
