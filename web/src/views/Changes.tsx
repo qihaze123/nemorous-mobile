@@ -257,12 +257,6 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
                         <span className="file-name">{fileName(file.path)}</span>
                         <FileTag status={file.status} />
                       </span>
-                      {file.added || file.deleted ? (
-                        <span className="file-stats">
-                          {file.added > 0 ? <em className="plus">+{file.added}</em> : null}
-                          {file.deleted > 0 ? <em className="minus">−{file.deleted}</em> : null}
-                        </span>
-                      ) : null}
                     </div>
                   )
                 })}
