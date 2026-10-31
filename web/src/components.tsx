@@ -373,6 +373,8 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
   ref,
 ) {
   const lines = useMemo(() => parsePatch(patch), [patch])
+  const hasOldLines = useMemo(() => lines.some((line) => line.old !== undefined), [lines])
+  const hasNewLines = useMemo(() => lines.some((line) => line.new !== undefined), [lines])
   const splitRows = useMemo(() => buildSplitRows(lines), [lines])
   const rows: (DiffLine | SplitRow)[] = style === 'split' ? splitRows : lines
   const splitWidths = useMemo(() => {
@@ -504,6 +506,22 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
             }
             const left = split.left ?? { kind: 'blank', text: '' }
             const right = split.right ?? { kind: 'blank', text: '' }
+            if (!hasOldLines) {
+              return (
+                <div key={index} className="diff-line split-one-side add" style={rowStyle(index)}>
+                  <span className="gutter">{right.no ?? ''}</span>
+                  <span className="code">{right.kind === 'add' ? '+' : right.kind === 'ctx' ? ' ' : ''}{right.text}</span>
+                </div>
+              )
+            }
+            if (!hasNewLines) {
+              return (
+                <div key={index} className="diff-line split-one-side del" style={rowStyle(index)}>
+                  <span className="gutter">{left.no ?? ''}</span>
+                  <span className="code">{left.kind === 'del' ? '-' : left.kind === 'ctx' ? ' ' : ''}{left.text}</span>
+                </div>
+              )
+            }
             return (
               <div key={index} className="diff-line split-row" style={rowStyle(index)}>
                 <span className={`split-gutter ${left.kind}`}>{left.no ?? ''}</span>
@@ -516,8 +534,8 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
           const line = row as DiffLine
           return (
             <div key={index} className={`diff-line ${line.kind}`} style={rowStyle(index)}>
-              <span className="gutter">{line.old ?? ''}</span>
-              <span className="gutter">{line.new ?? ''}</span>
+              {hasOldLines ? <span className="gutter">{line.old ?? ''}</span> : null}
+              {hasNewLines ? <span className="gutter">{line.new ?? ''}</span> : null}
               <span className="code">{line.kind === 'add' ? '+' : line.kind === 'del' ? '-' : line.kind === 'ctx' ? ' ' : ''}{line.text}</span>
             </div>
           )
