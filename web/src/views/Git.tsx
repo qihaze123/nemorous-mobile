@@ -721,7 +721,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
             }}
           />
           <div className="commit-file-diff-page">
-            <PatchView ref={patchRef} patch={chunks.get(path) ?? ''} style={diffStyle} />
+            <PatchView ref={patchRef} patch={chunks.get(path) ?? ''} style={diffStyle} idea />
           </div>
         </>
       ) : null}

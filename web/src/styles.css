@@ -3289,14 +3289,40 @@ h1 {
   font-variant-numeric: tabular-nums;
 }
 
-.commit-file-diff-page .diff-line.add .gutter:nth-child(2) {
+.commit-file-diff-page .diff-line .gutter.new.changed {
   background: var(--add-bg);
   color: var(--add);
+  box-shadow: inset -2px 0 var(--add);
 }
 
-.commit-file-diff-page .diff-line.del .gutter:nth-child(1) {
+.commit-file-diff-page .diff-line .gutter.old.changed {
   background: var(--del-bg);
   color: var(--del);
+  box-shadow: inset -2px 0 var(--del);
+}
+
+.commit-file-diff-page .diff-line .marker {
+  flex: none;
+  width: 16px;
+  color: var(--muted);
+  text-align: center;
+  user-select: none;
+}
+
+.commit-file-diff-page .diff-line .marker.add { color: var(--add); }
+.commit-file-diff-page .diff-line .marker.del { color: var(--del); }
+
+.commit-file-diff-page .diff-line mark {
+  border-radius: 2px;
+  color: inherit;
+}
+
+.commit-file-diff-page .diff-line mark.word-add {
+  background: color-mix(in srgb, var(--add) 30%, transparent);
+}
+
+.commit-file-diff-page .diff-line mark.word-del {
+  background: color-mix(in srgb, var(--del) 30%, transparent);
 }
 
 .commit-file-diff-page .diff-line.split-row .split-gutter {
@@ -3307,11 +3333,13 @@ h1 {
 .commit-file-diff-page .diff-line.split-row .split-gutter.del {
   background: var(--del-bg);
   color: var(--del);
+  box-shadow: inset -2px 0 var(--del);
 }
 
 .commit-file-diff-page .diff-line.split-row .split-gutter.add {
   background: var(--add-bg);
   color: var(--add);
+  box-shadow: inset -2px 0 var(--add);
 }
 
 .commit-file-diff-page .diff-line.split-row .split-gutter.blank {

@@ -304,10 +304,66 @@ export function parsePatch(patch: string): DiffLine[] {
   return out
 }
 
+interface WordSegment {
+  text: string
+  changed: boolean
+}
+
 interface SplitCell {
   kind: 'add' | 'del' | 'ctx' | 'blank'
   text: string
   no?: number
+  segments?: WordSegment[]
+}
+
+function wordPair(oldText: string, newText: string): { left: WordSegment[]; right: WordSegment[] } {
+  const max = Math.min(oldText.length, newText.length)
+  let prefix = 0
+  while (prefix < max && oldText[prefix] === newText[prefix]) prefix++
+  let suffix = 0
+  while (suffix < max - prefix && oldText[oldText.length - 1 - suffix] === newText[newText.length - 1 - suffix]) suffix++
+  const oldMiddle = oldText.slice(prefix, oldText.length - suffix)
+  const newMiddle = newText.slice(prefix, newText.length - suffix)
+  const left: WordSegment[] = []
+  const right: WordSegment[] = []
+  if (prefix) {
+    left.push({ text: oldText.slice(0, prefix), changed: false })
+    right.push({ text: newText.slice(0, prefix), changed: false })
+  }
+  if (oldMiddle || newMiddle) {
+    left.push({ text: oldMiddle, changed: true })
+    right.push({ text: newMiddle, changed: true })
+  }
+  if (suffix) {
+    left.push({ text: oldText.slice(oldText.length - suffix), changed: false })
+    right.push({ text: newText.slice(newText.length - suffix), changed: false })
+  }
+  return { left, right }
+}
+
+function annotateWordChanges(lines: DiffLine[]): (WordSegment[] | undefined)[] {
+  const out: (WordSegment[] | undefined)[] = new Array(lines.length)
+  let i = 0
+  while (i < lines.length) {
+    if (lines[i].kind !== 'del' && lines[i].kind !== 'add') {
+      i++
+      continue
+    }
+    const dels: number[] = []
+    const adds: number[] = []
+    while (i < lines.length && (lines[i].kind === 'del' || lines[i].kind === 'add')) {
+      if (lines[i].kind === 'del') dels.push(i)
+      else adds.push(i)
+      i++
+    }
+    const count = Math.min(dels.length, adds.length)
+    for (let j = 0; j < count; j++) {
+      const pair = wordPair(lines[dels[j]].text, lines[adds[j]].text)
+      out[dels[j]] = pair.left
+      out[adds[j]] = pair.right
+    }
+  }
+  return out
 }
 
 interface SplitRow {
@@ -347,11 +403,14 @@ function buildSplitRows(lines: DiffLine[]): SplitRow[] {
     }
     const count = Math.max(dels.length, adds.length)
     for (let j = 0; j < count; j++) {
-      out.push({
-        kind: 'split',
-        left: dels[j] ?? { kind: 'blank', text: '' },
-        right: adds[j] ?? { kind: 'blank', text: '' },
-      })
+      const left = dels[j] ?? { kind: 'blank', text: '' }
+      const right = adds[j] ?? { kind: 'blank', text: '' }
+      if (left.kind === 'del' && right.kind === 'add') {
+        const pair = wordPair(left.text, right.text)
+        left.segments = pair.left
+        right.segments = pair.right
+      }
+      out.push({ kind: 'split', left, right })
     }
   }
   return out
@@ -368,13 +427,14 @@ export interface PatchViewHandle {
   currentLine(): number | undefined
 }
 
-export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: boolean; style?: 'unified' | 'split' }>(function PatchView(
-  { patch, binary, style = 'unified' },
+export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: boolean; style?: 'unified' | 'split'; idea?: boolean }>(function PatchView(
+  { patch, binary, style = 'unified', idea = false },
   ref,
 ) {
   const lines = useMemo(() => parsePatch(patch), [patch])
   const hasOldLines = useMemo(() => lines.some((line) => line.old !== undefined), [lines])
   const hasNewLines = useMemo(() => lines.some((line) => line.new !== undefined), [lines])
+  const wordChanges = useMemo(() => (idea ? annotateWordChanges(lines) : []), [idea, lines])
   const splitRows = useMemo(() => buildSplitRows(lines), [lines])
   const rows: (DiffLine | SplitRow)[] = style === 'split' ? splitRows : lines
   const splitWidths = useMemo(() => {
@@ -506,18 +566,18 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
             }
             const left = split.left ?? { kind: 'blank', text: '' }
             const right = split.right ?? { kind: 'blank', text: '' }
-            if (!hasOldLines) {
+            if (idea && !hasOldLines) {
               return (
                 <div key={index} className="diff-line split-one-side add" style={rowStyle(index)}>
-                  <span className="gutter">{right.no ?? ''}</span>
+                  <span className="gutter new changed">{right.no ?? ''}</span>
                   <span className="code">{right.kind === 'add' ? '+' : right.kind === 'ctx' ? ' ' : ''}{right.text}</span>
                 </div>
               )
             }
-            if (!hasNewLines) {
+            if (idea && !hasNewLines) {
               return (
                 <div key={index} className="diff-line split-one-side del" style={rowStyle(index)}>
-                  <span className="gutter">{left.no ?? ''}</span>
+                  <span className="gutter old changed">{left.no ?? ''}</span>
                   <span className="code">{left.kind === 'del' ? '-' : left.kind === 'ctx' ? ' ' : ''}{left.text}</span>
                 </div>
               )
@@ -525,18 +585,23 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
             return (
               <div key={index} className="diff-line split-row" style={rowStyle(index)}>
                 <span className={`split-gutter ${left.kind}`}>{left.no ?? ''}</span>
-                <span className={`split-code ${left.kind}`}>{left.kind === 'del' ? '-' : left.kind === 'ctx' ? ' ' : ''}{left.text}</span>
+                <span className={`split-code ${left.kind}`}>{left.kind === 'del' ? '-' : left.kind === 'ctx' ? ' ' : ''}{idea && left.segments ? left.segments.map((segment, j) => segment.changed ? <mark key={j} className="word-del">{segment.text}</mark> : segment.text) : left.text}</span>
                 <span className={`split-gutter ${right.kind}`}>{right.no ?? ''}</span>
-                <span className={`split-code ${right.kind}`}>{right.kind === 'add' ? '+' : right.kind === 'ctx' ? ' ' : ''}{right.text}</span>
+                <span className={`split-code ${right.kind}`}>{right.kind === 'add' ? '+' : right.kind === 'ctx' ? ' ' : ''}{idea && right.segments ? right.segments.map((segment, j) => segment.changed ? <mark key={j} className="word-add">{segment.text}</mark> : segment.text) : right.text}</span>
               </div>
             )
           }
           const line = row as DiffLine
           return (
             <div key={index} className={`diff-line ${line.kind}`} style={rowStyle(index)}>
-              {hasOldLines ? <span className="gutter">{line.old ?? ''}</span> : null}
-              {hasNewLines ? <span className="gutter">{line.new ?? ''}</span> : null}
-              <span className="code">{line.kind === 'add' ? '+' : line.kind === 'del' ? '-' : line.kind === 'ctx' ? ' ' : ''}{line.text}</span>
+              {(idea ? hasOldLines : true) ? <span className={`gutter old ${line.kind === 'del' ? 'changed' : ''}`}>{line.old ?? ''}</span> : null}
+              {(idea ? hasNewLines : true) ? <span className={`gutter new ${line.kind === 'add' ? 'changed' : ''}`}>{line.new ?? ''}</span> : null}
+              {idea ? <span className={`marker ${line.kind}`}>{line.kind === 'add' ? '+' : line.kind === 'del' ? '−' : ''}</span> : null}
+              <span className="code">
+                {idea && wordChanges[index]
+                  ? wordChanges[index]!.map((segment, j) => segment.changed ? <mark key={j} className={`word-${line.kind}`}>{segment.text}</mark> : segment.text)
+                  : `${idea ? '' : line.kind === 'add' ? '+' : line.kind === 'del' ? '-' : line.kind === 'ctx' ? ' ' : ''}${line.text}`}
+              </span>
             </div>
           )
         })}
