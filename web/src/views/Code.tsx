@@ -172,18 +172,19 @@ export function CodeScreen({ ws }: { ws: Workspace }) {
       {result && mode === 'files' && result.files?.length ? (
         <div className="result-list">
           {result.files.map((f) => (
-            <button
-              className="result-row"
-              key={`${f.repoId}:${f.path}`}
-              title={f.path}
-              onClick={() => openFile(f.repoId, f.path)}
-            >
-              <span className="repo-chip" style={{ borderColor: repoColor(f.repoName) }}>{f.repoName}</span>
-              <span className="result-file">
-                <span className="result-file-name">{fileName(f.path)}</span>
-                <span className="result-file-dir">{dirPath(f.path)}</span>
-              </span>
-            </button>
+            <div className="result-scroll file-scroll" key={`${f.repoId}:${f.path}`}>
+              <button
+                className="result-row"
+                title={f.path}
+                onClick={() => openFile(f.repoId, f.path)}
+              >
+                <span className="repo-chip" style={{ borderColor: repoColor(f.repoName) }}>{f.repoName}</span>
+                <span className="result-file">
+                  <span className="result-file-name">{fileName(f.path)}</span>
+                  <span className="result-file-dir">{dirPath(f.path)}</span>
+                </span>
+              </button>
+            </div>
           ))}
           {result.truncated ? <p className="hint">结果过多，仅显示前 200 条。</p> : null}
         </div>
@@ -193,29 +194,32 @@ export function CodeScreen({ ws }: { ws: Workspace }) {
         <div className="result-list">
           {contentGroups.map((group) => (
             <section className="match-file" key={`${group.repoId}:${group.path}`}>
-              <button
-                className="match-file-head"
-                title={group.path}
-                onClick={() => openFile(group.repoId, group.path)}
-              >
-                <span className="repo-chip" style={{ borderColor: repoColor(group.repoName) }}>{group.repoName}</span>
-                <span className="result-file">
-                  <span className="result-file-name">{fileName(group.path)}</span>
-                  <span className="result-file-dir">{dirPath(group.path)}</span>
-                </span>
-                <span className="match-count">{group.matches.length} 处</span>
-              </button>
+              <div className="result-scroll match-head-scroll">
+                <button
+                  className="match-file-head"
+                  title={group.path}
+                  onClick={() => openFile(group.repoId, group.path)}
+                >
+                  <span className="repo-chip" style={{ borderColor: repoColor(group.repoName) }}>{group.repoName}</span>
+                  <span className="result-file">
+                    <span className="result-file-name">{fileName(group.path)}</span>
+                    <span className="result-file-dir">{dirPath(group.path)}</span>
+                  </span>
+                  <span className="match-count">{group.matches.length} 处</span>
+                </button>
+              </div>
               <div className="match-lines">
                 {group.matches.map((match, i) => (
-                  <button
-                    className="match-line"
-                    key={`${match.line}:${i}`}
-                    title={`${match.path}:${match.line}`}
-                    onClick={() => openFile(match.repoId, match.path, match.line)}
-                  >
-                    <span className="line-no">:{match.line}</span>
-                    <code className="match-text">{match.text}</code>
-                  </button>
+                  <div className="result-scroll match-line-scroll" key={`${match.line}:${i}`}>
+                    <button
+                      className="match-line"
+                      title={`${match.path}:${match.line}`}
+                      onClick={() => openFile(match.repoId, match.path, match.line)}
+                    >
+                      <span className="line-no">:{match.line}</span>
+                      <code className="match-text">{match.text}</code>
+                    </button>
+                  </div>
                 ))}
               </div>
             </section>

@@ -3054,3 +3054,52 @@ h1 {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.result-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.result-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.result-scroll > .result-row,
+.result-scroll > .match-file-head,
+.result-scroll > .match-line {
+  width: max-content;
+  min-width: 100%;
+}
+
+.result-scroll .result-row {
+  border-bottom: 0;
+}
+
+.result-scroll.file-scroll {
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.result-scroll .result-file {
+  flex: none;
+}
+
+.result-scroll .result-file-name {
+  flex: none;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.result-scroll .result-file-dir {
+  flex: none;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.result-scroll .match-text {
+  flex: none;
+  overflow: visible;
+  text-overflow: clip;
+}
