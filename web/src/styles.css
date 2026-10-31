@@ -3067,38 +3067,25 @@ h1 {
   display: none;
 }
 
-.result-scroll > .result-row,
-.result-scroll > .match-file-head,
-.result-scroll > .match-line {
+.result-list.result-scroll > .result-row,
+.result-list.result-scroll > .match-file {
   width: max-content;
   min-width: 100%;
 }
 
-.result-scroll .result-row {
-  border-bottom: 0;
+.result-list.result-scroll .match-file-head,
+.result-list.result-scroll .match-line {
+  width: max-content;
+  min-width: 100%;
 }
 
-.result-scroll.file-scroll {
-  border-bottom: 1px solid var(--border-soft);
-}
-
-.result-scroll .result-file {
+.result-list.result-scroll .result-file {
   flex: none;
 }
 
-.result-scroll .result-file-name {
-  flex: none;
-  overflow: visible;
-  text-overflow: clip;
-}
-
-.result-scroll .result-file-dir {
-  flex: none;
-  overflow: visible;
-  text-overflow: clip;
-}
-
-.result-scroll .match-text {
+.result-list.result-scroll .result-file-name,
+.result-list.result-scroll .result-file-dir,
+.result-list.result-scroll .match-text {
   flex: none;
   overflow: visible;
   text-overflow: clip;
