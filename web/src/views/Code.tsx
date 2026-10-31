@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import hljs from 'highlight.js/lib/common'
-import type { FileContent, RepoFiles, SearchResult, Workspace } from '../types'
+import type { FileContent, RepoFiles, SearchMatch, SearchResult, Workspace } from '../types'
 import { api } from '../api'
 import { back, go, useDebounced } from '../hooks'
 import { Empty, Icon, SectionTitle, Spinner, repoColor, useToast } from '../components'
@@ -84,6 +84,20 @@ export function CodeScreen({ ws }: { ws: Workspace }) {
       cancelled = true
     }
   }, [debounced, mode, regex, caseSensitive, repoId])
+
+  const contentGroups = useMemo(() => {
+    const groups = new Map<string, { repoId: string; repoName: string; path: string; matches: SearchMatch[] }>()
+    for (const match of result?.matches ?? []) {
+      const key = `${match.repoId}:${match.path}`
+      let group = groups.get(key)
+      if (!group) {
+        group = { repoId: match.repoId, repoName: match.repoName, path: match.path, matches: [] }
+        groups.set(key, group)
+      }
+      group.matches.push(match)
+    }
+    return [...groups.values()]
+  }, [result])
 
   const openFile = (id: string, path: string, line?: number) => {
     const q = new URLSearchParams({ repo: id, path })
@@ -175,20 +189,36 @@ export function CodeScreen({ ws }: { ws: Workspace }) {
         </div>
       ) : null}
 
-      {result && mode === 'content' && result.matches?.length ? (
+      {result && mode === 'content' && contentGroups.length ? (
         <div className="result-list">
-          {result.matches.map((m, i) => (
-            <button className="match-row" key={`${m.repoId}:${m.path}:${m.line}:${i}`} onClick={() => openFile(m.repoId, m.path, m.line)}>
-              <span className="match-head" title={`${m.path}:${m.line}`}>
-                <span className="repo-chip" style={{ borderColor: repoColor(m.repoName) }}>{m.repoName}</span>
+          {contentGroups.map((group) => (
+            <section className="match-file" key={`${group.repoId}:${group.path}`}>
+              <button
+                className="match-file-head"
+                title={group.path}
+                onClick={() => openFile(group.repoId, group.path)}
+              >
+                <span className="repo-chip" style={{ borderColor: repoColor(group.repoName) }}>{group.repoName}</span>
                 <span className="result-file">
-                  <span className="result-file-name">{fileName(m.path)}</span>
-                  <span className="result-file-dir">{dirPath(m.path)}</span>
+                  <span className="result-file-name">{fileName(group.path)}</span>
+                  <span className="result-file-dir">{dirPath(group.path)}</span>
                 </span>
-                <span className="line-no">:{m.line}</span>
-              </span>
-              <code className="match-text">{m.text}</code>
-            </button>
+                <span className="match-count">{group.matches.length} 处</span>
+              </button>
+              <div className="match-lines">
+                {group.matches.map((match, i) => (
+                  <button
+                    className="match-line"
+                    key={`${match.line}:${i}`}
+                    title={`${match.path}:${match.line}`}
+                    onClick={() => openFile(match.repoId, match.path, match.line)}
+                  >
+                    <span className="line-no">:{match.line}</span>
+                    <code className="match-text">{match.text}</code>
+                  </button>
+                ))}
+              </div>
+            </section>
           ))}
           {result.truncated ? <p className="hint">结果过多，仅显示前 300 条。</p> : null}
         </div>
