@@ -2576,7 +2576,7 @@ h1 {
 
 .menu-popover {
   position: fixed;
-  top: calc(env(safe-area-inset-top) + 66px);
+  top: calc(env(safe-area-inset-top) + 76px);
   right: 14px;
   z-index: 50;
   width: clamp(118px, 32vw, 136px);

@@ -211,7 +211,7 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
     const root = event.currentTarget.closest('.menu-card')?.getBoundingClientRect()
     const estimatedHeight = page === 'git' ? 280 : 160
     setSubAnchor({
-      top: Math.max(66, Math.min(rect.bottom + 6, innerHeight - estimatedHeight)),
+      top: Math.max(76, Math.min(rect.bottom + 6, innerHeight - estimatedHeight)),
       right: innerWidth - (root?.left ?? rect.left) + 6,
     })
     setMenuPage(page)
