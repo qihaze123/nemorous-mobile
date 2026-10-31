@@ -3390,11 +3390,27 @@ h1 {
   gap: 2px;
 }
 
-.commit-diff-actions {
-  gap: 4px;
+.diff-tools-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 0 6px;
 }
 
-.commit-diff-actions .icon-btn {
+.diff-tools-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.diff-tools-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.diff-tools-actions .icon-btn {
   width: 40px;
   height: 40px;
   border: 0;
@@ -3403,18 +3419,26 @@ h1 {
   color: var(--muted);
 }
 
-.commit-diff-actions .icon-btn[aria-pressed="true"] {
+.diff-tools-actions .icon-btn[aria-pressed="true"] {
   background: var(--surface);
   color: var(--accent);
 }
 
-.commit-diff-actions .icon-btn:active {
+.diff-tools-actions .icon-btn:active {
   background: var(--surface);
   color: var(--fg);
 }
 
-.commit-diff-actions .icon-btn.ok {
+.diff-tools-actions .icon-btn.ok {
   color: var(--add);
+}
+
+.commit-file-nav .tools-toggle {
+  color: var(--muted);
+}
+
+.commit-file-nav .tools-toggle[aria-expanded="true"] {
+  color: var(--accent);
 }
 
 .diff-find-bar {
