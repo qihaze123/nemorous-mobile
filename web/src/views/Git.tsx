@@ -778,14 +778,14 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
               </button>
             </div>
             <div className="commit-diff-actions">
-              <button className="icon-btn" onClick={() => { setFindOpen((open) => !open); setFindActive(0) }} aria-label="在 Diff 中查找" aria-pressed={findOpen}>
-                <Icon name="search" size={17} />
+              <button className="icon-btn" title="在 Diff 中查找" onClick={() => { setFindOpen((open) => !open); setFindActive(0) }} aria-label="在 Diff 中查找" aria-pressed={findOpen}>
+                <Icon name="search" size={18} />
               </button>
-              <button className="icon-btn" onClick={() => setFolded((value) => !value)} aria-label={folded ? '展开未修改上下文' : '折叠未修改上下文'} aria-pressed={folded}>
-                <Icon name="fold" size={17} />
+              <button className="icon-btn" title={folded ? '展开未修改上下文' : '折叠未修改上下文'} onClick={() => setFolded((value) => !value)} aria-label={folded ? '展开未修改上下文' : '折叠未修改上下文'} aria-pressed={folded}>
+                <Icon name="fold" size={18} />
               </button>
-              <button className="icon-btn" onClick={() => void copyPath()} aria-label="复制文件路径">
-                <Icon name={copiedPath ? 'check' : 'copy'} size={17} />
+              <button className={`icon-btn ${copiedPath ? 'ok' : ''}`} title="复制文件路径" onClick={() => void copyPath()} aria-label="复制文件路径" aria-pressed={copiedPath}>
+                <Icon name={copiedPath ? 'check' : 'copyPath'} size={18} />
               </button>
             </div>
           </div>

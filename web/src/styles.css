@@ -3390,10 +3390,15 @@ h1 {
   gap: 2px;
 }
 
+.commit-diff-actions {
+  gap: 4px;
+}
+
 .commit-diff-actions .icon-btn {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border: 0;
+  border-radius: 10px;
   background: transparent;
   color: var(--muted);
 }
@@ -3401,6 +3406,15 @@ h1 {
 .commit-diff-actions .icon-btn[aria-pressed="true"] {
   background: var(--surface);
   color: var(--accent);
+}
+
+.commit-diff-actions .icon-btn:active {
+  background: var(--surface);
+  color: var(--fg);
+}
+
+.commit-diff-actions .icon-btn.ok {
+  color: var(--add);
 }
 
 .diff-find-bar {
