@@ -3360,3 +3360,16 @@ h1 {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.commit-file-diff-page .diff-line.hunk {
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+  border-left: 2px solid color-mix(in srgb, var(--blue) 45%, transparent);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.commit-file-diff-page .diff-line.hunk.split-wide {
+  padding-left: 8px;
+}
