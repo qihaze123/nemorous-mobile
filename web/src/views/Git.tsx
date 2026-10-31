@@ -621,7 +621,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
   const [detail, setDetail] = useState<CommitDetail | null>(null)
   const [error, setError] = useState('')
   const [diffStyle, setDiffStyle] = useState<'unified' | 'split'>('unified')
-  const [folded, setFolded] = useState(false)
+  const [folded, setFolded] = useState(true)
   const [findOpen, setFindOpen] = useState(false)
   const [find, setFind] = useState('')
   const [findCount, setFindCount] = useState(0)
@@ -632,7 +632,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
 
   useEffect(() => {
     setDiffStyle('unified')
-    setFolded(false)
+    setFolded(true)
     setFind('')
     setFindOpen(false)
     setFindActive(0)

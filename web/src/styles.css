@@ -3439,3 +3439,41 @@ h1 {
   background: var(--accent);
   color: var(--bg);
 }
+
+.diff-line.fold-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 20px;
+  padding: 0 8px;
+  border: 0;
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--surface);
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  text-align: left;
+}
+
+.diff-line.fold-row.open {
+  color: var(--accent);
+}
+
+.diff-line.fold-row:active {
+  background: var(--bg-elev);
+}
+
+.fold-chevron {
+  flex: none;
+  width: 12px;
+  text-align: center;
+}
+
+.fold-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

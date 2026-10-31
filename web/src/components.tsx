@@ -252,11 +252,14 @@ export function ConfirmSheet({
 /* ---------- diff ---------- */
 
 interface DiffLine {
-  kind: 'add' | 'del' | 'ctx' | 'hunk' | 'meta'
+  kind: 'add' | 'del' | 'ctx' | 'hunk' | 'meta' | 'fold'
   text: string
   old?: number
   new?: number
   hunkNew?: number
+  foldId?: string
+  foldCount?: number
+  foldExpanded?: boolean
 }
 
 export function parsePatch(patch: string): DiffLine[] {
@@ -368,11 +371,14 @@ function annotateWordChanges(lines: DiffLine[]): (WordSegment[] | undefined)[] {
 }
 
 interface SplitRow {
-  kind: 'hunk' | 'meta' | 'split'
+  kind: 'hunk' | 'meta' | 'split' | 'fold'
   text?: string
   hunkNew?: number
   left?: SplitCell
   right?: SplitCell
+  foldId?: string
+  foldCount?: number
+  foldExpanded?: boolean
 }
 
 function buildSplitRows(lines: DiffLine[]): SplitRow[] {
@@ -380,8 +386,8 @@ function buildSplitRows(lines: DiffLine[]): SplitRow[] {
   let i = 0
   while (i < lines.length) {
     const line = lines[i]
-    if (line.kind === 'hunk' || line.kind === 'meta') {
-      out.push({ kind: line.kind, text: line.text, hunkNew: line.hunkNew })
+    if (line.kind === 'hunk' || line.kind === 'meta' || line.kind === 'fold') {
+      out.push({ kind: line.kind, text: line.text, hunkNew: line.hunkNew, foldId: line.foldId, foldCount: line.foldCount, foldExpanded: line.foldExpanded })
       i++
       continue
     }
@@ -417,7 +423,7 @@ function buildSplitRows(lines: DiffLine[]): SplitRow[] {
   return out
 }
 
-function foldContext(lines: DiffLine[], keep = 1): DiffLine[] {
+function foldContextRows(lines: DiffLine[], expanded: Set<string>, keep = 3): DiffLine[] {
   const out: DiffLine[] = []
   let i = 0
   while (i < lines.length) {
@@ -429,18 +435,25 @@ function foldContext(lines: DiffLine[], keep = 1): DiffLine[] {
     const start = i
     while (i < lines.length && lines[i].kind === 'ctx') i++
     const run = lines.slice(start, i)
-    const prev = out[out.length - 1]
+    const prev = lines[start - 1]
     const next = lines[i]
     const head = prev && (prev.kind === 'add' || prev.kind === 'del') ? keep : 0
     const tail = next && (next.kind === 'add' || next.kind === 'del') ? keep : 0
-    if (run.length <= head + tail) {
+    if (run.length <= head + tail + 1) {
       out.push(...run)
       continue
     }
-    out.push(...run.slice(0, head))
-    const hidden = run.length - head - tail
-    if (hidden > 0) out.push({ kind: 'meta', text: `⋯ ${hidden} 行未显示` })
-    out.push(...run.slice(run.length - tail))
+    const id = `fold:${start}:${i}`
+    const isExpanded = expanded.has(id)
+    if (isExpanded) {
+      out.push({ kind: 'fold', text: '', foldId: id, foldCount: run.length, foldExpanded: true })
+      out.push(...run)
+    } else {
+      const hidden = run.length - head - tail
+      out.push(...run.slice(0, head))
+      out.push({ kind: 'fold', text: '', foldId: id, foldCount: hidden, foldExpanded: false })
+      out.push(...run.slice(run.length - tail))
+    }
   }
   return out
 }
@@ -467,7 +480,11 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
   ref,
 ) {
   const rawLines = useMemo(() => parsePatch(patch), [patch])
-  const lines = useMemo(() => (folded ? foldContext(rawLines) : rawLines), [folded, rawLines])
+  const [expandedFolds, setExpandedFolds] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    setExpandedFolds(new Set())
+  }, [patch, folded])
+  const lines = useMemo(() => (folded ? foldContextRows(rawLines, expandedFolds) : rawLines), [folded, rawLines, expandedFolds])
   const hasOldLines = useMemo(() => lines.some((line) => line.old !== undefined), [lines])
   const hasNewLines = useMemo(() => lines.some((line) => line.new !== undefined), [lines])
   const wordChanges = useMemo(() => (idea ? annotateWordChanges(lines) : []), [idea, lines])
@@ -648,7 +665,29 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
           const index = virtual ? start + i : i
           if (style === 'split') {
             const split = row as SplitRow
-            if (split.kind === 'hunk' || split.kind === 'meta') {
+            if (split.kind === 'hunk' || split.kind === 'meta' || split.kind === 'fold') {
+              if (split.kind === 'fold') {
+                return (
+                  <button
+                    key={index}
+                    className={`diff-line fold-row ${split.foldExpanded ? 'open' : ''}`}
+                    style={rowStyle(index)}
+                    onClick={() => {
+                      const id = split.foldId
+                      if (!id) return
+                      setExpandedFolds((prev) => {
+                        const next = new Set(prev)
+                        if (next.has(id)) next.delete(id)
+                        else next.add(id)
+                        return next
+                      })
+                    }}
+                  >
+                    <span className="fold-chevron">{split.foldExpanded ? '⌃' : '⌄'}</span>
+                    <span className="fold-text">{split.foldExpanded ? `${split.foldCount} 行已展开` : `${split.foldCount} 行未显示`}</span>
+                  </button>
+                )
+              }
               return (
                 <div key={index} className={`diff-line ${split.kind} split-wide`} style={rowStyle(index)}>
                   <span className="code">{split.text}</span>
@@ -683,6 +722,28 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
             )
           }
           const line = row as DiffLine
+          if (line.kind === 'fold') {
+            return (
+              <button
+                key={index}
+                className={`diff-line fold-row ${line.foldExpanded ? 'open' : ''}`}
+                style={rowStyle(index)}
+                onClick={() => {
+                  const id = line.foldId
+                  if (!id) return
+                  setExpandedFolds((prev) => {
+                    const next = new Set(prev)
+                    if (next.has(id)) next.delete(id)
+                    else next.add(id)
+                    return next
+                  })
+                }}
+              >
+                <span className="fold-chevron">{line.foldExpanded ? '⌃' : '⌄'}</span>
+                <span className="fold-text">{line.foldExpanded ? `${line.foldCount} 行已展开` : `${line.foldCount} 行未显示`}</span>
+              </button>
+            )
+          }
           return (
             <div key={index} className={`diff-line ${line.kind}`} style={rowStyle(index)}>
               {(idea ? hasOldLines : true) ? <span className={`gutter old ${line.kind === 'del' ? 'changed' : ''}`}>{line.old ?? ''}</span> : null}
