@@ -458,7 +458,11 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
             setMenuOpen((open) => !open)
           }}
         >
-          <Icon name="more" />
+          <svg className="more-dots" width="26" height="26" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="5" cy="12" r="2.2" />
+            <circle cx="12" cy="12" r="2.2" />
+            <circle cx="19" cy="12" r="2.2" />
+          </svg>
         </button>
       </header>
 

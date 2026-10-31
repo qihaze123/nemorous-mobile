@@ -2903,3 +2903,14 @@ h1 {
 .app.with-tab .screen-bottom-space.changes-bottom-space.action {
   height: calc(140px + env(safe-area-inset-bottom));
 }
+
+.icon-btn.menu-btn {
+  width: 48px;
+  height: 48px;
+  color: var(--fg);
+}
+
+.more-dots {
+  display: block;
+  fill: currentColor;
+}
