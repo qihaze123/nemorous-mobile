@@ -3114,3 +3114,26 @@ h1 {
   line-height: 1.5;
   white-space: nowrap;
 }
+
+.commit-meta-grid > * {
+  min-width: 0;
+}
+
+.commit-meta-grid span:nth-child(even) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commit-meta-grid code {
+  display: block;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  white-space: nowrap;
+  word-break: normal;
+}
+
+.commit-meta-grid code::-webkit-scrollbar {
+  display: none;
+}
