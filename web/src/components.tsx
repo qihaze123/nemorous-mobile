@@ -458,18 +458,16 @@ function foldContextRows(lines: DiffLine[], expanded: Set<string>, keep = 3, pre
     const hidden = run.length - head - tail
     const nextChange = !!(next && (next.kind === 'add' || next.kind === 'del'))
     if (isExpanded) {
-      const marks = new Set<number>()
-      if (prev && (prev.kind === 'add' || prev.kind === 'del')) marks.add(0)
-      if (nextChange) marks.add(run.length - 1)
-      if (marks.size === 0) marks.add(0)
-      out.push(...run.map((line, index) => marks.has(index)
+      const mark = tail > 0 ? run.length - tail - 1 : head > 0 ? head - 1 : 0
+      const side = tail > 0 ? ('before' as const) : ('after' as const)
+      out.push(...run.map((line, index) => index === mark
         ? {
             ...line,
             foldId: id,
             foldExpanded: true,
             foldCount: run.length,
             foldHidden: hidden,
-            foldSide: index === 0 ? ('after' as const) : ('before' as const),
+            foldSide: side,
           }
         : line))
     } else {
@@ -483,7 +481,7 @@ function foldContextRows(lines: DiffLine[], expanded: Set<string>, keep = 3, pre
 
 function foldAnchorFor(el: HTMLElement, source: HTMLElement, side?: 'before' | 'after'): { key: string; offset: number } | null {
   const lines = [...el.querySelectorAll<HTMLElement>('[data-line-key]')]
-  const sourceLine = source.closest<HTMLElement>('[data-line-key]')
+  const sourceLine = source.classList.contains('fold-gutter-toggle') ? null : source.closest<HTMLElement>('[data-line-key]')
   let anchor: HTMLElement | null | undefined = sourceLine
   if (!anchor) {
     const rect = source.getBoundingClientRect()
