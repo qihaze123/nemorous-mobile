@@ -28,6 +28,7 @@ const iconPaths: Record<string, string[]> = {
   panel: ['M4 5h16v14H4Z', 'M9 5v14'],
   rows: ['M4 6h16', 'M4 12h16', 'M4 18h16'],
   columns: ['M4 5h16v14H4Z', 'M12 5v14'],
+  fold: ['M4 6h16', 'M8 10l4 4 4-4', 'M8 18l4-4 4 4'],
   copy: ['M9 9h11v11H9Z', 'M5 15H4V4h11v1'],
   warning: ['M12 4 2 20h20Z', 'M12 10v4M12 17h.01'],
   branch: ['M6 3v12', 'M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z', 'M18 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z', 'M6 15c0-3 6-4 12-5'],
@@ -416,6 +417,34 @@ function buildSplitRows(lines: DiffLine[]): SplitRow[] {
   return out
 }
 
+function foldContext(lines: DiffLine[], keep = 1): DiffLine[] {
+  const out: DiffLine[] = []
+  let i = 0
+  while (i < lines.length) {
+    if (lines[i].kind !== 'ctx') {
+      out.push(lines[i])
+      i++
+      continue
+    }
+    const start = i
+    while (i < lines.length && lines[i].kind === 'ctx') i++
+    const run = lines.slice(start, i)
+    const prev = out[out.length - 1]
+    const next = lines[i]
+    const head = prev && (prev.kind === 'add' || prev.kind === 'del') ? keep : 0
+    const tail = next && (next.kind === 'add' || next.kind === 'del') ? keep : 0
+    if (run.length <= head + tail) {
+      out.push(...run)
+      continue
+    }
+    out.push(...run.slice(0, head))
+    const hidden = run.length - head - tail
+    if (hidden > 0) out.push({ kind: 'meta', text: `⋯ ${hidden} 行未显示` })
+    out.push(...run.slice(run.length - tail))
+  }
+  return out
+}
+
 const DIFF_LINE_HEIGHT = 20
 const DIFF_OVERSCAN = 12
 const DIFF_VIRTUAL_THRESHOLD = 200
@@ -427,11 +456,12 @@ export interface PatchViewHandle {
   currentLine(): number | undefined
 }
 
-export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: boolean; style?: 'unified' | 'split'; idea?: boolean }>(function PatchView(
-  { patch, binary, style = 'unified', idea = false },
+export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: boolean; style?: 'unified' | 'split'; idea?: boolean; folded?: boolean }>(function PatchView(
+  { patch, binary, style = 'unified', idea = false, folded = false },
   ref,
 ) {
-  const lines = useMemo(() => parsePatch(patch), [patch])
+  const rawLines = useMemo(() => parsePatch(patch), [patch])
+  const lines = useMemo(() => (folded ? foldContext(rawLines) : rawLines), [folded, rawLines])
   const hasOldLines = useMemo(() => lines.some((line) => line.old !== undefined), [lines])
   const hasNewLines = useMemo(() => lines.some((line) => line.new !== undefined), [lines])
   const wordChanges = useMemo(() => (idea ? annotateWordChanges(lines) : []), [idea, lines])

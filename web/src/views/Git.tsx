@@ -621,17 +621,93 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
   const [detail, setDetail] = useState<CommitDetail | null>(null)
   const [error, setError] = useState('')
   const [diffStyle, setDiffStyle] = useState<'unified' | 'split'>('unified')
+  const [folded, setFolded] = useState(false)
+  const [findOpen, setFindOpen] = useState(false)
+  const [find, setFind] = useState('')
+  const [findCount, setFindCount] = useState(0)
+  const [findActive, setFindActive] = useState(0)
+  const [copiedPath, setCopiedPath] = useState(false)
+  const diffRoot = useRef<HTMLDivElement>(null)
+  const patchRef = useRef<PatchViewHandle>(null)
 
   useEffect(() => {
     setDiffStyle('unified')
+    setFolded(false)
+    setFind('')
+    setFindOpen(false)
+    setFindActive(0)
   }, [path])
-  const patchRef = useRef<PatchViewHandle>(null)
+
   useEffect(() => {
     setDetail(null)
-    api<CommitDetail>(`/api/repos/${repoId}/commits/${hash}`)
+    setError('')
+    api<CommitDetail>(`/api/repos/${repoId}/commits/${hash}?path=${encodeURIComponent(path)}`)
       .then(setDetail)
       .catch((err) => setError(err instanceof Error ? err.message : '读取提交失败'))
-  }, [repoId, hash])
+  }, [repoId, hash, path])
+
+  useEffect(() => {
+    const root = diffRoot.current
+    const highlights = (CSS as unknown as { highlights?: { delete: (name: string) => void; set: (name: string, value: unknown) => void } }).highlights
+    const HighlightCtor = (window as unknown as { Highlight?: new (...ranges: Range[]) => unknown }).Highlight
+    if (!root || !highlights || !HighlightCtor) {
+      setFindCount(0)
+      return
+    }
+    highlights.delete('diff-find')
+    highlights.delete('diff-find-active')
+    const query = find.trim()
+    if (!query) {
+      setFindCount(0)
+      return
+    }
+    const ranges: Range[] = []
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+    let node = walker.nextNode()
+    while (node) {
+      const parent = node.parentElement
+      if (!parent || parent.closest('.gutter, .marker')) {
+        node = walker.nextNode()
+        continue
+      }
+      const text = node.textContent ?? ''
+      const lower = text.toLowerCase()
+      const needle = query.toLowerCase()
+      let from = 0
+      while (from < lower.length) {
+        const at = lower.indexOf(needle, from)
+        if (at < 0) break
+        const range = document.createRange()
+        range.setStart(node, at)
+        range.setEnd(node, at + query.length)
+        ranges.push(range)
+        from = at + query.length
+      }
+      node = walker.nextNode()
+    }
+    setFindCount(ranges.length)
+    if (ranges.length === 0) return
+    const active = Math.min(findActive, ranges.length - 1)
+    highlights.set('diff-find', new HighlightCtor(...ranges))
+    highlights.set('diff-find-active', new HighlightCtor(ranges[active]))
+    const scroller = root.querySelector<HTMLElement>('.patch-viewport')
+    if (scroller) {
+      const box = scroller.getBoundingClientRect()
+      const match = ranges[active].getBoundingClientRect()
+      if (match.top < box.top || match.bottom > box.bottom) scroller.scrollTop += match.top - box.top - box.height / 3
+      if (match.left < box.left || match.right > box.right) scroller.scrollLeft += match.left - box.left - 20
+    }
+  }, [find, findActive, detail, folded, diffStyle])
+
+  const copyPath = async () => {
+    try {
+      await navigator.clipboard.writeText(path)
+      setCopiedPath(true)
+      window.setTimeout(() => setCopiedPath(false), 1600)
+    } catch {
+      /* clipboard unavailable */
+    }
+  }
 
   const chunks = useMemo(() => splitPatch(detail?.patch ?? ''), [detail])
   const index = detail ? detail.files.findIndex((f) => f.path === path) : -1
@@ -686,7 +762,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
       {!detail && !error ? <Spinner label="读取提交…" /> : null}
       {detail ? (
         <>
-          <div className="diff-style-bar">
+          <div className="diff-style-bar commit-diff-toolbar">
             <div className="segmented diff-style">
               <button className={diffStyle === 'unified' ? 'on' : ''} onClick={() => setDiffStyle('unified')} aria-label="单栏">
                 <Icon name="rows" size={16} />
@@ -697,7 +773,42 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
                 <span className="diff-style-word">并排</span>
               </button>
             </div>
+            <div className="commit-diff-actions">
+              <button className="icon-btn" onClick={() => { setFindOpen((open) => !open); setFindActive(0) }} aria-label="在 Diff 中查找" aria-pressed={findOpen}>
+                <Icon name="search" size={17} />
+              </button>
+              <button className="icon-btn" onClick={() => setFolded((value) => !value)} aria-label={folded ? '展开未修改上下文' : '折叠未修改上下文'} aria-pressed={folded}>
+                <Icon name="fold" size={17} />
+              </button>
+              <button className="icon-btn" onClick={() => void copyPath()} aria-label="复制文件路径">
+                <Icon name={copiedPath ? 'check' : 'copy'} size={17} />
+              </button>
+            </div>
           </div>
+          {findOpen ? (
+            <div className="diff-find-bar">
+              <Icon name="search" size={15} />
+              <input
+                value={find}
+                onChange={(event) => { setFind(event.target.value); setFindActive(0) }}
+                placeholder="在 Diff 中查找…"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                autoFocus
+              />
+              <span className="diff-find-count">{findCount ? `${Math.min(findActive + 1, findCount)}/${findCount}` : '0/0'}</span>
+              <button className="icon-btn tiny" disabled={findCount === 0} onClick={() => setFindActive((value) => (value - 1 + findCount) % findCount)} aria-label="上一个匹配">
+                <Icon name="up" size={14} />
+              </button>
+              <button className="icon-btn tiny" disabled={findCount === 0} onClick={() => setFindActive((value) => (value + 1) % findCount)} aria-label="下一个匹配">
+                <Icon name="down" size={14} />
+              </button>
+              <button className="icon-btn tiny" onClick={() => { setFindOpen(false); setFind(''); setFindActive(0) }} aria-label="关闭查找">
+                <Icon name="close" size={14} />
+              </button>
+            </div>
+          ) : null}
           <DiffNavBar
             position={index >= 0 ? `${index + 1}/${detail.files.length}` : ''}
             canPrevFile={index > 0}
@@ -711,8 +822,8 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
               go(`#/file?repo=${repoId}&path=${encodeURIComponent(path)}&rev=${hash}${line ? `&line=${line}` : ''}`)
             }}
           />
-          <div className="commit-file-diff-page">
-            <PatchView ref={patchRef} patch={chunks.get(path) ?? ''} style={diffStyle} idea />
+          <div className="commit-file-diff-page" ref={diffRoot}>
+            <PatchView ref={patchRef} patch={chunks.get(path) ?? ''} style={diffStyle} idea folded={folded} />
           </div>
         </>
       ) : null}

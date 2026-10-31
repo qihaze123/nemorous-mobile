@@ -1049,6 +1049,35 @@ func (a *App) CommitDetail(ctx context.Context, id, hash string) (CommitDetail, 
 	}, nil
 }
 
+// CommitFileDetail is CommitDetail with the patch for one file expanded to full context.
+func (a *App) CommitFileDetail(ctx context.Context, id, hash, path string) (CommitDetail, error) {
+	detail, err := a.CommitDetail(ctx, id, hash)
+	if err != nil {
+		return CommitDetail{}, err
+	}
+	found := false
+	for _, file := range detail.Files {
+		if file.Path == path {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return CommitDetail{}, errors.New("文件不在这个提交里")
+	}
+	repo, err := a.repo(id)
+	if err != nil {
+		return CommitDetail{}, err
+	}
+	patch, err := gitOK(ctx, repo.Path, inspectTimeout,
+		"show", "--format=", "--no-color", "--no-ext-diff", "--no-renames", "--unified=999999", hash, "--", path)
+	if err != nil {
+		return CommitDetail{}, err
+	}
+	detail.Patch = patch
+	return detail, nil
+}
+
 const maxListedFiles = 20000
 
 // Files lists tracked and untracked repository-relative paths.

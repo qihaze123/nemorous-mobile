@@ -375,7 +375,14 @@ func (a *App) handleApplyPreset(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleCommitDetail(w http.ResponseWriter, r *http.Request) {
-	detail, err := a.CommitDetail(r.Context(), r.PathValue("id"), r.PathValue("hash"))
+	path := r.URL.Query().Get("path")
+	var detail CommitDetail
+	var err error
+	if path != "" {
+		detail, err = a.CommitFileDetail(r.Context(), r.PathValue("id"), r.PathValue("hash"), path)
+	} else {
+		detail, err = a.CommitDetail(r.Context(), r.PathValue("id"), r.PathValue("hash"))
+	}
 	if err != nil {
 		a.fail(w, err)
 		return
