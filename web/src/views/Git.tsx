@@ -869,7 +869,6 @@ export function CommitPatchScreen({ repoId, hash }: { repoId: string; hash: stri
   const [detail, setDetail] = useState<CommitDetail | null>(null)
   const [error, setError] = useState('')
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
-  const notify = useToast()
   useEffect(() => {
     setCollapsed(new Set())
   }, [hash])
@@ -898,32 +897,6 @@ export function CommitPatchScreen({ repoId, hash }: { repoId: string; hash: stri
           <h1 className="file-title">{detail?.commit.subject ?? hash.slice(0, 8)}</h1>
           <code className="commit-patch-hash">{detail?.commit.short ?? hash.slice(0, 7)}</code>
         </div>
-        <button
-          className="mini-btn"
-          onClick={() => {
-            const rows = detail?.files ?? []
-            setCollapsed(collapsed.size === rows.length ? new Set() : new Set(rows.map((f) => f.path)))
-          }}
-          disabled={!detail}
-        >
-          {detail && collapsed.size >= detail.files.length ? '全部展开' : '全部收起'}
-        </button>
-        <button
-          className="icon-btn"
-          disabled={!detail?.patch}
-          onClick={async () => {
-            if (!detail) return
-            try {
-              await navigator.clipboard.writeText(detail.patch)
-              notify('已复制完整 Patch', 'ok')
-            } catch {
-              notify('复制失败', 'error')
-            }
-          }}
-          aria-label="复制完整 Patch"
-        >
-          <Icon name="copy" />
-        </button>
       </header>
       {error ? <div className="error-banner">{error}</div> : null}
       {!detail && !error ? <Spinner label="读取提交…" /> : null}
@@ -933,6 +906,16 @@ export function CommitPatchScreen({ repoId, hash }: { repoId: string; hash: stri
             <span>{detail.files.length} 个文件</span>
             <span className="plus">+{added}</span>
             <span className="minus">−{deleted}</span>
+            <span className="grow" />
+            <button
+              className="mini-btn"
+              onClick={() => {
+                const rows = detail.files
+                setCollapsed(collapsed.size >= rows.length ? new Set() : new Set(rows.map((f) => f.path)))
+              }}
+            >
+              {collapsed.size >= detail.files.length ? '全部展开' : '全部收起'}
+            </button>
           </div>
           <MultiPatchView
             key={detail.commit.hash}

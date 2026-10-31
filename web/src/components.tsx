@@ -450,8 +450,13 @@ function foldContextRows(lines: DiffLine[], expanded: Set<string>, keep = 3, pre
     const id = `${prefix}fold:${start}:${i}`
     const isExpanded = expanded.has(id)
     if (isExpanded) {
-      const [first, ...rest] = run
-      out.push({ ...first, foldId: id, foldExpanded: true, foldCount: run.length }, ...rest)
+      const marks = new Set<number>()
+      if (prev && (prev.kind === 'add' || prev.kind === 'del')) marks.add(0)
+      if (next && (next.kind === 'add' || next.kind === 'del')) marks.add(run.length - 1)
+      if (marks.size === 0) marks.add(0)
+      out.push(...run.map((line, index) => marks.has(index)
+        ? { ...line, foldId: id, foldExpanded: true, foldCount: run.length }
+        : line))
     } else {
       const hidden = run.length - head - tail
       out.push(...run.slice(0, head))
