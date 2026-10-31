@@ -136,6 +136,7 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
   const [collapsedRepos, setCollapsedRepos] = useState<Set<string>>(new Set())
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuBusy, setMenuBusy] = useState(false)
+  const [actionRepoId, setActionRepoId] = useState(ws.repos[0]?.id ?? '')
   const notify = useToast()
 
   const sections = useMemo<Section[]>(() => {
@@ -190,25 +191,19 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
     setMenuOpen(false)
   }
 
-  const runBatch = async (action: 'pull' | 'push' | 'stash') => {
+  const actionRepo = ws.repos.find((repo) => repo.id === actionRepoId) ?? ws.repos[0]
+
+  const runRepoAction = async (action: 'pull' | 'push' | 'stash') => {
+    const repo = actionRepo
+    if (!repo) return
     setMenuBusy(true)
-    const label = action === 'pull' ? '拉取' : action === 'push' ? '推送' : 'Stash'
     try {
-      const res =
-        action === 'stash'
-          ? await post<{ results: OpResult[] }>('/api/batch/stash', { repos: [] })
-          : await post<{ results: OpResult[] }>('/api/batch', { action })
-      const failed = res.results.filter((r) => r.status === 'FAIL')
-      if (failed.length) {
-        notify(`${failed.length} 个仓库失败：${failed[0].repoName} ${failed[0].message}`, 'error')
-      } else {
-        const skipped = res.results.filter((r) => r.status === 'SKIP').length
-        notify(`${label}完成${skipped > 0 ? `（${skipped} 个跳过）` : ''}`, 'ok')
-        setMenuOpen(false)
-      }
+      const res = await post<OpResult>(`/api/repos/${repo.id}/${action}`, action === 'stash' ? { message: '' } : {})
+      notify(`${repo.name}: ${res.message}`, res.status === 'FAIL' ? 'error' : res.status === 'SKIP' ? 'info' : 'ok')
+      if (res.status !== 'FAIL') setMenuOpen(false)
       await refresh()
     } catch (err) {
-      notify(err instanceof Error ? err.message : `${label}失败`, 'error')
+      notify(err instanceof Error ? err.message : '操作失败', 'error')
     } finally {
       setMenuBusy(false)
     }
@@ -461,20 +456,36 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
           </button>
         </div>
         <div className="menu-section">
-          <div className="menu-label">Git 操作（全部仓库）</div>
-          <button className="menu-row" disabled={menuBusy} onClick={() => void runBatch('pull')}>
+          <div className="menu-label">Git 操作</div>
+          {ws.repos.length > 1 ? (
+            <label className="menu-select">
+              <span>仓库</span>
+              <select value={actionRepo?.id ?? ''} onChange={(e) => setActionRepoId(e.target.value)}>
+                {ws.repos.map((repo) => (
+                  <option key={repo.id} value={repo.id}>{repo.name}</option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <div className="menu-repo">
+              <span className="repo-dot" style={{ background: repoColor(actionRepo?.name ?? '') }} />
+              <span>{actionRepo?.name}</span>
+              <code>{actionRepo?.branch}</code>
+            </div>
+          )}
+          <button className="menu-row" disabled={menuBusy || !actionRepo} onClick={() => void runRepoAction('pull')}>
             <span className="menu-check"><Icon name="sync" size={16} /></span>
             <span>拉取</span>
           </button>
-          <button className="menu-row" disabled={menuBusy} onClick={() => void runBatch('push')}>
+          <button className="menu-row" disabled={menuBusy || !actionRepo} onClick={() => void runRepoAction('push')}>
             <span className="menu-check"><Icon name="branch" size={16} /></span>
             <span>推送</span>
           </button>
-          <button className="menu-row" disabled={menuBusy} onClick={() => void runBatch('stash')}>
+          <button className="menu-row" disabled={menuBusy || !actionRepo} onClick={() => void runRepoAction('stash')}>
             <span className="menu-check"><Icon name="folder" size={16} /></span>
-            <span>Stash 全部改动</span>
+            <span>Stash 当前改动</span>
           </button>
-          <p className="menu-hint">Stash 会收起所有仓库的未提交改动（含未跟踪文件），不会删除。</p>
+          <p className="menu-hint">Stash 会收起当前仓库的未提交改动（含未跟踪文件），不会删除。</p>
         </div>
       </Sheet>
       <Sheet

@@ -2765,3 +2765,46 @@ h1 {
 .menu-btn svg {
   stroke-width: 2.6;
 }
+
+.menu-repo {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px;
+  font-size: 12px;
+}
+
+.menu-repo code {
+  color: var(--muted);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repo-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.menu-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.menu-select select {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--fg);
+  font-size: 12px;
+}
