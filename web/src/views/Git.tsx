@@ -760,7 +760,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
   return (
     <div className="screen fill-screen">
       <header className="topbar commit-diff-header">
-        <button className="icon-btn" onClick={() => back(`#/commit?repo=${repoId}&hash=${hash}`)} aria-label="返回提交">
+        <button className="icon-btn" onClick={() => go(`#/commit?repo=${repoId}&hash=${hash}`)} aria-label="返回提交">
           <Icon name="back" />
         </button>
         <div className="grow commit-diff-title">
