@@ -105,8 +105,6 @@ export function DiffScreen({
   const patchRef = useRef<PatchViewHandle>(null)
   const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('nemorous.sidebar') !== 'closed')
 
-  const repo = ws.repos.find((r) => r.id === repoId)
-  const file = repo?.files.find((f) => f.path === path)
   const navFiles = useMemo(() => {
     const out: { repoId: string; path: string; staged: boolean }[] = []
     for (const r of ws.repos) {
@@ -258,16 +256,23 @@ export function DiffScreen({
       <DiffSidebar ws={ws} repoId={repoId} path={path} staged={staged} open={sidebarOpen} />
       <div className="diff-main">
         <div className="screen diff-screen fill-screen">
-          <header className="topbar">
+          <header className="topbar commit-diff-header">
             <button className="icon-btn sidebar-toggle" onClick={toggleSidebar} aria-label="文件栏">
               <Icon name="panel" />
             </button>
             <button className="icon-btn" onClick={() => back('#/changes')} aria-label="返回">
               <Icon name="back" />
             </button>
-            <div className="grow">
-              <div className="eyebrow">差异{file ? <StatusLetter file={file} /> : null}</div>
-              <h1 className="file-title">{path}</h1>
+            <div className="grow commit-diff-title">
+              <h1 className="file-title commit-file-name">
+                <span className="commit-file-stem">{(() => { const name = path.slice(path.lastIndexOf('/') + 1); const dot = name.lastIndexOf('.'); return dot > 0 ? name.slice(0, dot) : name })()}</span>
+                {(() => { const name = path.slice(path.lastIndexOf('/') + 1); const dot = name.lastIndexOf('.'); return dot > 0 ? name.slice(dot) : '' })()}
+              </h1>
+              <div className="commit-diff-meta">
+                <span className="diff-path" title={path.slice(0, path.lastIndexOf('/') + 1) || './'}>
+                  <span dir="ltr">{path.slice(0, path.lastIndexOf('/') + 1) || './'}</span>
+                </span>
+              </div>
             </div>
           </header>
 
