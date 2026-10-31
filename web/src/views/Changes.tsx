@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import type { FileChange, OpResult, RepoState, Workspace } from '../types'
 import { post } from '../api'
 import { go } from '../hooks'
-import { Empty, HealthPill, Icon, Sheet, repoColor, useToast } from '../components'
+import { Empty, Icon, Sheet, repoColor, useToast } from '../components'
 
 type SectionKey = 'staged' | 'unstaged'
 type Mode = 'list' | 'tree'
@@ -216,10 +216,10 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
     return count === files.length ? 'all' : 'some'
   }
 
-  const quick = async (repo: RepoState, action: 'pull' | 'push') => {
-    setBusyKey(`${repo.id}:${action}`)
+  const pushRepo = async (repo: RepoState) => {
+    setBusyKey(`${repo.id}:push`)
     try {
-      const res = await post<OpResult>(`/api/repos/${repo.id}/${action}`, {})
+      const res = await post<OpResult>(`/api/repos/${repo.id}/push`, {})
       notify(`${repo.name}: ${res.message}`, res.status === 'FAIL' ? 'error' : res.status === 'SKIP' ? 'info' : 'ok')
       await refresh()
     } catch (err) {
@@ -330,12 +330,8 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
                     {repo.behind > 0 ? <em className="behind">↓{repo.behind}</em> : null}
                   </span>
                 </span>
-                <HealthPill health={repo.health} />
                 <span className="repo-sync">
-                  <button className="icon-btn tiny" aria-label={`拉取 ${repo.name}`} disabled={busyKey === `${repo.id}:pull`} onClick={() => void quick(repo, 'pull')}>
-                    <Icon name="sync" size={15} />
-                  </button>
-                  <button className="icon-btn tiny" aria-label={`推送 ${repo.name}`} disabled={busyKey === `${repo.id}:push` || repo.ahead === 0} onClick={() => void quick(repo, 'push')}>
+                  <button className="icon-btn tiny" aria-label={`推送 ${repo.name}`} disabled={busyKey === `${repo.id}:push` || repo.ahead === 0} onClick={() => void pushRepo(repo)}>
                     <Icon name="branch" size={15} />
                   </button>
                 </span>
