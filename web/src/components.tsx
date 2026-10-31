@@ -541,22 +541,16 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
     pendingFoldAnchor.current = null
     const el = viewport.current
     if (!pending || !el) return
-    window.setTimeout(() => {
-      const settle = (attempt: number) => {
-        const anchor = [...el.querySelectorAll<HTMLElement>('[data-line-key]')]
-          .find((node) => node.dataset.lineKey === pending.key)
-          ?? [...el.querySelectorAll<HTMLElement>('[data-change-key]')]
-            .find((node) => node.dataset.changeKey === pending.key)
-        if (!anchor) return
-        const diff = (anchor.getBoundingClientRect().top - el.getBoundingClientRect().top) - pending.offset
-        if (Math.abs(diff) > 1) el.scrollTop += diff
-        if (Math.abs(diff) > 1 && attempt < 5) requestAnimationFrame(() => settle(attempt + 1))
-      }
-      settle(0)
-      if (![...el.querySelectorAll<HTMLElement>('[data-line-key]')].some((node) => node.dataset.lineKey === pending.key || node.dataset.changeKey === pending.key) && pending.delta) {
-        el.scrollTop += pending.delta
-      }
-    }, 0)
+    const anchor = [...el.querySelectorAll<HTMLElement>('[data-line-key]')]
+      .find((node) => node.dataset.lineKey === pending.key)
+      ?? [...el.querySelectorAll<HTMLElement>('[data-change-key]')]
+        .find((node) => node.dataset.changeKey === pending.key)
+    if (anchor) {
+      el.scrollTop += (anchor.getBoundingClientRect().top - el.getBoundingClientRect().top) - pending.offset
+    } else if (pending.delta) {
+      el.scrollTop += pending.delta
+    }
+    setScrollTop(el.scrollTop)
   }, [expandedFolds])
   const toggleFold = (id: string, side: 'before' | 'after' | undefined, hidden: number | undefined, source: HTMLElement) => {
     const el = viewport.current
@@ -974,7 +968,7 @@ export function MultiPatchView({
     }
   }, [])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const top = scrollTop
     let lo = 0
     let hi = rows.length
@@ -995,22 +989,16 @@ export function MultiPatchView({
     pendingFoldAnchor.current = null
     const el = viewport.current
     if (!pending || !el) return
-    window.setTimeout(() => {
-      const settle = (attempt: number) => {
-        const anchor = [...el.querySelectorAll<HTMLElement>('[data-line-key]')]
-          .find((node) => node.dataset.lineKey === pending.key)
-          ?? [...el.querySelectorAll<HTMLElement>('[data-change-key]')]
-            .find((node) => node.dataset.changeKey === pending.key)
-        if (!anchor) return
-        const diff = (anchor.getBoundingClientRect().top - el.getBoundingClientRect().top) - pending.offset
-        if (Math.abs(diff) > 1) el.scrollTop += diff
-        if (Math.abs(diff) > 1 && attempt < 5) requestAnimationFrame(() => settle(attempt + 1))
-      }
-      settle(0)
-      if (![...el.querySelectorAll<HTMLElement>('[data-line-key]')].some((node) => node.dataset.lineKey === pending.key || node.dataset.changeKey === pending.key) && pending.delta) {
-        el.scrollTop += pending.delta
-      }
-    }, 0)
+    const anchor = [...el.querySelectorAll<HTMLElement>('[data-line-key]')]
+      .find((node) => node.dataset.lineKey === pending.key)
+      ?? [...el.querySelectorAll<HTMLElement>('[data-change-key]')]
+        .find((node) => node.dataset.changeKey === pending.key)
+    if (anchor) {
+      el.scrollTop += (anchor.getBoundingClientRect().top - el.getBoundingClientRect().top) - pending.offset
+    } else if (pending.delta) {
+      el.scrollTop += pending.delta
+    }
+    setScrollTop(el.scrollTop)
   }, [expandedFolds])
   const toggleFold = (id: string, side: 'before' | 'after' | undefined, hidden: number | undefined, source: HTMLElement) => {
     const el = viewport.current
