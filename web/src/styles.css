@@ -760,7 +760,9 @@ h1 {
   border-right: 1px solid var(--border-soft);
   background: var(--bg);
   color: var(--muted);
-  font: 11px/20px ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: max(9px, calc(var(--code-font-size, 12.5px) - 1.5px));
+  line-height: var(--code-line-height, 20px);
   text-align: right;
   user-select: none;
 }
@@ -773,7 +775,9 @@ h1 {
 .code-pre {
   margin: 0;
   padding: 10px 14px;
-  font: 12.5px/20px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--code-font-size, 12.5px);
+  line-height: var(--code-line-height, 20px);
   white-space: pre;
 }
 
@@ -3668,4 +3672,152 @@ h1 {
 .mp-inner.has-expanded {
   box-sizing: content-box;
   padding-bottom: 60vh;
+}
+
+
+/* ---------- immersive reading ---------- */
+
+.screen.immersive {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  height: 100dvh;
+}
+
+.screen.immersive > .topbar,
+.screen.immersive > .code-meta,
+.screen.immersive > .diff-nav-row,
+.screen.immersive > .diff-find-bar,
+.screen.immersive > .commit-patch-meta,
+.screen.immersive > .hint {
+  display: none !important;
+}
+
+.screen.immersive > .code-scroll {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  padding-top: env(safe-area-inset-top);
+}
+
+.screen.immersive > .commit-file-diff-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.screen.immersive .commit-file-diff-page > .patch-viewport,
+.screen.immersive > .patch-viewport {
+  flex: 1;
+  max-height: none;
+}
+
+.diff-page.immersive .diff-sidebar {
+  display: none !important;
+}
+
+.diff-page.immersive .diff-main > .screen {
+  padding: 0;
+}
+
+.immersive-dock {
+  position: fixed;
+  right: max(10px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-elev) 82%, transparent);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 24%);
+  backdrop-filter: blur(16px);
+  opacity: 0.78;
+  transition: opacity 160ms ease;
+}
+
+.immersive-dock:hover,
+.immersive-dock:active {
+  opacity: 1;
+}
+
+.dock-btn {
+  min-width: 34px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.dock-btn:hover,
+.dock-btn:active {
+  color: var(--fg);
+  background: var(--surface);
+}
+
+.dock-btn:disabled {
+  opacity: 0.35;
+}
+
+.dock-btn.font {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.dock-btn.exit {
+  color: var(--fg);
+}
+
+.dock-size {
+  min-width: 20px;
+  color: var(--muted);
+  font: 9.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-align: center;
+}
+
+.dock-sep {
+  width: 1px;
+  height: 16px;
+  margin: 0 2px;
+  background: var(--border);
+}
+
+.update-banner {
+  position: sticky;
+  top: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: calc(env(safe-area-inset-top) + 8px) 14px 8px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-elev));
+  border-bottom: 1px solid var(--border);
+  color: var(--fg);
+  font-size: 12px;
+}
+
+.update-banner span {
+  flex: 1;
+  min-width: 0;
+}
+
+.update-banner .update-refresh {
+  padding: 5px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 11.5px;
+  font-weight: 650;
 }

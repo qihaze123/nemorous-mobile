@@ -26,6 +26,7 @@ const iconPaths: Record<string, string[]> = {
   right: ['M9 6l6 6-6 6'],
   jump: ['M14 4h6v6', 'M20 4 9 15'],
   panel: ['M4 5h16v14H4Z', 'M9 5v14'],
+  expand: ['M8 3H3v5', 'M16 3h5v5', 'M8 21H3v-5', 'M16 21h5v-5'],
   rows: ['M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z', 'M3 9h18', 'M3 15h18'],
   columns: ['M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z', 'M12 3v18'],
   fold: ['M12 22v-6', 'M12 8V2', 'M4 12H2', 'M10 12H8', 'M16 12h-2', 'M22 12h-2', 'M15 19l-3-3-3 3', 'M15 5l-3 3-3-3'],
@@ -131,6 +132,31 @@ export function SectionTitle({ children, action }: { children: ReactNode; action
 }
 
 /* ---------- toast ---------- */
+
+export function ImmersiveDock({
+  onExit,
+  font,
+}: {
+  onExit: () => void
+  font?: { size: number; min: number; max: number; onChange: (next: number) => void }
+}) {
+  const label = font ? (Number.isInteger(font.size) ? String(font.size) : font.size.toFixed(1)) : ''
+  return (
+    <div className={`immersive-dock ${font ? 'with-font' : ''}`} role="toolbar" aria-label="沉浸查看控制">
+      {font ? (
+        <>
+          <button className="dock-btn font" disabled={font.size <= font.min} onClick={() => font.onChange(font.size - 1)} aria-label="减小字号">A−</button>
+          <span className="dock-size" aria-live="polite">{label}</span>
+          <button className="dock-btn font" disabled={font.size >= font.max} onClick={() => font.onChange(font.size + 1)} aria-label="增大字号">A+</button>
+          <span className="dock-sep" aria-hidden="true" />
+        </>
+      ) : null}
+      <button className="dock-btn exit" onClick={onExit} aria-label="退出沉浸查看" title="退出沉浸查看（Esc）">
+        <Icon name="close" size={16} />
+      </button>
+    </div>
+  )
+}
 
 type ToastKind = 'ok' | 'error' | 'info'
 interface ToastItem {

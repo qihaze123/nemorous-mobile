@@ -120,6 +120,19 @@ export function repoQuery(repoId: string, path: string, extra?: Record<string, s
   return q.toString()
 }
 
+export function useImmersive() {
+  const [immersive, setImmersive] = useState(false)
+  useEffect(() => {
+    if (!immersive) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setImmersive(false)
+    }
+    addEventListener('keydown', onKey)
+    return () => removeEventListener('keydown', onKey)
+  }, [immersive])
+  return [immersive, setImmersive] as const
+}
+
 export function useDebounced<T>(value: T, delay = 250): T {
   const [debounced, setDebounced] = useState(value)
   useEffect(() => {

@@ -119,6 +119,7 @@ export default function App() {
   const [error, setError] = useState('')
   const [authFailed, setAuthFailed] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [updateVersion, setUpdateVersion] = useState('')
 
   const refresh = useCallback(async () => {
     try {
@@ -135,6 +136,37 @@ export default function App() {
       }
     } finally {
       setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    let baseline = ''
+    const check = async () => {
+      try {
+        const res = await fetch('/api/health', { cache: 'no-store' })
+        if (!res.ok) return
+        const health = (await res.json()) as { version?: string }
+        if (!active || !health.version) return
+        if (!baseline) {
+          baseline = health.version
+        } else if (health.version !== baseline) {
+          setUpdateVersion(health.version)
+        }
+      } catch {
+        /* offline: try again later */
+      }
+    }
+    void check()
+    const timer = setInterval(() => void check(), 60_000)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void check()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      active = false
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [])
 
@@ -272,6 +304,15 @@ export default function App() {
 
   return (
     <Shell tab={detail ? undefined : tab}>
+      {updateVersion ? (
+        <div className="update-banner" role="status">
+          <span>新版本 {updateVersion} 已就绪</span>
+          <button className="update-refresh" onClick={() => location.reload()}>刷新</button>
+          <button className="icon-btn tiny" onClick={() => setUpdateVersion('')} aria-label="稍后">
+            <Icon name="close" size={14} />
+          </button>
+        </div>
+      ) : null}
       {error ? (
         <div className="error-banner global" onClick={() => void refresh()}>
           <Icon name="warning" size={15} /> {error}（点按重试）

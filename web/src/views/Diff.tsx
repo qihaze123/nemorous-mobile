@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DiffResult, Workspace } from '../types'
 import { api } from '../api'
-import { back, go, replace } from '../hooks'
-import { Icon, PatchView, Spinner, StatusLetter, repoColor, type PatchViewHandle } from '../components'
+import { back, go, replace, useImmersive } from '../hooks'
+import { Icon, ImmersiveDock, PatchView, Spinner, StatusLetter, repoColor, type PatchViewHandle } from '../components'
 
 function DiffSidebar({
   ws,
@@ -92,6 +92,7 @@ export function DiffScreen({
   staged: boolean
 }) {
   const [diff, setDiff] = useState<DiffResult | null>(null)
+  const [immersive, setImmersive] = useImmersive()
   const [error, setError] = useState('')
   const [diffStyle, setDiffStyle] = useState<'unified' | 'split'>('unified')
   const [folded, setFolded] = useState(true)
@@ -251,11 +252,17 @@ export function DiffScreen({
     })
   }
 
+  const enterImmersive = () => {
+    setToolsOpen(false)
+    setFindOpen(false)
+    setImmersive(true)
+  }
+
   return (
-    <div className="diff-page">
+    <div className={`diff-page ${immersive ? 'immersive' : ''}`}>
       <DiffSidebar ws={ws} repoId={repoId} path={path} staged={staged} open={sidebarOpen} />
       <div className="diff-main">
-        <div className="screen diff-screen fill-screen">
+        <div className={`screen diff-screen fill-screen ${immersive ? 'immersive' : ''}`}>
           <header className="topbar commit-diff-header">
             <button className="icon-btn sidebar-toggle" onClick={toggleSidebar} aria-label="文件栏">
               <Icon name="panel" />
@@ -274,6 +281,9 @@ export function DiffScreen({
                 </span>
               </div>
             </div>
+            <button className="icon-btn" onClick={enterImmersive} aria-label="沉浸查看" title="沉浸查看">
+              <Icon name="expand" />
+            </button>
           </header>
 
           {error ? <div className="error-banner"><Icon name="warning" size={15} /> {error}</div> : null}
@@ -362,6 +372,7 @@ export function DiffScreen({
             </>
           ) : null}
           <div className="screen-bottom-space" />
+          {immersive ? <ImmersiveDock onExit={() => setImmersive(false)} /> : null}
         </div>
       </div>
     </div>

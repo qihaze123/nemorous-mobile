@@ -1,9 +1,9 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import hljs from 'highlight.js/lib/common'
 import type { FileContent, RepoFiles, SearchMatch, SearchResult, Workspace } from '../types'
 import { api } from '../api'
-import { back, go, useDebounced } from '../hooks'
-import { Empty, Icon, SectionTitle, Spinner, repoColor, useToast } from '../components'
+import { back, go, useDebounced, useImmersive } from '../hooks'
+import { Empty, Icon, ImmersiveDock, SectionTitle, Spinner, repoColor, useToast } from '../components'
 
 const LANG_BY_EXT: Record<string, string> = {
   ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript', mjs: 'javascript', cjs: 'javascript',
@@ -410,9 +410,21 @@ const MAX_HIGHLIGHT_BYTES = 300_000
 export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: string; rev?: string; line?: number }) {
   const [file, setFile] = useState<FileContent | null>(null)
   const [error, setError] = useState('')
+  const [immersive, setImmersive] = useImmersive()
+  const [fontSize, setFontSizeState] = useState(() => {
+    const saved = Number(localStorage.getItem('nemorous.codeFontSize'))
+    return saved >= 10 && saved <= 22 ? saved : 13
+  })
   const scrollRef = useRef<HTMLDivElement>(null)
   const notify = useToast()
   const lineParam = line ?? 0
+  const lineHeight = Math.round(fontSize * 1.6)
+  const codeStyle = { '--code-font-size': `${fontSize}px`, '--code-line-height': `${lineHeight}px` } as CSSProperties
+  const setFontSize = (next: number) => {
+    const clamped = Math.min(22, Math.max(10, next))
+    setFontSizeState(clamped)
+    localStorage.setItem('nemorous.codeFontSize', String(clamped))
+  }
 
   useEffect(() => {
     setFile(null)
@@ -442,8 +454,23 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
 
   useEffect(() => {
     if (!file || !lineParam || !scrollRef.current) return
-    scrollRef.current.scrollTop = Math.max(0, (lineParam - 1) * 20 - 120)
-  }, [file, lineParam])
+    scrollRef.current.scrollTop = Math.max(0, (lineParam - 1) * lineHeight - 120)
+  }, [file, lineParam, lineHeight])
+
+  useEffect(() => {
+    if (!immersive) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === '+' || event.key === '=') {
+        event.preventDefault()
+        setFontSize(fontSize + 1)
+      } else if (event.key === '-') {
+        event.preventDefault()
+        setFontSize(fontSize - 1)
+      }
+    }
+    addEventListener('keydown', onKey)
+    return () => removeEventListener('keydown', onKey)
+  }, [immersive, fontSize])
 
   const copy = async () => {
     if (!file) return
@@ -456,7 +483,7 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
   }
 
   return (
-    <div className="screen file-screen fill-screen">
+    <div className={`screen file-screen fill-screen ${immersive ? 'immersive' : ''}`} style={codeStyle}>
       <header className="topbar">
         <button
           className="icon-btn"
@@ -476,6 +503,9 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
           <h1 className="file-title">{path}</h1>
           {rev ? <span className="pill">{rev}</span> : null}
         </div>
+        <button className="icon-btn" onClick={() => setImmersive(true)} aria-label="沉浸查看" title="沉浸查看">
+          <Icon name="expand" />
+        </button>
         <button className="icon-btn" onClick={() => void copy()} aria-label="复制">
           <Icon name="copy" />
         </button>
@@ -512,6 +542,12 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
         </>
       ) : null}
       <div className="screen-bottom-space" />
+      {immersive && file && !file.binary ? (
+        <ImmersiveDock
+          onExit={() => setImmersive(false)}
+          font={{ size: fontSize, min: 10, max: 22, onChange: setFontSize }}
+        />
+      ) : null}
     </div>
   )
 }

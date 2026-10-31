@@ -1,8 +1,8 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { BranchList, BranchesResponse, Commit, CommitDetail, CommitFile, Workspace } from '../types'
 import { api } from '../api'
-import { back, go, replace, useDebounced } from '../hooks'
-import { Empty, Icon, MultiPatchView, PatchView, SectionTitle, Sheet, Spinner, ago, dayKey, repoColor, timeOf, useToast, type PatchViewHandle } from '../components'
+import { back, go, replace, useDebounced, useImmersive } from '../hooks'
+import { Empty, Icon, ImmersiveDock, MultiPatchView, PatchView, SectionTitle, Sheet, Spinner, ago, dayKey, repoColor, timeOf, useToast, type PatchViewHandle } from '../components'
 
 interface CommitFilters {
   repoId: string
@@ -628,6 +628,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
   const [findActive, setFindActive] = useState(0)
   const [copiedPath, setCopiedPath] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
+  const [immersive, setImmersive] = useImmersive()
   const diffRoot = useRef<HTMLDivElement>(null)
   const patchRef = useRef<PatchViewHandle>(null)
 
@@ -638,6 +639,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
     setFindOpen(false)
     setFindActive(0)
     setToolsOpen(false)
+    setImmersive(false)
   }, [path])
 
   useEffect(() => {
@@ -722,6 +724,12 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
     })
   }
 
+  const enterImmersive = () => {
+    setToolsOpen(false)
+    setFindOpen(false)
+    setImmersive(true)
+  }
+
   const chunks = useMemo(() => splitPatch(detail?.patch ?? ''), [detail])
   const atLast = new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('change') === 'last'
   const index = detail ? detail.files.findIndex((f) => f.path === path) : -1
@@ -758,7 +766,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
   })
 
   return (
-    <div className="screen fill-screen">
+    <div className={`screen fill-screen commit-file-screen ${immersive ? 'immersive' : ''}`}>
       <header className="topbar commit-diff-header">
         <button className="icon-btn" onClick={() => back(`#/commit?repo=${repoId}&hash=${hash}`)} aria-label="返回提交">
           <Icon name="back" />
@@ -774,6 +782,9 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
             </span>
           </div>
         </div>
+        <button className="icon-btn" onClick={enterImmersive} aria-label="沉浸查看" title="沉浸查看">
+          <Icon name="expand" />
+        </button>
       </header>
       {error ? <div className="error-banner">{error}</div> : null}
       {!detail && !error ? <Spinner label="读取提交…" /> : null}
@@ -861,6 +872,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
         </>
       ) : null}
       <div className="screen-bottom-space" />
+      {immersive ? <ImmersiveDock onExit={() => setImmersive(false)} /> : null}
     </div>
   )
 }
@@ -869,8 +881,10 @@ export function CommitPatchScreen({ repoId, hash }: { repoId: string; hash: stri
   const [detail, setDetail] = useState<CommitDetail | null>(null)
   const [error, setError] = useState('')
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [immersive, setImmersive] = useImmersive()
   useEffect(() => {
     setCollapsed(new Set())
+    setImmersive(false)
   }, [hash])
   useEffect(() => {
     setDetail(null)
@@ -888,7 +902,7 @@ export function CommitPatchScreen({ repoId, hash }: { repoId: string; hash: stri
   )
 
   return (
-    <div className="screen fill-screen">
+    <div className={`screen fill-screen commit-patch-screen ${immersive ? 'immersive' : ''}`}>
       <header className="topbar">
         <button className="icon-btn" onClick={() => back(`#/commit?repo=${repoId}&hash=${hash}`)} aria-label="返回提交">
           <Icon name="back" />
@@ -897,6 +911,9 @@ export function CommitPatchScreen({ repoId, hash }: { repoId: string; hash: stri
           <h1 className="file-title">{detail?.commit.subject ?? hash.slice(0, 8)}</h1>
           <code className="commit-patch-hash">{detail?.commit.short ?? hash.slice(0, 7)}</code>
         </div>
+        <button className="icon-btn" onClick={() => setImmersive(true)} aria-label="沉浸查看" title="沉浸查看">
+          <Icon name="expand" />
+        </button>
       </header>
       {error ? <div className="error-banner">{error}</div> : null}
       {!detail && !error ? <Spinner label="读取提交…" /> : null}
@@ -933,6 +950,7 @@ export function CommitPatchScreen({ repoId, hash }: { repoId: string; hash: stri
         </>
       ) : null}
       <div className="screen-bottom-space" />
+      {immersive ? <ImmersiveDock onExit={() => setImmersive(false)} /> : null}
     </div>
   )
 }
