@@ -481,6 +481,36 @@ function foldContextRows(lines: DiffLine[], expanded: Set<string>, keep = 3, pre
   return out
 }
 
+function foldAnchorFor(el: HTMLElement, source: HTMLElement, side?: 'before' | 'after'): { key: string; offset: number } | null {
+  const lines = [...el.querySelectorAll<HTMLElement>('[data-line-key]')]
+  const sourceLine = source.closest<HTMLElement>('[data-line-key]')
+  let anchor: HTMLElement | null | undefined = sourceLine
+  if (!anchor) {
+    const rect = source.getBoundingClientRect()
+    anchor = side === 'after'
+      ? [...lines].reverse().find((node) => node.getBoundingClientRect().bottom <= rect.top + 2)
+      : lines.find((node) => node.getBoundingClientRect().top >= rect.bottom - 2)
+  }
+  if (!anchor) {
+    const changes = [...el.querySelectorAll<HTMLElement>('[data-change-key]')]
+    const rect = source.getBoundingClientRect()
+    const center = (rect.top + rect.bottom) / 2
+    let distance = Infinity
+    for (const node of changes) {
+      const r = node.getBoundingClientRect()
+      const next = Math.abs((r.top + r.bottom) / 2 - center)
+      if (next < distance) {
+        distance = next
+        anchor = node
+      }
+    }
+  }
+  if (!anchor) return null
+  const key = anchor.dataset.lineKey ?? anchor.dataset.changeKey
+  if (!key) return null
+  return { key, offset: anchor.getBoundingClientRect().top - el.getBoundingClientRect().top }
+}
+
 const DIFF_LINE_HEIGHT = 20
 const DIFF_OVERSCAN = 12
 const DIFF_VIRTUAL_THRESHOLD = 200
@@ -515,8 +545,10 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
     if (!pending || !el) return
     window.setTimeout(() => {
       const settle = (attempt: number) => {
-        const anchor = [...el.querySelectorAll<HTMLElement>('[data-change-key]')]
-          .find((node) => node.dataset.changeKey === pending.key)
+        const anchor = [...el.querySelectorAll<HTMLElement>('[data-line-key]')]
+          .find((node) => node.dataset.lineKey === pending.key)
+          ?? [...el.querySelectorAll<HTMLElement>('[data-change-key]')]
+            .find((node) => node.dataset.changeKey === pending.key)
         if (!anchor) return
         const diff = (anchor.getBoundingClientRect().top - el.getBoundingClientRect().top) - pending.offset
         if (Math.abs(diff) > 1) el.scrollTop += diff
@@ -525,26 +557,9 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
       settle(0)
     }, 0)
   }, [expandedFolds])
-  const toggleFold = (id: string,  _side: 'before' | 'after' | undefined, _hidden: number | undefined, source: HTMLElement) => {
+  const toggleFold = (id: string, side: 'before' | 'after' | undefined, _hidden: number | undefined, source: HTMLElement) => {
     const el = viewport.current
-    if (el) {
-      const changes = [...el.querySelectorAll<HTMLElement>('[data-change-key]')]
-      const rect = source.getBoundingClientRect()
-      const sourceCenter = (rect.top + rect.bottom) / 2
-      let anchor: HTMLElement | undefined
-      let distance = Infinity
-      for (const node of changes) {
-        const nodeRect = node.getBoundingClientRect()
-        const nextDistance = Math.abs((nodeRect.top + nodeRect.bottom) / 2 - sourceCenter)
-        if (nextDistance < distance) {
-          anchor = node
-          distance = nextDistance
-        }
-      }
-      if (anchor?.dataset.changeKey) {
-        pendingFoldAnchor.current = { key: anchor.dataset.changeKey, offset: anchor.getBoundingClientRect().top - el.getBoundingClientRect().top }
-      }
-    }
+    if (el) pendingFoldAnchor.current = foldAnchorFor(el, source, side)
     setExpandedFolds((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -777,6 +792,7 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
                 className="diff-line split-row"
                 style={rowStyle(index)}
                 data-change-key={left.kind === 'del' || right.kind === 'add' ? `s:${left.no ?? ''}:${right.no ?? ''}:${left.text}:${right.text}` : undefined}
+                data-line-key={`s:${left.no ?? ''}:${right.no ?? ''}:${left.text}:${right.text}`}
               >
                 <span className={`split-gutter ${left.kind}`}>
                   {split.foldExpanded && split.foldId ? (
@@ -810,6 +826,7 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
               className={`diff-line ${line.kind}`}
               style={rowStyle(index)}
               data-change-key={line.kind === 'add' ? `a:${line.new ?? ''}:${line.text}` : line.kind === 'del' ? `d:${line.old ?? ''}:${line.text}` : undefined}
+              data-line-key={line.kind === 'hunk' || line.kind === 'meta' ? undefined : `l:${line.old ?? ''}:${line.new ?? ''}:${line.text}`}
             >
               {(idea ? hasOldLines : true) ? <span className={`gutter old ${line.kind === 'del' ? 'changed' : ''}`}>{line.old ?? ''}</span> : null}
               {(idea ? hasNewLines : true) ? <span className={`gutter new ${line.kind === 'add' ? 'changed' : ''}`}>{line.new ?? ''}</span> : null}
@@ -973,8 +990,10 @@ export function MultiPatchView({
     if (!pending || !el) return
     window.setTimeout(() => {
       const settle = (attempt: number) => {
-        const anchor = [...el.querySelectorAll<HTMLElement>('[data-change-key]')]
-          .find((node) => node.dataset.changeKey === pending.key)
+        const anchor = [...el.querySelectorAll<HTMLElement>('[data-line-key]')]
+          .find((node) => node.dataset.lineKey === pending.key)
+          ?? [...el.querySelectorAll<HTMLElement>('[data-change-key]')]
+            .find((node) => node.dataset.changeKey === pending.key)
         if (!anchor) return
         const diff = (anchor.getBoundingClientRect().top - el.getBoundingClientRect().top) - pending.offset
         if (Math.abs(diff) > 1) el.scrollTop += diff
@@ -983,26 +1002,9 @@ export function MultiPatchView({
       settle(0)
     }, 0)
   }, [expandedFolds])
-  const toggleFold = (id: string,  _side: 'before' | 'after' | undefined, _hidden: number | undefined, source: HTMLElement) => {
+  const toggleFold = (id: string, side: 'before' | 'after' | undefined, _hidden: number | undefined, source: HTMLElement) => {
     const el = viewport.current
-    if (el) {
-      const changes = [...el.querySelectorAll<HTMLElement>('[data-change-key]')]
-      const rect = source.getBoundingClientRect()
-      const sourceCenter = (rect.top + rect.bottom) / 2
-      let anchor: HTMLElement | undefined
-      let distance = Infinity
-      for (const node of changes) {
-        const nodeRect = node.getBoundingClientRect()
-        const nextDistance = Math.abs((nodeRect.top + nodeRect.bottom) / 2 - sourceCenter)
-        if (nextDistance < distance) {
-          anchor = node
-          distance = nextDistance
-        }
-      }
-      if (anchor?.dataset.changeKey) {
-        pendingFoldAnchor.current = { key: anchor.dataset.changeKey, offset: anchor.getBoundingClientRect().top - el.getBoundingClientRect().top }
-      }
-    }
+    if (el) pendingFoldAnchor.current = foldAnchorFor(el, source, side)
     setExpandedFolds((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -1064,6 +1066,7 @@ export function MultiPatchView({
                 className={`diff-line ${row.line.kind}`}
                 style={{ top: row.top, height: row.height, left: 0, minWidth: '100%', width: 'max-content' }}
                 data-change-key={row.line.kind === 'add' ? `${row.file.path}:a:${row.line.new ?? ''}:${row.line.text}` : row.line.kind === 'del' ? `${row.file.path}:d:${row.line.old ?? ''}:${row.line.text}` : undefined}
+                data-line-key={row.line.kind === 'hunk' || row.line.kind === 'meta' ? undefined : `${row.file.path}:l:${row.line.old ?? ''}:${row.line.new ?? ''}:${row.line.text}`}
               >
                 {row.hasOld ? <span className={`gutter old ${row.line.kind === 'del' ? 'changed' : ''}`}>{row.line.old ?? ''}</span> : null}
                 {row.hasNew ? <span className={`gutter new ${row.line.kind === 'add' ? 'changed' : ''}`}>{row.line.new ?? ''}</span> : null}
