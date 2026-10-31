@@ -3373,3 +3373,8 @@ h1 {
 .commit-file-diff-page .diff-line.hunk.split-wide {
   padding-left: 8px;
 }
+
+.patch-viewport,
+.code-scroll {
+  border-radius: 0;
+}
