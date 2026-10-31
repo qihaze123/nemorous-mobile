@@ -685,7 +685,9 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
             {(() => { const name = path.slice(path.lastIndexOf('/') + 1); const dot = name.lastIndexOf('.'); return dot > 0 ? name.slice(dot) : '' })()}
           </h1>
           <div className="commit-diff-meta">
-            <span className="diff-path">{path.slice(0, path.lastIndexOf('/') + 1) || './'}</span>
+            <span className="diff-path" title={path.slice(0, path.lastIndexOf('/') + 1) || './'}>
+              <span dir="ltr">{path.slice(0, path.lastIndexOf('/') + 1) || './'}</span>
+            </span>
           </div>
         </div>
       </header>

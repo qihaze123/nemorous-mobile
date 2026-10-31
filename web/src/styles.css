@@ -3321,3 +3321,14 @@ h1 {
 .commit-file-diff-page .diff-line.split-row .split-gutter:nth-child(3) {
   border-left: 1px solid var(--border-soft);
 }
+
+.diff-path {
+  flex-basis: 100%;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  direction: rtl;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
