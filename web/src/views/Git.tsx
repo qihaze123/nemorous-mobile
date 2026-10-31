@@ -733,7 +733,6 @@ function CommitTreeRows({
           {node.dir ? (
             <>
               <button
-                ref={(el) => registerRow(`d:${node.path}`, el)}
                 className="commit-tree-row dir"
                 style={{ paddingLeft: 4 + depth * 14 }}
                 onClick={() => onToggle(node.path)}
@@ -741,7 +740,6 @@ function CommitTreeRows({
                 <Icon name={collapsed.has(node.path) ? 'chevron' : 'down'} size={13} />
                 <Icon name="folder" size={15} />
                 <span className="tree-name">{node.name}</span>
-                {dots.has(`d:${node.path}`) ? <span className="tree-dots" aria-hidden="true">…</span> : null}
               </button>
               {!collapsed.has(node.path) ? (
                 <CommitTreeRows nodes={node.children} depth={depth + 1} collapsed={collapsed} dots={dots} registerRow={registerRow} onToggle={onToggle} onOpen={onOpen} />
@@ -791,7 +789,7 @@ export function CommitScreen({ repoId, hash }: { repoId: string; hash: string })
     const rect = container.getBoundingClientRect()
     const next = new Set<string>()
     rowEls.current.forEach((el, key) => {
-      if (el.getBoundingClientRect().right > rect.right - 1) next.add(key)
+      if (el.getBoundingClientRect().right > rect.right + 1) next.add(key)
     })
     setDots((prev) => {
       if (prev.size === next.size && [...next].every((key) => prev.has(key))) return prev
