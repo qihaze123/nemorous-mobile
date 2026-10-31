@@ -2579,7 +2579,27 @@ h1 {
   top: calc(env(safe-area-inset-top) + 66px);
   right: 14px;
   z-index: 50;
-  width: min(250px, calc(100vw - 28px));
+  width: clamp(118px, 32vw, 136px);
+  max-height: calc(100dvh - 82px - env(safe-area-inset-bottom));
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.menu-popover::-webkit-scrollbar {
+  display: none;
+}
+
+.menu-subpop {
+  position: fixed;
+  z-index: 51;
+  width: clamp(148px, 42vw, 168px);
+  max-height: calc(100dvh - 82px - env(safe-area-inset-bottom));
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.menu-subpop::-webkit-scrollbar {
+  display: none;
 }
 
 .menu-card {
@@ -2715,17 +2735,6 @@ h1 {
   color: var(--muted);
   font-size: 10px;
   line-height: 1.5;
-}
-
-.menu-popover {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.menu-subcard {
-  width: calc(100% - 8px);
-  align-self: flex-end;
 }
 
 .menu-subhead {

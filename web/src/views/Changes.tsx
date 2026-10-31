@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState, type MouseEvent } from 'react'
 import type { FileChange, OpResult, RepoState, Workspace } from '../types'
 import { post } from '../api'
 import { go } from '../hooks'
@@ -136,6 +136,7 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
   const [collapsedRepos, setCollapsedRepos] = useState<Set<string>>(new Set())
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuPage, setMenuPage] = useState<'root' | 'view' | 'git'>('root')
+  const [subAnchor, setSubAnchor] = useState<{ top: number; right: number } | null>(null)
   const [menuBusy, setMenuBusy] = useState(false)
   const [actionRepoId, setActionRepoId] = useState(ws.repos[0]?.id ?? '')
   const notify = useToast()
@@ -199,6 +200,21 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
     setModeState(next)
     localStorage.setItem('nemorous.changesMode', next)
     setMenuOpen(false)
+  }
+
+  const openSub = (page: 'view' | 'git', event: MouseEvent<HTMLButtonElement>) => {
+    if (menuPage === page) {
+      setMenuPage('root')
+      return
+    }
+    const rect = event.currentTarget.getBoundingClientRect()
+    const root = event.currentTarget.closest('.menu-card')?.getBoundingClientRect()
+    const estimatedHeight = page === 'git' ? 280 : 160
+    setSubAnchor({
+      top: Math.max(66, Math.min(rect.bottom + 6, innerHeight - estimatedHeight)),
+      right: innerWidth - (root?.left ?? rect.left) + 6,
+    })
+    setMenuPage(page)
   }
 
   const actionRepo = ws.repos.find((repo) => repo.id === actionRepoId) ?? ws.repos[0]
@@ -469,7 +485,7 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
             <div className="menu-card">
               <button
                 className={`menu-option ${menuPage === 'view' ? 'active' : ''}`}
-                onClick={() => setMenuPage(menuPage === 'view' ? 'root' : 'view')}
+                onClick={(event) => openSub('view', event)}
               >
                 <Icon name="panel" size={17} />
                 <span className="menu-option-main">
@@ -480,7 +496,7 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
               </button>
               <button
                 className={`menu-option ${menuPage === 'git' ? 'active' : ''}`}
-                onClick={() => setMenuPage(menuPage === 'git' ? 'root' : 'git')}
+                onClick={(event) => openSub('git', event)}
               >
                 <Icon name="git" size={17} />
                 <span className="menu-option-main">
@@ -490,8 +506,10 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
                 <Icon name={menuPage === 'git' ? 'down' : 'chevron'} size={15} />
               </button>
             </div>
-            {menuPage !== 'root' ? (
-              <div className="menu-card menu-subcard" key={menuPage}>
+          </div>
+          {menuPage !== 'root' && subAnchor ? (
+            <div className="menu-subpop" style={{ top: subAnchor.top, right: subAnchor.right }}>
+              <div className="menu-card" key={menuPage}>
                 <div className="menu-subhead">{menuPage === 'view' ? '视图' : 'Git 操作'}</div>
                 {menuPage === 'view' ? (
                   <>
@@ -539,8 +557,8 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
                   </>
                 )}
               </div>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </>
       ) : null}
       <Sheet
