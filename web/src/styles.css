@@ -3654,3 +3654,18 @@ h1 {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.patch-viewport,
+.mp-viewport {
+  overflow-anchor: none;
+}
+
+.patch.has-expanded {
+  box-sizing: content-box;
+  padding-bottom: 60vh;
+}
+
+.mp-inner.has-expanded {
+  box-sizing: content-box;
+  padding-bottom: 60vh;
+}
