@@ -914,3 +914,26 @@ func TestBranchPresets(t *testing.T) {
 		t.Fatal("empty preset name accepted")
 	}
 }
+
+func TestInspectSkipsUntrackedNestedRepository(t *testing.T) {
+	root := t.TempDir()
+	dir := newRepo(t, root, "repo", false)
+	writeFile(t, filepath.Join(dir, "fresh.txt"), "new\n")
+	nested := filepath.Join(dir, "nested")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	run(t, nested, "init", "-q", "-b", "main")
+	writeFile(t, filepath.Join(nested, "x.txt"), "nested\n")
+
+	st := inspect(context.Background(), Repo{ID: "repo", Name: "repo", Path: dir, Rel: "repo"})
+	if st.Error != "" {
+		t.Fatalf("inspect: %s", st.Error)
+	}
+	if len(st.Files) != 1 || st.Files[0].Path != "fresh.txt" {
+		t.Fatalf("files = %+v, want only fresh.txt", st.Files)
+	}
+	if st.UntrackedCount != 1 {
+		t.Fatalf("untracked = %d, want 1", st.UntrackedCount)
+	}
+}

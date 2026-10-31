@@ -168,6 +168,13 @@ func parseStatusZ(ctx context.Context, out string, st *RepoState) {
 		}
 		x, y := rec[0], rec[1]
 		path := rec[3:]
+		// `git status --untracked-files=all` still collapses a nested
+		// repository/worktree into a single directory entry ending in "/".
+		// Its contents belong to that other repository and cannot be
+		// committed here, so keep it out of this repo's change list.
+		if x == '?' && y == '?' && strings.HasSuffix(path, "/") {
+			continue
+		}
 		f := FileChange{
 			Path:       path,
 			Index:      string(x),
