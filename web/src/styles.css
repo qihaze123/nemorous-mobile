@@ -2715,3 +2715,11 @@ h1 {
 .app.with-tab .screen-bottom-space.action {
   height: calc(156px + env(safe-area-inset-bottom));
 }
+
+.app.with-tab .screen-bottom-space.changes-bottom-space {
+  height: calc(56px + env(safe-area-inset-bottom));
+}
+
+.app.with-tab .screen-bottom-space.changes-bottom-space.action {
+  height: calc(140px + env(safe-area-inset-bottom));
+}

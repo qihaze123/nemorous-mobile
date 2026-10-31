@@ -26,14 +26,25 @@ function fileKey(repoId: string, path: string) {
   return `${repoId}::${path}`
 }
 
+function normalizePath(path: string) {
+  return path.replace(/\/+$/, '')
+}
+
 function baseName(path: string) {
-  const i = path.lastIndexOf('/')
-  return i < 0 ? path : path.slice(i + 1)
+  const clean = normalizePath(path)
+  const i = clean.lastIndexOf('/')
+  return i < 0 ? clean : clean.slice(i + 1)
+}
+
+function displayName(path: string) {
+  const name = baseName(path)
+  return path.endsWith('/') ? `${name}/` : name
 }
 
 function dirName(path: string) {
-  const i = path.lastIndexOf('/')
-  return i < 0 ? '' : path.slice(0, i + 1)
+  const clean = normalizePath(path)
+  const i = clean.lastIndexOf('/')
+  return i < 0 ? '' : clean.slice(0, i + 1)
 }
 
 function statusClass(status: string) {
@@ -56,7 +67,8 @@ function statusClass(status: string) {
 function buildTree(files: FileChange[]): TreeNode[] {
   const root: TreeNode[] = []
   for (const file of files) {
-    const parts = file.path.split('/')
+    const parts = file.path.split('/').filter(Boolean)
+    if (parts.length === 0) continue
     let level = root
     let prefix = ''
     for (let i = 0; i < parts.length; i++) {
@@ -355,7 +367,7 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
                         >
                           {selected.has(fileKey(repo.id, file.path)) ? <Icon name="check" size={12} /> : null}
                         </span>
-                        <span className={`file-name ${statusClass(file.status)}`}>{baseName(file.path)}</span>
+                        <span className={`file-name ${statusClass(file.status)}`}>{displayName(file.path)}</span>
                         <span className="file-dir">{dirName(file.path)}</span>
                       </div>
                     ))}
@@ -449,7 +461,7 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
         ) : null}
         <p className="hint">提交会先把所选文件加入暂存区。推送永不使用 --force；已推送或已打标签的提交不能 amend。</p>
       </Sheet>
-      <div className={`screen-bottom-space ${selected.size > 0 ? 'action' : ''}`} />
+      <div className={`screen-bottom-space changes-bottom-space ${selected.size > 0 ? 'action' : ''}`} />
     </div>
   )
 }
@@ -531,7 +543,7 @@ function ChangeTree({
               label={`选择 ${file.path}`}
               onToggle={() => onToggleFile(file)}
             />
-            <span className={`file-name ${statusClass(file.status)}`}>{baseName(file.path)}</span>
+            <span className={`file-name ${statusClass(file.status)}`}>{displayName(file.path)}</span>
           </div>
         )
       })}
