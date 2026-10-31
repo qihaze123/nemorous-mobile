@@ -779,72 +779,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
       {!detail && !error ? <Spinner label="读取提交…" /> : null}
       {detail ? (
         <>
-          {toolsOpen ? (
-            <div className="diff-tools-panel">
-              <div className="diff-tools-row">
-                <div className="segmented diff-style">
-                  <button className={diffStyle === 'unified' ? 'on' : ''} onClick={() => setDiffStyle('unified')} aria-label="单栏">
-                    <Icon name="rows" size={16} />
-                    <span className="diff-style-word">单栏</span>
-                  </button>
-                  <button className={diffStyle === 'split' ? 'on' : ''} onClick={() => setDiffStyle('split')} aria-label="并排">
-                    <Icon name="columns" size={16} />
-                    <span className="diff-style-word">并排</span>
-                  </button>
-                </div>
-                <div className="diff-tools-actions">
-                  <button
-                    className="icon-btn"
-                    title="打开完整文件"
-                    aria-label="打开完整文件"
-                    onClick={() => {
-                      const line = patchRef.current?.currentLine()
-                      go(`#/file?repo=${repoId}&path=${encodeURIComponent(path)}&rev=${hash}${line ? `&line=${line}` : ''}`)
-                    }}
-                  >
-                    <Icon name="file" size={18} />
-                  </button>
-                  <button className="icon-btn" title="在 Diff 中查找" onClick={() => { setFindOpen((open) => !open); setFindActive(0) }} aria-label="在 Diff 中查找" aria-pressed={findOpen}>
-                    <Icon name="search" size={18} />
-                  </button>
-                  <button className="icon-btn" title={folded ? '展开未修改上下文' : '折叠未修改上下文'} onClick={() => setFolded((value) => !value)} aria-label={folded ? '展开未修改上下文' : '折叠未修改上下文'} aria-pressed={folded}>
-                    <Icon name="fold" size={18} />
-                  </button>
-                  <button className={`icon-btn ${copiedPath ? 'ok' : ''}`} title="复制文件路径" onClick={() => void copyPath()} aria-label="复制文件路径" aria-pressed={copiedPath}>
-                    <Icon name={copiedPath ? 'check' : 'copyPath'} size={18} />
-                  </button>
-                </div>
-              </div>
-              {findOpen ? (
-                <div className="diff-find-bar">
-                  <Icon name="search" size={15} />
-                  <input
-                    value={find}
-                    onChange={(event) => { setFind(event.target.value); setFindActive(0) }}
-                    placeholder="在 Diff 中查找…"
-                    autoCapitalize="off"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    autoFocus
-                  />
-                  <span className="diff-find-count">{findCount ? `${Math.min(findActive + 1, findCount)}/${findCount}` : '0/0'}</span>
-                  <button className="icon-btn tiny" disabled={findCount === 0} onClick={() => setFindActive((value) => (value - 1 + findCount) % findCount)} aria-label="上一个匹配">
-                    <Icon name="up" size={14} />
-                  </button>
-                  <button className="icon-btn tiny" disabled={findCount === 0} onClick={() => setFindActive((value) => (value + 1) % findCount)} aria-label="下一个匹配">
-                    <Icon name="down" size={14} />
-                  </button>
-                  <button className="icon-btn tiny" onClick={() => { setFindOpen(false); setFind(''); setFindActive(0) }} aria-label="关闭查找">
-                    <Icon name="close" size={14} />
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-          <div className="diff-nav-row commit-file-nav">
-            <button className="nav-icon tools-toggle" onClick={toggleTools} aria-label={toolsOpen ? '收起附加操作' : '展开附加操作'} aria-expanded={toolsOpen}>
-              <Icon name={toolsOpen ? 'down' : 'left'} size={15} />
-            </button>
+          <div className={`diff-nav-row commit-file-nav ${toolsOpen ? 'tools-open' : ''}`}>
             <button className="nav-icon" onClick={() => step(-1)} title="上一处改动" aria-label="上一处改动">
               <Icon name="up" size={15} />
             </button>
@@ -858,7 +793,68 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
               <Icon name="right" size={15} />
             </button>
             <span className="diff-position">{index >= 0 ? `${index + 1}/${detail.files.length}` : ''}</span>
+            <div className="commit-file-tools">
+              {toolsOpen ? (
+                <div className="inline-tools">
+                  <div className="segmented diff-style nav-style">
+                    <button className={diffStyle === 'unified' ? 'on' : ''} onClick={() => setDiffStyle('unified')} aria-label="单栏" title="单栏">
+                      <Icon name="rows" size={14} />
+                    </button>
+                    <button className={diffStyle === 'split' ? 'on' : ''} onClick={() => setDiffStyle('split')} aria-label="并排" title="并排">
+                      <Icon name="columns" size={14} />
+                    </button>
+                  </div>
+                  <button
+                    className="nav-icon nav-tool"
+                    title="打开完整文件"
+                    aria-label="打开完整文件"
+                    onClick={() => {
+                      const line = patchRef.current?.currentLine()
+                      go(`#/file?repo=${repoId}&path=${encodeURIComponent(path)}&rev=${hash}${line ? `&line=${line}` : ''}`)
+                    }}
+                  >
+                    <Icon name="file" size={15} />
+                  </button>
+                  <button className="nav-icon nav-tool" title="在 Diff 中查找" onClick={() => { setFindOpen((open) => !open); setFindActive(0) }} aria-label="在 Diff 中查找" aria-pressed={findOpen}>
+                    <Icon name="search" size={15} />
+                  </button>
+                  <button className="nav-icon nav-tool" title={folded ? '展开未修改上下文' : '折叠未修改上下文'} onClick={() => setFolded((value) => !value)} aria-label={folded ? '展开未修改上下文' : '折叠未修改上下文'} aria-pressed={folded}>
+                    <Icon name="fold" size={15} />
+                  </button>
+                  <button className={`nav-icon nav-tool ${copiedPath ? 'ok' : ''}`} title="复制文件路径" onClick={() => void copyPath()} aria-label="复制文件路径" aria-pressed={copiedPath}>
+                    <Icon name={copiedPath ? 'check' : 'copyPath'} size={15} />
+                  </button>
+                </div>
+              ) : null}
+              <button className="nav-icon tools-toggle" onClick={toggleTools} aria-label={toolsOpen ? '收起附加操作' : '展开附加操作'} aria-expanded={toolsOpen}>
+                <Icon name={toolsOpen ? 'right' : 'left'} size={15} />
+              </button>
+            </div>
           </div>
+          {findOpen ? (
+            <div className="diff-find-bar">
+              <Icon name="search" size={15} />
+              <input
+                value={find}
+                onChange={(event) => { setFind(event.target.value); setFindActive(0) }}
+                placeholder="在 Diff 中查找…"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                autoFocus
+              />
+              <span className="diff-find-count">{findCount ? `${Math.min(findActive + 1, findCount)}/${findCount}` : '0/0'}</span>
+              <button className="icon-btn tiny" disabled={findCount === 0} onClick={() => setFindActive((value) => (value - 1 + findCount) % findCount)} aria-label="上一个匹配">
+                <Icon name="up" size={14} />
+              </button>
+              <button className="icon-btn tiny" disabled={findCount === 0} onClick={() => setFindActive((value) => (value + 1) % findCount)} aria-label="下一个匹配">
+                <Icon name="down" size={14} />
+              </button>
+              <button className="icon-btn tiny" onClick={() => { setFindOpen(false); setFind(''); setFindActive(0) }} aria-label="关闭查找">
+                <Icon name="close" size={14} />
+              </button>
+            </div>
+          ) : null}
           <div className="commit-file-diff-page" ref={diffRoot}>
             <PatchView ref={patchRef} patch={chunks.get(path) ?? ''} style={diffStyle} idea folded={folded} focusChange={atLast ? 'last' : 'first'} />
           </div>

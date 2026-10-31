@@ -3520,3 +3520,82 @@ h1 {
 .fold-gutter-toggle:active {
   color: var(--accent);
 }
+
+.commit-file-nav {
+  gap: 4px;
+}
+
+.commit-file-nav.tools-open .diff-position {
+  display: none;
+}
+
+.commit-file-nav .diff-position {
+  margin-left: auto;
+  margin-right: 4px;
+}
+
+.commit-file-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.inline-tools {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  animation: inline-tools-in 160ms ease-out;
+}
+
+@keyframes inline-tools-in {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.commit-file-tools .nav-tool,
+.commit-file-tools .tools-toggle {
+  width: 30px;
+  height: 28px;
+}
+
+.commit-file-tools .nav-tool {
+  color: var(--muted);
+}
+
+.commit-file-tools .nav-tool[aria-pressed="true"] {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+
+.commit-file-tools .nav-tool.ok {
+  color: var(--add);
+}
+
+.commit-file-tools .tools-toggle {
+  color: var(--muted);
+}
+
+.commit-file-tools .tools-toggle[aria-expanded="true"] {
+  color: var(--accent);
+}
+
+.diff-style.nav-style {
+  height: 28px;
+  padding: 0;
+}
+
+.diff-style.nav-style button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
