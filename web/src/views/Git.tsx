@@ -28,7 +28,7 @@ function filterCount(f: CommitFilters): number {
   return [f.repoId, f.branch, f.mine, f.path, f.days, f.regex, f.caseSensitive].filter(Boolean).length
 }
 
-export function GitScreen({ ws, refresh }: { ws: Workspace; refresh: () => Promise<void> }) {
+export function GitScreen({ ws }: { ws: Workspace }) {
   const [commits, setCommits] = useState<Commit[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -38,7 +38,6 @@ export function GitScreen({ ws, refresh }: { ws: Workspace; refresh: () => Promi
   const [draft, setDraft] = useState<CommitFilters>(EMPTY_FILTERS)
   const [filterOpen, setFilterOpen] = useState(false)
   const [branches, setBranches] = useState<BranchesResponse | null>(null)
-  const [reload, setReload] = useState(0)
   const [repoSheet, setRepoSheet] = useState<string | null>(null)
   const notify = useToast()
 
@@ -70,7 +69,7 @@ export function GitScreen({ ws, refresh }: { ws: Workspace; refresh: () => Promi
     return () => {
       cancelled = true
     }
-  }, [debouncedQuery, filters, ws.generatedAt, reload])
+  }, [debouncedQuery, filters, ws.generatedAt])
 
   const grouped = useMemo(() => {
     const map: { day: string; items: Commit[] }[] = []
@@ -104,16 +103,6 @@ export function GitScreen({ ws, refresh }: { ws: Workspace; refresh: () => Promi
           <div className="eyebrow">提交</div>
           <h1>统一提交森林</h1>
         </div>
-        <button
-          className="icon-btn"
-          onClick={() => {
-            void refresh()
-            setReload((v) => v + 1)
-          }}
-          aria-label="刷新"
-        >
-          <Icon name="refresh" />
-        </button>
       </header>
 
       <div className="commit-search search-box">

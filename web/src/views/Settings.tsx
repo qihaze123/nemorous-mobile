@@ -142,9 +142,6 @@ export function SettingsScreen({ ws }: { ws: Workspace }) {
           <div className="eyebrow">设置</div>
           <h1>连接与外观</h1>
         </div>
-        <button className="icon-btn" onClick={() => void load()} aria-label="刷新">
-          <Icon name="refresh" />
-        </button>
       </header>
 
       <SectionTitle>安装到手机</SectionTitle>
@@ -183,9 +180,6 @@ export function SettingsScreen({ ws }: { ws: Workspace }) {
             <div className="action-row">
               <button className="btn subtle" onClick={() => void copyCode()}>
                 <Icon name="copy" size={15} /> 复制配对码
-              </button>
-              <button className="btn subtle" onClick={() => void load()}>
-                <Icon name="refresh" size={15} /> 刷新
               </button>
             </div>
           </>

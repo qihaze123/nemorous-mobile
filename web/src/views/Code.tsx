@@ -19,6 +19,16 @@ const SPECIAL_NAMES: Record<string, string> = {
   Dockerfile: 'dockerfile', Makefile: 'makefile', Jenkinsfile: 'groovy', Gemfile: 'ruby',
 }
 
+function fileName(path: string) {
+  const i = path.lastIndexOf('/')
+  return i < 0 ? path : path.slice(i + 1)
+}
+
+function dirPath(path: string) {
+  const i = path.lastIndexOf('/')
+  return i < 0 ? '' : path.slice(0, i + 1)
+}
+
 function languageOf(path: string): string {
   const name = path.slice(path.lastIndexOf('/') + 1)
   if (SPECIAL_NAMES[name]) return SPECIAL_NAMES[name]
@@ -148,9 +158,17 @@ export function CodeScreen({ ws }: { ws: Workspace }) {
       {result && mode === 'files' && result.files?.length ? (
         <div className="result-list">
           {result.files.map((f) => (
-            <button className="result-row" key={`${f.repoId}:${f.path}`} onClick={() => openFile(f.repoId, f.path)}>
+            <button
+              className="result-row"
+              key={`${f.repoId}:${f.path}`}
+              title={f.path}
+              onClick={() => openFile(f.repoId, f.path)}
+            >
               <span className="repo-chip" style={{ borderColor: repoColor(f.repoName) }}>{f.repoName}</span>
-              <span className="result-path">{f.path}</span>
+              <span className="result-file">
+                <span className="result-file-name">{fileName(f.path)}</span>
+                <span className="result-file-dir">{dirPath(f.path)}</span>
+              </span>
             </button>
           ))}
           {result.truncated ? <p className="hint">结果过多，仅显示前 200 条。</p> : null}
@@ -161,9 +179,12 @@ export function CodeScreen({ ws }: { ws: Workspace }) {
         <div className="result-list">
           {result.matches.map((m, i) => (
             <button className="match-row" key={`${m.repoId}:${m.path}:${m.line}:${i}`} onClick={() => openFile(m.repoId, m.path, m.line)}>
-              <span className="match-head">
+              <span className="match-head" title={`${m.path}:${m.line}`}>
                 <span className="repo-chip" style={{ borderColor: repoColor(m.repoName) }}>{m.repoName}</span>
-                <span className="result-path">{m.path}</span>
+                <span className="result-file">
+                  <span className="result-file-name">{fileName(m.path)}</span>
+                  <span className="result-file-dir">{dirPath(m.path)}</span>
+                </span>
                 <span className="line-no">:{m.line}</span>
               </span>
               <code className="match-text">{m.text}</code>

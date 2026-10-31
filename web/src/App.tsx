@@ -258,7 +258,7 @@ export default function App() {
         : <div className="screen"><p className="hint">缺少提交参数。</p></div>
       break
     case 'git':
-      screen = <GitScreen ws={ws} refresh={refresh} />
+      screen = <GitScreen ws={ws} />
       break
     case 'code':
       screen = <CodeScreen ws={ws} />
