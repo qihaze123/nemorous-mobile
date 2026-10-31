@@ -617,6 +617,28 @@ export function CommitScreen({ repoId, hash }: { repoId: string; hash: string })
   )
 }
 
+function commitFileStatus(status: string | undefined): string {
+  switch (status) {
+    case 'A': return '新增'
+    case 'D': return '删除'
+    case 'R': return '重命名'
+    case '?': return '未跟踪'
+    case 'U': return '冲突'
+    default: return '修改'
+  }
+}
+
+function commitFileStatusClass(status: string | undefined): string {
+  switch (status) {
+    case 'A': return 'added'
+    case 'D': return 'deleted'
+    case 'R': return 'renamed'
+    case '?': return 'untracked'
+    case 'U': return 'conflict'
+    default: return 'modified'
+  }
+}
+
 export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash: string; path: string }) {
   const [detail, setDetail] = useState<CommitDetail | null>(null)
   const [error, setError] = useState('')
@@ -676,13 +698,22 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
 
   return (
     <div className="screen fill-screen">
-      <header className="topbar">
+      <header className="topbar commit-diff-header">
         <button className="icon-btn" onClick={() => back(`#/commit?repo=${repoId}&hash=${hash}`)} aria-label="返回提交">
           <Icon name="back" />
         </button>
-        <div className="grow">
-          <div className="eyebrow">文件 Diff</div>
-          <h1 className="file-title">{path.slice(path.lastIndexOf('/') + 1)}</h1>
+        <div className="grow commit-diff-title">
+          <h1 className="file-title commit-file-name">
+            <span className="commit-file-stem">{(() => { const name = path.slice(path.lastIndexOf('/') + 1); const dot = name.lastIndexOf('.'); return dot > 0 ? name.slice(0, dot) : name })()}</span>
+            {(() => { const name = path.slice(path.lastIndexOf('/') + 1); const dot = name.lastIndexOf('.'); return dot > 0 ? name.slice(dot) : '' })()}
+          </h1>
+          <div className="commit-diff-meta">
+            <span className={`diff-status ${commitFileStatusClass(file?.status)}`}>{commitFileStatus(file?.status)}</span>
+            {(file?.added ?? 0) > 0 ? <span className="diff-added">+{file?.added}</span> : null}
+            {(file?.deleted ?? 0) > 0 ? <span className="diff-deleted">−{file?.deleted}</span> : null}
+            <span className="diff-compare">{hash.slice(0, 7)}</span>
+            <span className="diff-path">{path.slice(0, path.lastIndexOf('/') + 1) || './'}</span>
+          </div>
         </div>
         <button
           className="icon-btn"
@@ -696,18 +727,16 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
       {!detail && !error ? <Spinner label="读取提交…" /> : null}
       {detail ? (
         <>
-          <div className="commit-file-meta">
-            <span className={`status-letter s-${file?.status.slice(0, 1) === '?' ? 'untracked' : file?.status.slice(0, 1)}`}>{file?.status.slice(0, 1)}</span>
-            <span className="grow">{path}</span>
-            <span className="file-stats">
-              {(file?.added ?? 0) > 0 ? <em className="plus">+{file?.added}</em> : null}
-              {(file?.deleted ?? 0) > 0 ? <em className="minus">−{file?.deleted}</em> : null}
-            </span>
-          </div>
           <div className="diff-style-bar">
             <div className="segmented diff-style">
-              <button className={diffStyle === 'unified' ? 'on' : ''} onClick={() => setDiffStyle('unified')}>统一</button>
-              <button className={diffStyle === 'split' ? 'on' : ''} onClick={() => setDiffStyle('split')}>分栏</button>
+              <button className={diffStyle === 'unified' ? 'on' : ''} onClick={() => setDiffStyle('unified')} aria-label="单栏">
+                <Icon name="rows" size={16} />
+                <span className="diff-style-word">单栏</span>
+              </button>
+              <button className={diffStyle === 'split' ? 'on' : ''} onClick={() => setDiffStyle('split')} aria-label="并排">
+                <Icon name="columns" size={16} />
+                <span className="diff-style-word">并排</span>
+              </button>
             </div>
           </div>
           <DiffNavBar

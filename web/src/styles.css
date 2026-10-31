@@ -3199,3 +3199,89 @@ h1 {
 .diff-line.split-wide .code {
   padding: 0;
 }
+
+.commit-diff-title {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.commit-diff-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+  color: var(--muted);
+  font: 10px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.diff-status {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.diff-status.added,
+.diff-status.untracked {
+  color: var(--add);
+  background: var(--add-bg);
+}
+
+.diff-status.deleted,
+.diff-status.conflict {
+  color: var(--del);
+  background: var(--del-bg);
+}
+
+.diff-status.modified,
+.diff-status.renamed {
+  color: var(--blue);
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
+}
+
+.diff-added { color: var(--add); }
+.diff-deleted { color: var(--del); }
+.diff-compare { color: var(--muted); }
+.diff-path { flex-basis: 100%; color: var(--muted); }
+
+.diff-style button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.diff-style-word {
+  font-size: 10px;
+}
+
+@media (max-width: 600px) {
+  .diff-style-word {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
+.commit-file-name {
+  display: flex;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.commit-file-stem {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
