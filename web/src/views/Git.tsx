@@ -633,7 +633,6 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
 
   const chunks = useMemo(() => splitPatch(detail?.patch ?? ''), [detail])
   const index = detail ? detail.files.findIndex((f) => f.path === path) : -1
-  const file = detail && index >= 0 ? detail.files[index] : null
 
   const jump = (direction: 1 | -1): boolean => {
     if (!detail) return false
@@ -686,8 +685,6 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
             {(() => { const name = path.slice(path.lastIndexOf('/') + 1); const dot = name.lastIndexOf('.'); return dot > 0 ? name.slice(dot) : '' })()}
           </h1>
           <div className="commit-diff-meta">
-            {(file?.added ?? 0) > 0 ? <span className="diff-added">+{file?.added}</span> : null}
-            {(file?.deleted ?? 0) > 0 ? <span className="diff-deleted">−{file?.deleted}</span> : null}
             <span className="diff-path">{path.slice(0, path.lastIndexOf('/') + 1) || './'}</span>
           </div>
         </div>

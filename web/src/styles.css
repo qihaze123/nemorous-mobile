@@ -3247,8 +3247,6 @@ h1 {
   background: color-mix(in srgb, var(--blue) 12%, transparent);
 }
 
-.diff-added { color: var(--add); }
-.diff-deleted { color: var(--del); }
 .diff-compare { color: var(--muted); }
 .diff-path { flex-basis: 100%; color: var(--muted); }
 
