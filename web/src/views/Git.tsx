@@ -868,7 +868,11 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
 export function CommitPatchScreen({ repoId, hash }: { repoId: string; hash: string }) {
   const [detail, setDetail] = useState<CommitDetail | null>(null)
   const [error, setError] = useState('')
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const notify = useToast()
+  useEffect(() => {
+    setCollapsed(new Set())
+  }, [hash])
   useEffect(() => {
     setDetail(null)
     api<CommitDetail>(`/api/repos/${repoId}/commits/${hash}?context=full`)
@@ -890,10 +894,20 @@ export function CommitPatchScreen({ repoId, hash }: { repoId: string; hash: stri
         <button className="icon-btn" onClick={() => back(`#/commit?repo=${repoId}&hash=${hash}`)} aria-label="返回提交">
           <Icon name="back" />
         </button>
-        <div className="grow">
-          <div className="eyebrow">完整 Patch</div>
+        <div className="grow commit-patch-head">
           <h1 className="file-title">{detail?.commit.subject ?? hash.slice(0, 8)}</h1>
+          <code className="commit-patch-hash">{detail?.commit.short ?? hash.slice(0, 7)}</code>
         </div>
+        <button
+          className="mini-btn"
+          onClick={() => {
+            const rows = detail?.files ?? []
+            setCollapsed(collapsed.size === rows.length ? new Set() : new Set(rows.map((f) => f.path)))
+          }}
+          disabled={!detail}
+        >
+          {detail && collapsed.size >= detail.files.length ? '全部展开' : '全部收起'}
+        </button>
         <button
           className="icon-btn"
           disabled={!detail?.patch}
@@ -919,10 +933,20 @@ export function CommitPatchScreen({ repoId, hash }: { repoId: string; hash: stri
             <span>{detail.files.length} 个文件</span>
             <span className="plus">+{added}</span>
             <span className="minus">−{deleted}</span>
-            <span className="grow" />
-            <code>{detail.commit.short}</code>
           </div>
-          <MultiPatchView key={detail.commit.hash} files={files} />
+          <MultiPatchView
+            key={detail.commit.hash}
+            files={files}
+            collapsed={collapsed}
+            onToggleFile={(path) =>
+              setCollapsed((prev) => {
+                const next = new Set(prev)
+                if (next.has(path)) next.delete(path)
+                else next.add(path)
+                return next
+              })
+            }
+          />
         </>
       ) : null}
       <div className="screen-bottom-space" />

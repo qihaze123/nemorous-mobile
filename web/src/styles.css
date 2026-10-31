@@ -3636,3 +3636,21 @@ h1 {
   font-size: inherit;
   line-height: inherit;
 }
+
+.commit-patch-head {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.commit-patch-hash {
+  color: var(--muted);
+  font: 10px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.commit-patch-head .file-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

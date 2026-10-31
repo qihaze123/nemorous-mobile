@@ -833,10 +833,16 @@ const MP_FILE_HEIGHT = 32
 const MP_LINE_HEIGHT = 20
 const MP_OVERSCAN = 10
 
-export function MultiPatchView({ files }: { files: MultiPatchFile[] }) {
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+export function MultiPatchView({
+  files,
+  collapsed,
+  onToggleFile,
+}: {
+  files: MultiPatchFile[]
+  collapsed: Set<string>
+  onToggleFile: (path: string) => void
+}) {
   const [expandedFolds, setExpandedFolds] = useState<Set<string>>(new Set())
-  const [picker, setPicker] = useState(false)
   const [scrollTop, setScrollTop] = useState(0)
   const [height, setHeight] = useState(600)
   const [range, setRange] = useState({ start: 0, end: 40 })
@@ -893,24 +899,6 @@ export function MultiPatchView({ files }: { files: MultiPatchFile[] }) {
     setRange((prev) => (prev.start === start && prev.end === end ? prev : { start, end }))
   }, [rows, scrollTop, height])
 
-  const current = useMemo(() => {
-    let file: MultiPatchFile | undefined = rows[0]?.kind === 'file' ? rows[0].file : rows[0]?.file
-    for (const row of rows) {
-      if (row.top > scrollTop) break
-      file = row.file
-    }
-    return file
-  }, [rows, scrollTop])
-
-  const toggle = (path: string) => {
-    setCollapsed((prev) => {
-      const next = new Set(prev)
-      if (next.has(path)) next.delete(path)
-      else next.add(path)
-      return next
-    })
-  }
-
   const toggleFold = (id: string) => {
     setExpandedFolds((prev) => {
       const next = new Set(prev)
@@ -920,40 +908,8 @@ export function MultiPatchView({ files }: { files: MultiPatchFile[] }) {
     })
   }
 
-  const allCollapsed = files.length > 0 && files.every((f) => collapsed.has(f.path))
-  const fileTops = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const row of rows) {
-      if (row.kind === 'file' && !map.has(row.file.path)) map.set(row.file.path, row.top)
-    }
-    return map
-  }, [rows])
-
-  const jumpTo = (path: string) => {
-    const top = fileTops.get(path)
-    if (top !== undefined && viewport.current) viewport.current.scrollTop = top
-    setPicker(false)
-  }
-
   return (
     <div className="multi-patch idea-diff">
-      <div className="mp-bar">
-        <span className={`status-letter s-${current?.status.slice(0, 1) === '?' ? 'untracked' : current?.status.slice(0, 1)}`}>
-          {current?.status.slice(0, 1)}
-        </span>
-        <button className="mp-current" onClick={() => setPicker(true)} title="选择文件">
-          <span>{current?.path}</span>
-          <Icon name="chevron" size={12} />
-        </button>
-        <button
-          className="mini-btn"
-          onClick={() =>
-            setCollapsed(allCollapsed ? new Set() : new Set(files.map((f) => f.path)))
-          }
-        >
-          {allCollapsed ? '全部展开' : '全部收起'}
-        </button>
-      </div>
       <div
         className="mp-viewport"
         ref={viewport}
@@ -973,7 +929,7 @@ export function MultiPatchView({ files }: { files: MultiPatchFile[] }) {
                 key={`f:${row.file.path}`}
                 className="mp-file-row"
                 style={{ top: row.top, height: row.height }}
-                onClick={() => toggle(row.file.path)}
+                onClick={() => onToggleFile(row.file.path)}
                 aria-expanded={!collapsed.has(row.file.path)}
               >
                 <Icon name={collapsed.has(row.file.path) ? 'chevron' : 'down'} size={13} />
@@ -1022,22 +978,6 @@ export function MultiPatchView({ files }: { files: MultiPatchFile[] }) {
           )}
         </div>
       </div>
-      <Sheet open={picker} title="文件" onClose={() => setPicker(false)}>
-        <div className="mp-file-list">
-          {files.map((file) => (
-            <button key={file.path} className="mp-file-item" onClick={() => jumpTo(file.path)}>
-              <span className={`status-letter s-${file.status.slice(0, 1) === '?' ? 'untracked' : file.status.slice(0, 1)}`}>
-                {file.status.slice(0, 1)}
-              </span>
-              <span className="file-path">{file.path}</span>
-              <span className="file-stats">
-                {file.added > 0 ? <em className="plus">+{file.added}</em> : null}
-                {file.deleted > 0 ? <em className="minus">−{file.deleted}</em> : null}
-              </span>
-            </button>
-          ))}
-        </div>
-      </Sheet>
     </div>
   )
 }
