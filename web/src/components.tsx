@@ -1,4 +1,4 @@
-import { createContext, forwardRef, useCallback, useContext, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createContext, forwardRef, useCallback, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 import type { FileChange, RepoHealth } from './types'
 
@@ -612,7 +612,7 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
     },
   }), [changeRows, firstChangeRow, hunkRows, rows])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = viewport.current
     if (!el) return
     setScrollTop(0)
@@ -629,9 +629,9 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
       observer.disconnect()
       window.clearTimeout(settle.current)
     }
-  }, [patch, style, hasOldLines, hasNewLines])
+  }, [patch, style])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!idea) return
     const el = viewport.current
     if (!el) return
