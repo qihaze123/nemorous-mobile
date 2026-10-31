@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { FileChange, OpResult, RepoState, Workspace } from '../types'
 import { post } from '../api'
 import { go } from '../hooks'
-import { Empty, FileTag, HealthPill, Icon, Sheet, repoColor, useToast } from '../components'
+import { Empty, HealthPill, Icon, Sheet, repoColor, useToast } from '../components'
 
 function keyOf(repoId: string, path: string) {
   return `${repoId}::${path}`
@@ -255,7 +255,6 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
                       <span className="file-info">
                         <span className="file-dir">{dirName(file.path)}</span>
                         <span className="file-name">{fileName(file.path)}</span>
-                        <FileTag status={file.status} />
                       </span>
                     </div>
                   )
