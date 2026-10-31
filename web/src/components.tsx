@@ -532,7 +532,7 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
 ) {
   const rawLines = useMemo(() => parsePatch(patch), [patch])
   const [expandedFolds, setExpandedFolds] = useState<Set<string>>(new Set())
-  const pendingFoldAnchor = useRef<{ key: string; offset: number } | null>(null)
+  const pendingFoldAnchor = useRef<{ key: string; offset: number; delta: number } | null>(null)
   useEffect(() => {
     setExpandedFolds(new Set())
   }, [patch, folded])
@@ -553,11 +553,20 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
         if (Math.abs(diff) > 1 && attempt < 5) requestAnimationFrame(() => settle(attempt + 1))
       }
       settle(0)
+      if (![...el.querySelectorAll<HTMLElement>('[data-line-key]')].some((node) => node.dataset.lineKey === pending.key || node.dataset.changeKey === pending.key) && pending.delta) {
+        el.scrollTop += pending.delta
+      }
     }, 0)
   }, [expandedFolds])
-  const toggleFold = (id: string, side: 'before' | 'after' | undefined, _hidden: number | undefined, source: HTMLElement) => {
+  const toggleFold = (id: string, side: 'before' | 'after' | undefined, hidden: number | undefined, source: HTMLElement) => {
     const el = viewport.current
-    if (el) pendingFoldAnchor.current = foldAnchorFor(el, source, side)
+    if (el) {
+      const found = foldAnchorFor(el, source, side)
+      const delta = side === 'before' && hidden && hidden > 1
+        ? (!expandedFolds.has(id) ? 1 : -1) * (hidden - 1) * (el.classList.contains('mp-viewport') ? MP_LINE_HEIGHT : DIFF_LINE_HEIGHT)
+        : 0
+      pendingFoldAnchor.current = found ? { ...found, delta } : (delta ? { key: '', offset: 0, delta } : null)
+    }
     setExpandedFolds((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -924,7 +933,7 @@ export function MultiPatchView({
   onToggleFile: (path: string) => void
 }) {
   const [expandedFolds, setExpandedFolds] = useState<Set<string>>(new Set())
-  const pendingFoldAnchor = useRef<{ key: string; offset: number } | null>(null)
+  const pendingFoldAnchor = useRef<{ key: string; offset: number; delta: number } | null>(null)
   const [scrollTop, setScrollTop] = useState(0)
   const [height, setHeight] = useState(600)
   const [range, setRange] = useState({ start: 0, end: 40 })
@@ -998,11 +1007,20 @@ export function MultiPatchView({
         if (Math.abs(diff) > 1 && attempt < 5) requestAnimationFrame(() => settle(attempt + 1))
       }
       settle(0)
+      if (![...el.querySelectorAll<HTMLElement>('[data-line-key]')].some((node) => node.dataset.lineKey === pending.key || node.dataset.changeKey === pending.key) && pending.delta) {
+        el.scrollTop += pending.delta
+      }
     }, 0)
   }, [expandedFolds])
-  const toggleFold = (id: string, side: 'before' | 'after' | undefined, _hidden: number | undefined, source: HTMLElement) => {
+  const toggleFold = (id: string, side: 'before' | 'after' | undefined, hidden: number | undefined, source: HTMLElement) => {
     const el = viewport.current
-    if (el) pendingFoldAnchor.current = foldAnchorFor(el, source, side)
+    if (el) {
+      const found = foldAnchorFor(el, source, side)
+      const delta = side === 'before' && hidden && hidden > 1
+        ? (!expandedFolds.has(id) ? 1 : -1) * (hidden - 1) * (el.classList.contains('mp-viewport') ? MP_LINE_HEIGHT : DIFF_LINE_HEIGHT)
+        : 0
+      pendingFoldAnchor.current = found ? { ...found, delta } : (delta ? { key: '', offset: 0, delta } : null)
+    }
     setExpandedFolds((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
