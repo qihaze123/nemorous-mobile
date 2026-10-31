@@ -302,6 +302,59 @@ export function parsePatch(patch: string): DiffLine[] {
   return out
 }
 
+interface SplitCell {
+  kind: 'add' | 'del' | 'ctx' | 'blank'
+  text: string
+  no?: number
+}
+
+interface SplitRow {
+  kind: 'hunk' | 'meta' | 'split'
+  text?: string
+  hunkNew?: number
+  left?: SplitCell
+  right?: SplitCell
+}
+
+function buildSplitRows(lines: DiffLine[]): SplitRow[] {
+  const out: SplitRow[] = []
+  let i = 0
+  while (i < lines.length) {
+    const line = lines[i]
+    if (line.kind === 'hunk' || line.kind === 'meta') {
+      out.push({ kind: line.kind, text: line.text, hunkNew: line.hunkNew })
+      i++
+      continue
+    }
+    if (line.kind === 'ctx') {
+      out.push({
+        kind: 'split',
+        left: { kind: 'ctx', text: line.text, no: line.old },
+        right: { kind: 'ctx', text: line.text, no: line.new },
+      })
+      i++
+      continue
+    }
+    const dels: SplitCell[] = []
+    const adds: SplitCell[] = []
+    while (i < lines.length && (lines[i].kind === 'del' || lines[i].kind === 'add')) {
+      const changed = lines[i]
+      if (changed.kind === 'del') dels.push({ kind: 'del', text: changed.text, no: changed.old })
+      else adds.push({ kind: 'add', text: changed.text, no: changed.new })
+      i++
+    }
+    const count = Math.max(dels.length, adds.length)
+    for (let j = 0; j < count; j++) {
+      out.push({
+        kind: 'split',
+        left: dels[j] ?? { kind: 'blank', text: '' },
+        right: adds[j] ?? { kind: 'blank', text: '' },
+      })
+    }
+  }
+  return out
+}
+
 const DIFF_LINE_HEIGHT = 20
 const DIFF_OVERSCAN = 12
 const DIFF_VIRTUAL_THRESHOLD = 200
@@ -313,30 +366,42 @@ export interface PatchViewHandle {
   currentLine(): number | undefined
 }
 
-export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: boolean }>(function PatchView(
-  { patch, binary },
+export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: boolean; style?: 'unified' | 'split' }>(function PatchView(
+  { patch, binary, style = 'unified' },
   ref,
 ) {
   const lines = useMemo(() => parsePatch(patch), [patch])
+  const splitRows = useMemo(() => buildSplitRows(lines), [lines])
+  const rows: (DiffLine | SplitRow)[] = style === 'split' ? splitRows : lines
+  const splitWidths = useMemo(() => {
+    let oldWidth = 20
+    let newWidth = 20
+    for (const row of splitRows) {
+      if (row.kind !== 'split') continue
+      oldWidth = Math.max(oldWidth, row.left?.text.length ?? 0)
+      newWidth = Math.max(newWidth, row.right?.text.length ?? 0)
+    }
+    return { old: Math.min(120, oldWidth + 4), new: Math.min(120, newWidth + 4) }
+  }, [splitRows])
   const viewport = useRef<HTMLDivElement>(null)
   const [scrollTop, setScrollTop] = useState(0)
   const [height, setHeight] = useState(600)
   const settle = useRef<number | undefined>(undefined)
-  const virtual = lines.length > DIFF_VIRTUAL_THRESHOLD
-  const hunkLines = useMemo(
-    () => lines.map((line, index) => (line.kind === 'hunk' ? index : -1)).filter((index) => index >= 0),
-    [lines],
+  const virtual = rows.length > DIFF_VIRTUAL_THRESHOLD
+  const hunkRows = useMemo(
+    () => rows.map((row, index) => (row.kind === 'hunk' ? index : -1)).filter((index) => index >= 0),
+    [rows],
   )
 
   useImperativeHandle(ref, () => ({
     scrollToHunk(direction) {
       const el = viewport.current
-      if (!el || hunkLines.length === 0) return false
+      if (!el || hunkRows.length === 0) return false
       const top = el.scrollTop
       const target =
         direction > 0
-          ? hunkLines.find((index) => index * DIFF_LINE_HEIGHT > top + 4)
-          : [...hunkLines].reverse().find((index) => index * DIFF_LINE_HEIGHT < top - 4)
+          ? hunkRows.find((index) => index * DIFF_LINE_HEIGHT > top + 4)
+          : [...hunkRows].reverse().find((index) => index * DIFF_LINE_HEIGHT < top - 4)
       if (target === undefined) return false
       el.scrollTop = Math.max(0, target * DIFF_LINE_HEIGHT - 4)
       return true
@@ -345,15 +410,15 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
       const el = viewport.current
       if (!el) return undefined
       const top = el.scrollTop + 1
-      const visible = hunkLines.find((index) => index * DIFF_LINE_HEIGHT >= top - 4)
+      const visible = hunkRows.find((index) => index * DIFF_LINE_HEIGHT >= top - 4)
       if (visible !== undefined && visible * DIFF_LINE_HEIGHT < top + 80) {
-        const value = lines[visible].hunkNew
+        const value = rows[visible].hunkNew
         if (value !== undefined) return value
       }
       let hunk: number | undefined
-      for (const index of hunkLines) {
+      for (const index of hunkRows) {
         if (index * DIFF_LINE_HEIGHT <= top) {
-          const value = lines[index].hunkNew
+          const value = rows[index].hunkNew
           if (value !== undefined) hunk = value
         } else {
           break
@@ -361,12 +426,18 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
       }
       if (hunk !== undefined) return hunk
       const start = Math.max(0, Math.floor(el.scrollTop / DIFF_LINE_HEIGHT))
-      for (let i = start; i < lines.length; i++) {
-        if (lines[i].new !== undefined) return lines[i].new
+      for (let i = start; i < rows.length; i++) {
+        const row = rows[i]
+        if (row.kind === 'split') {
+          if (row.right?.no !== undefined) return row.right.no
+        } else {
+          const next = row as DiffLine
+          if (next.kind !== 'hunk' && next.kind !== 'meta' && next.new !== undefined) return next.new
+        }
       }
       return undefined
     },
-  }), [hunkLines, lines])
+  }), [hunkRows, rows])
 
   useEffect(() => {
     const el = viewport.current
@@ -380,18 +451,27 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
       observer.disconnect()
       window.clearTimeout(settle.current)
     }
-  }, [patch])
+  }, [patch, style])
 
   if (binary) return <Empty icon="warning" title="二进制文件" hint="手机端不展示二进制差异，请在桌面端查看。" />
   if (!patch.trim()) return <Empty title="没有差异" hint="文件内容与对比版本一致。" />
 
   let start = 0
-  let end = lines.length
+  let end = rows.length
   if (virtual) {
     start = Math.max(0, Math.floor(scrollTop / DIFF_LINE_HEIGHT) - DIFF_OVERSCAN)
-    end = Math.min(lines.length, Math.ceil((scrollTop + height) / DIFF_LINE_HEIGHT) + DIFF_OVERSCAN)
+    end = Math.min(rows.length, Math.ceil((scrollTop + height) / DIFF_LINE_HEIGHT) + DIFF_OVERSCAN)
   }
-  const visible = virtual ? lines.slice(start, end) : lines
+  const visible = virtual ? rows.slice(start, end) : rows
+  const rowStyle = (index: number) =>
+    virtual ? { position: 'absolute' as const, top: index * DIFF_LINE_HEIGHT, left: 0, minWidth: '100%', width: 'max-content' } : undefined
+  const patchStyle = {
+    ...(virtual ? { height: rows.length * DIFF_LINE_HEIGHT } : {}),
+    ...(style === 'split'
+      ? ({ '--split-old': `${splitWidths.old}ch`, '--split-new': `${splitWidths.new}ch` } as React.CSSProperties)
+      : {}),
+  }
+
   return (
     <div
       className="patch-viewport"
@@ -399,25 +479,38 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
       onScroll={(e) => {
         const top = e.currentTarget.scrollTop
         flushSync(() => setScrollTop(top))
-        // Some browsers coalesce the last scroll event of a fling.
         window.clearTimeout(settle.current)
         settle.current = window.setTimeout(() => {
           if (viewport.current) setScrollTop(viewport.current.scrollTop)
         }, 120)
       }}
     >
-      <div
-        className={`patch ${virtual ? 'virtual' : ''}`}
-        style={virtual ? { height: lines.length * DIFF_LINE_HEIGHT } : undefined}
-      >
-        {visible.map((line, i) => {
+      <div className={`patch ${virtual ? 'virtual' : ''} ${style}`} style={patchStyle}>
+        {visible.map((row, i) => {
           const index = virtual ? start + i : i
+          if (style === 'split') {
+            const split = row as SplitRow
+            if (split.kind === 'hunk' || split.kind === 'meta') {
+              return (
+                <div key={index} className={`diff-line ${split.kind} split-wide`} style={rowStyle(index)}>
+                  <span className="code">{split.text}</span>
+                </div>
+              )
+            }
+            const left = split.left ?? { kind: 'blank', text: '' }
+            const right = split.right ?? { kind: 'blank', text: '' }
+            return (
+              <div key={index} className="diff-line split-row" style={rowStyle(index)}>
+                <span className="split-gutter">{left.no ?? ''}</span>
+                <span className={`split-code ${left.kind}`}>{left.kind === 'del' ? '-' : left.kind === 'ctx' ? ' ' : ''}{left.text}</span>
+                <span className="split-gutter">{right.no ?? ''}</span>
+                <span className={`split-code ${right.kind}`}>{right.kind === 'add' ? '+' : right.kind === 'ctx' ? ' ' : ''}{right.text}</span>
+              </div>
+            )
+          }
+          const line = row as DiffLine
           return (
-            <div
-              key={index}
-              className={`diff-line ${line.kind}`}
-              style={virtual ? { position: 'absolute', top: index * DIFF_LINE_HEIGHT, left: 0, minWidth: '100%', width: 'max-content' } : undefined}
-            >
+            <div key={index} className={`diff-line ${line.kind}`} style={rowStyle(index)}>
               <span className="gutter">{line.old ?? ''}</span>
               <span className="gutter">{line.new ?? ''}</span>
               <span className="code">{line.kind === 'add' ? '+' : line.kind === 'del' ? '-' : line.kind === 'ctx' ? ' ' : ''}{line.text}</span>

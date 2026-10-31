@@ -3137,3 +3137,65 @@ h1 {
 .commit-meta-grid code::-webkit-scrollbar {
   display: none;
 }
+
+.diff-style-bar {
+  display: flex;
+  padding: 2px 0 8px;
+}
+
+.diff-style {
+  flex: none;
+}
+
+.patch.split {
+  width: max-content;
+  min-width: 100%;
+}
+
+.diff-line.split-row {
+  display: grid;
+  grid-template-columns: 34px minmax(var(--split-old, 20ch), 1fr) 34px minmax(var(--split-new, 20ch), 1fr);
+  width: max-content;
+  min-width: 100%;
+  height: 20px;
+}
+
+.diff-line.split-row .split-gutter {
+  padding-right: 6px;
+  border-right: 1px solid var(--border-soft);
+  background: var(--bg);
+  color: var(--muted);
+  opacity: 0.6;
+  text-align: right;
+  user-select: none;
+}
+
+.diff-line.split-row .split-code {
+  padding: 0 10px;
+  overflow: visible;
+  white-space: pre;
+}
+
+.diff-line.split-row .split-code.del {
+  background: var(--del-bg);
+  color: var(--fg);
+}
+
+.diff-line.split-row .split-code.add {
+  background: var(--add-bg);
+  color: var(--fg);
+}
+
+.diff-line.split-row .split-code.blank {
+  background: color-mix(in srgb, var(--muted) 5%, transparent);
+}
+
+.diff-line.split-wide {
+  display: block;
+  width: 100%;
+  padding: 0 10px;
+}
+
+.diff-line.split-wide .code {
+  padding: 0;
+}

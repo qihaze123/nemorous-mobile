@@ -620,6 +620,7 @@ export function CommitScreen({ repoId, hash }: { repoId: string; hash: string })
 export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash: string; path: string }) {
   const [detail, setDetail] = useState<CommitDetail | null>(null)
   const [error, setError] = useState('')
+  const [diffStyle, setDiffStyle] = useState<'unified' | 'split'>('unified')
   const patchRef = useRef<PatchViewHandle>(null)
   const boundary = useRef<{ direction: 1 | -1; at: number } | null>(null)
   const notify = useToast()
@@ -681,7 +682,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
         </button>
         <div className="grow">
           <div className="eyebrow">文件 Diff</div>
-          <h1 className="file-title">{path}</h1>
+          <h1 className="file-title">{path.slice(path.lastIndexOf('/') + 1)}</h1>
         </div>
         <button
           className="icon-btn"
@@ -703,6 +704,12 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
               {(file?.deleted ?? 0) > 0 ? <em className="minus">−{file?.deleted}</em> : null}
             </span>
           </div>
+          <div className="diff-style-bar">
+            <div className="segmented diff-style">
+              <button className={diffStyle === 'unified' ? 'on' : ''} onClick={() => setDiffStyle('unified')}>统一</button>
+              <button className={diffStyle === 'split' ? 'on' : ''} onClick={() => setDiffStyle('split')}>分栏</button>
+            </div>
+          </div>
           <DiffNavBar
             position={index >= 0 ? `${index + 1}/${detail.files.length}` : ''}
             canPrevFile={index > 0}
@@ -716,7 +723,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
               go(`#/file?repo=${repoId}&path=${encodeURIComponent(path)}&rev=${hash}${line ? `&line=${line}` : ''}`)
             }}
           />
-          <PatchView ref={patchRef} patch={chunks.get(path) ?? ''} />
+          <PatchView ref={patchRef} patch={chunks.get(path) ?? ''} style={diffStyle} />
         </>
       ) : null}
       <div className="screen-bottom-space" />
