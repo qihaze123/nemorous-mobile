@@ -4381,3 +4381,10 @@ h1 {
 .diff-sidebar-zoom {
   min-width: 0;
 }
+
+@media (orientation: landscape) {
+  .file-page.sidebar-open .file-main > .screen,
+  .diff-page.sidebar-open .diff-main > .screen {
+    padding-left: 0;
+  }
+}
