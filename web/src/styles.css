@@ -3915,6 +3915,7 @@ h1 {
 .commit-file-tools {
   flex: 1 1 auto;
   min-width: 0;
+  justify-content: flex-end;
 }
 
 .commit-file-nav .inline-tools {
