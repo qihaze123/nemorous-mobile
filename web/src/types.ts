@@ -28,6 +28,7 @@ export interface Commit {
   hash: string
   short: string
   subject: string
+  body?: string
   author: string
   authorEmail?: string
   time: number

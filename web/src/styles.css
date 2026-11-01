@@ -4695,3 +4695,41 @@ h1 {
   text-overflow: clip;
   scrollbar-width: none;
 }
+
+.commit-message-card {
+  margin-bottom: 10px;
+  padding: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--bg-elev);
+}
+
+.commit-message-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.commit-message-subject {
+  flex: 1;
+  min-width: 0;
+  color: var(--fg);
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.commit-message-head .mini-btn {
+  flex: none;
+}
+
+.commit-message-body {
+  margin: 10px 0 0;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--border-soft);
+  color: var(--muted);
+  font: 12.5px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

@@ -43,6 +43,7 @@ type Commit struct {
 	Hash        string `json:"hash"`
 	Short       string `json:"short"`
 	Subject     string `json:"subject"`
+	Body        string `json:"body,omitempty"`
 	Author      string `json:"author"`
 	AuthorEmail string `json:"authorEmail,omitempty"`
 	Time        int64  `json:"time"`

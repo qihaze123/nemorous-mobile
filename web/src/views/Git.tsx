@@ -509,6 +509,7 @@ export function CommitScreen({ repoId, hash }: { repoId: string; hash: string })
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [dots, setDots] = useState<Set<string>>(new Set())
   const [error, setError] = useState('')
+  const notify = useToast()
   const treeRef = useRef<HTMLDivElement>(null)
   const rowEls = useRef(new Map<string, HTMLElement>())
   const registerRow = useCallback((key: string, el: HTMLElement | null) => {
@@ -565,6 +566,25 @@ export function CommitScreen({ repoId, hash }: { repoId: string; hash: string })
       {!detail && !error ? <Spinner label="读取提交…" /> : null}
       {detail ? (
         <>
+          <div className="commit-message-card">
+            <div className="commit-message-head">
+              <div className="commit-message-subject">{detail.commit.subject}</div>
+              <button
+                className="mini-btn"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(
+                      detail.commit.body ? `${detail.commit.subject}\n\n${detail.commit.body}` : detail.commit.subject,
+                    )
+                    notify('已复制提交信息', 'ok')
+                  } catch {
+                    notify('复制失败', 'error')
+                  }
+                }}
+              >复制</button>
+            </div>
+            {detail.commit.body ? <pre className="commit-message-body">{detail.commit.body}</pre> : null}
+          </div>
           <div className="commit-card">
             <div className="commit-meta-grid">
               <span>仓库</span><span>{detail.commit.repoName}</span>

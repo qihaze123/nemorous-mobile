@@ -1044,7 +1044,7 @@ func (a *App) CommitDetail(ctx context.Context, id, hash string) (CommitDetail, 
 		return CommitDetail{}, errors.New("非法提交哈希")
 	}
 	meta, err := gitOK(ctx, repo.Path, inspectTimeout,
-		"log", "-1", "--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%at", hash)
+		"log", "-1", "--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%at%x1f%b", hash)
 	if err != nil {
 		return CommitDetail{}, err
 	}
@@ -1053,6 +1053,10 @@ func (a *App) CommitDetail(ctx context.Context, id, hash string) (CommitDetail, 
 		return CommitDetail{}, errors.New("未找到提交")
 	}
 	ts, _ := strconv.ParseInt(parts[4], 10, 64)
+	body := ""
+	if len(parts) > 5 {
+		body = strings.TrimSpace(parts[5])
+	}
 	filesOut, err := gitOK(ctx, repo.Path, inspectTimeout,
 		"show", "--name-status", "--format=", "--no-renames", hash)
 	if err != nil {
@@ -1087,7 +1091,7 @@ func (a *App) CommitDetail(ctx context.Context, id, hash string) (CommitDetail, 
 	}
 	return CommitDetail{
 		Commit: Commit{
-			Hash: parts[0], Short: parts[1], Subject: parts[2], Author: parts[3], Time: ts,
+			Hash: parts[0], Short: parts[1], Subject: parts[2], Body: body, Author: parts[3], Time: ts,
 			RepoID: repo.ID, RepoName: repo.Name,
 		},
 		Files: files,
