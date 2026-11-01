@@ -200,3 +200,10 @@ export interface WorkspacesResponse {
   repos: WorkspaceRepo[]
 }
 
+export interface WorkspaceReposResponse {
+  root: string
+  name: string
+  active: boolean
+  repos: WorkspaceRepo[]
+}
+

@@ -9,7 +9,7 @@ import (
 )
 
 // Version is stamped into the health response and the UI footer.
-const Version = "0.3.1"
+const Version = "0.3.2"
 
 // APIHandler returns the routed, authenticated JSON API.
 func (a *App) APIHandler() http.Handler {
@@ -18,6 +18,7 @@ func (a *App) APIHandler() http.Handler {
 	mux.HandleFunc("POST /api/pair", a.handlePair)
 	mux.HandleFunc("GET /api/workspace", a.authed(a.handleWorkspace))
 	mux.HandleFunc("GET /api/workspaces", a.authed(a.handleWorkspaces))
+	mux.HandleFunc("GET /api/workspaces/repos", a.authed(a.handleWorkspaceRepos))
 	mux.HandleFunc("POST /api/workspaces", a.authed(a.handleAddWorkspace))
 	mux.HandleFunc("POST /api/workspaces/select", a.authed(a.handleSelectWorkspace))
 	mux.HandleFunc("POST /api/workspaces/visibility", a.authed(a.handleWorkspaceVisibility))
@@ -128,6 +129,15 @@ func (a *App) handleWorkspaces(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, a.Workspaces(r.Context()))
 }
 
+func (a *App) handleWorkspaceRepos(w http.ResponseWriter, r *http.Request) {
+	res, err := a.WorkspaceRepos(r.Context(), r.URL.Query().Get("path"))
+	if err != nil {
+		a.fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
+}
+
 func (a *App) handleAddWorkspace(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Path   string `json:"path"`
@@ -163,6 +173,7 @@ func (a *App) handleSelectWorkspace(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) handleWorkspaceVisibility(w http.ResponseWriter, r *http.Request) {
 	var req struct {
+		Path   string `json:"path"`
 		Repo   string `json:"repo"`
 		Hidden bool   `json:"hidden"`
 	}
@@ -170,7 +181,7 @@ func (a *App) handleWorkspaceVisibility(w http.ResponseWriter, r *http.Request) 
 		a.fail(w, err)
 		return
 	}
-	res, err := a.SetRepoHidden(r.Context(), req.Repo, req.Hidden)
+	res, err := a.SetRepoHiddenAt(r.Context(), req.Path, req.Repo, req.Hidden)
 	if err != nil {
 		a.fail(w, err)
 		return

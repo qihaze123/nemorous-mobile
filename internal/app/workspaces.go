@@ -292,9 +292,59 @@ func (a *App) SelectWorkspace(ctx context.Context, raw string) (WorkspacesRespon
 	return a.Workspaces(ctx), nil
 }
 
-// SetRepoHidden hides or restores a repository in the active workspace.
-func (a *App) SetRepoHidden(ctx context.Context, id string, hidden bool) (WorkspacesResponse, error) {
-	root, all := a.snapshotAll()
+// WorkspaceRepos returns every repository in one workspace, including hidden ones.
+func (a *App) WorkspaceRepos(ctx context.Context, raw string) (WorkspaceReposResponse, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return WorkspaceReposResponse{}, errors.New("工作区路径不能为空")
+	}
+	root, err := filepath.Abs(raw)
+	if err != nil {
+		return WorkspaceReposResponse{}, err
+	}
+	if !a.workspaces.has(root) {
+		return WorkspaceReposResponse{}, errors.New("工作区不存在")
+	}
+	all, err := Discover(root)
+	if err != nil {
+		return WorkspaceReposResponse{}, err
+	}
+	activeRoot, _ := a.snapshotAll()
+	hidden := map[string]bool{}
+	for _, h := range a.workspaces.hiddenFor(root) {
+		hidden[filepath.Clean(h)] = true
+	}
+	res := WorkspaceReposResponse{
+		Root: root, Name: filepath.Base(root), Active: root == activeRoot,
+		Repos: make([]WorkspaceRepo, 0, len(all)),
+	}
+	for _, repo := range all {
+		res.Repos = append(res.Repos, WorkspaceRepo{
+			ID: repo.ID, Name: repo.Name, Rel: repo.Rel,
+			Hidden: hidden[filepath.Clean(repo.Rel)] || hidden[repo.ID],
+		})
+	}
+	return res, nil
+}
+
+// SetRepoHiddenAt hides or restores a repository in a specific workspace.
+func (a *App) SetRepoHiddenAt(ctx context.Context, raw, id string, hidden bool) (WorkspaceReposResponse, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		root, _ := a.snapshotAll()
+		raw = root
+	}
+	root, err := filepath.Abs(raw)
+	if err != nil {
+		return WorkspaceReposResponse{}, err
+	}
+	if !a.workspaces.has(root) {
+		return WorkspaceReposResponse{}, errors.New("工作区不存在")
+	}
+	all, err := Discover(root)
+	if err != nil {
+		return WorkspaceReposResponse{}, err
+	}
 	var target *Repo
 	for i := range all {
 		if all[i].ID == id || all[i].Rel == id {
@@ -303,23 +353,34 @@ func (a *App) SetRepoHidden(ctx context.Context, id string, hidden bool) (Worksp
 		}
 	}
 	if target == nil {
-		return WorkspacesResponse{}, errors.New("仓库不存在")
+		return WorkspaceReposResponse{}, errors.New("仓库不存在")
 	}
 	if target.Rel == "." {
-		return WorkspacesResponse{}, errors.New("工作区根仓库不能隐藏")
+		return WorkspaceReposResponse{}, errors.New("工作区根仓库不能隐藏")
 	}
-	var err error
 	if hidden {
 		err = a.workspaces.hide(root, target.Rel)
 	} else {
 		err = a.workspaces.show(root, target.Rel)
 	}
 	if err != nil {
+		return WorkspaceReposResponse{}, err
+	}
+	activeRoot, activeAll := a.snapshotAll()
+	if root == activeRoot {
+		a.mu.Lock()
+		a.repos = a.workspaces.visible(root, activeAll)
+		a.mu.Unlock()
+	}
+	a.hub.notify()
+	return a.WorkspaceRepos(ctx, root)
+}
+
+// SetRepoHidden keeps the older active-workspace API for tests and scripts.
+func (a *App) SetRepoHidden(_ context.Context, id string, hidden bool) (WorkspacesResponse, error) {
+	root, _ := a.snapshotAll()
+	if _, err := a.SetRepoHiddenAt(context.Background(), root, id, hidden); err != nil {
 		return WorkspacesResponse{}, err
 	}
-	a.mu.Lock()
-	a.repos = a.workspaces.visible(root, all)
-	a.mu.Unlock()
-	a.hub.notify()
-	return a.Workspaces(ctx), nil
+	return a.Workspaces(context.Background()), nil
 }

@@ -4059,3 +4059,27 @@ h1 {
   color: var(--muted);
   font-size: 10px;
 }
+
+.workspace-icon {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.workspace-detail-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 2px 0 8px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.workspace-detail-head span {
+  color: var(--muted);
+  font-size: 10.5px;
+}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { BranchPreset, DevicesResponse, PairCodeResponse, PresetsResponse, Workspace, WorkspacesResponse } from '../types'
+import type { BranchPreset, DevicesResponse, PairCodeResponse, PresetsResponse, Workspace, WorkspaceReposResponse, WorkspacesResponse, WorkspaceSummary } from '../types'
 import { api, clearPairing, deviceName, getServer, getTheme, post, setTheme } from '../api'
 import { canFullscreen, canInstall, enterFullscreen, INSTALL_EVENT, installApp, isSecureContext, isStandalone } from '../pwa'
 import { Icon, SectionTitle, Sheet, Spinner, ago, useToast } from '../components'
@@ -15,6 +15,9 @@ export function SettingsScreen({ ws }: { ws: Workspace }) {
   const [pair, setPair] = useState<PairCodeResponse | null>(null)
   const [presets, setPresets] = useState<BranchPreset[]>([])
   const [workspaces, setWorkspaces] = useState<WorkspacesResponse | null>(null)
+  const [workspaceDetail, setWorkspaceDetail] = useState<WorkspaceSummary | null>(null)
+  const [workspaceRepos, setWorkspaceRepos] = useState<WorkspaceReposResponse | null>(null)
+  const [workspaceDetailLoading, setWorkspaceDetailLoading] = useState(false)
   const [workspaceOpen, setWorkspaceOpen] = useState(false)
   const [workspacePath, setWorkspacePath] = useState('')
   const [workspaceCreate, setWorkspaceCreate] = useState(false)
@@ -107,14 +110,36 @@ export function SettingsScreen({ ws }: { ws: Workspace }) {
     }
   }
 
-  const toggleRepo = async (repo: string, hidden: boolean) => {
-    if (busy) return
-    setBusy(`repo:${repo}`)
+  const openWorkspace = async (item: WorkspaceSummary) => {
+    setWorkspaceDetail(item)
+    setWorkspaceRepos(null)
+    setWorkspaceDetailLoading(true)
     try {
-      await post('/api/workspaces/visibility', { repo, hidden })
-      location.reload()
+      const res = await api<WorkspaceReposResponse>(`/api/workspaces/repos?path=${encodeURIComponent(item.root)}`)
+      setWorkspaceRepos(res)
+    } catch (err) {
+      notify(err instanceof Error ? err.message : '读取工作区失败', 'error')
+    } finally {
+      setWorkspaceDetailLoading(false)
+    }
+  }
+
+  const toggleRepo = async (repo: WorkspaceReposResponse['repos'][number]) => {
+    if (busy || !workspaceDetail) return
+    setBusy(`repo:${repo.id}`)
+    try {
+      const res = await post<WorkspaceReposResponse>('/api/workspaces/visibility', {
+        path: workspaceDetail.root,
+        repo: repo.id,
+        hidden: !repo.hidden,
+      })
+      setWorkspaceRepos(res)
+      const list = await api<WorkspacesResponse>('/api/workspaces')
+      setWorkspaces(list)
+      setWorkspaceDetail(list.workspaces.find((item) => item.root === res.root) ?? null)
     } catch (err) {
       notify(err instanceof Error ? err.message : '更新可见性失败', 'error')
+    } finally {
       setBusy('')
     }
   }
@@ -193,9 +218,10 @@ export function SettingsScreen({ ws }: { ws: Workspace }) {
           <button
             key={item.root}
             className={`workspace-row ${item.active ? 'on' : ''}`}
-            disabled={!!busy || item.active}
-            onClick={() => void switchWorkspace(item.root)}
+            disabled={!!busy}
+            onClick={() => void openWorkspace(item)}
           >
+            <span className="workspace-icon"><Icon name="folder" size={16} /></span>
             <span className="workspace-main">
               <span className="workspace-name">
                 {item.name}
@@ -206,14 +232,14 @@ export function SettingsScreen({ ws }: { ws: Workspace }) {
             <span className="workspace-count">
               {item.repos} 仓库{item.hidden ? ` · ${item.hidden} 隐藏` : ''}
             </span>
-            <Icon name={item.active ? 'check' : busy === `workspace:${item.root}` ? 'refresh' : 'chevron'} size={15} />
+            <Icon name="chevron" size={15} />
           </button>
         ))}
         {!workspaces ? <Spinner label="读取工作区…" /> : null}
-        <button className="btn ghost block" onClick={() => setWorkspaceOpen(true)}>
+        <button className="btn ghost block" onClick={() => { setWorkspaceDetail(null); setWorkspaceOpen(true) }}>
           <Icon name="plus" size={15} /> 添加 / 创建工作区
         </button>
-        <p className="hint">切换工作区会刷新当前页面；所有已配对设备共享同一活动工作区。</p>
+        <p className="hint">点工作区进入详情，再切换或管理仓库可见性。</p>
       </div>
 
       <Sheet
@@ -248,28 +274,52 @@ export function SettingsScreen({ ws }: { ws: Workspace }) {
         <p className="hint">添加后，本机所有已配对设备都能访问该目录下的 Git 仓库。空工作区需要先在电脑端放入或克隆仓库。</p>
       </Sheet>
 
-      <SectionTitle>仓库可见性</SectionTitle>
-      <div className="panel">
-        <p className="hint">隐藏只影响手机视图，不会删除仓库、改动或文件。工作区根仓库不能隐藏。</p>
-        {workspaces?.repos.map((repo) => (
-          <div className={`workspace-repo-row ${repo.hidden ? 'hidden' : ''}`} key={repo.id}>
-            <span className="workspace-repo-main">
-              <span className="workspace-repo-name">{repo.name}</span>
-              <code className="workspace-path">{repo.rel}</code>
-            </span>
-            {repo.hidden ? <span className="workspace-repo-state">已隐藏</span> : null}
-            <button
-              className="mini-btn"
-              disabled={!!busy || repo.rel === '.'}
-              onClick={() => void toggleRepo(repo.id, !repo.hidden)}
-              title={repo.rel === '.' ? '工作区根仓库不能隐藏' : repo.hidden ? '恢复显示' : '从手机视图隐藏'}
-            >
-              {busy === `repo:${repo.id}` ? '…' : repo.hidden ? '显示' : '隐藏'}
-            </button>
-          </div>
-        ))}
-        {workspaces?.repos.length === 0 ? <p className="hint">当前工作区没有仓库。</p> : null}
-      </div>
+      <Sheet
+        open={!!workspaceDetail}
+        title={workspaceDetail ? `工作区 · ${workspaceDetail.name}` : '工作区'}
+        onClose={() => { if (!busy) { setWorkspaceDetail(null); setWorkspaceRepos(null) } }}
+        footer={
+          <>
+            <button className="btn ghost" disabled={!!busy} onClick={() => { setWorkspaceDetail(null); setWorkspaceRepos(null) }}>关闭</button>
+            {workspaceDetail?.active ? (
+              <button className="btn subtle" disabled>当前工作区</button>
+            ) : (
+              <button className="btn primary" disabled={!!busy || !workspaceDetail} onClick={() => workspaceDetail && void switchWorkspace(workspaceDetail.root)}>
+                {busy === `workspace:${workspaceDetail?.root}` ? '切换中…' : '切换到此工作区'}
+              </button>
+            )}
+          </>
+        }
+      >
+        {workspaceDetail ? (
+          <>
+            <div className="workspace-detail-head">
+              <code className="workspace-path">{workspaceDetail.root}</code>
+              <span>{workspaceDetail.repos} 仓库{workspaceDetail.hidden ? ` · ${workspaceDetail.hidden} 隐藏` : ''}</span>
+            </div>
+            <p className="hint">隐藏只影响手机视图，不会删除仓库、改动或文件；根仓库不能隐藏。</p>
+            {workspaceDetailLoading && !workspaceRepos ? <Spinner label="读取仓库…" /> : null}
+            {workspaceRepos?.repos.map((repo) => (
+              <div className={`workspace-repo-row ${repo.hidden ? 'hidden' : ''}`} key={repo.id}>
+                <span className="workspace-repo-main">
+                  <span className="workspace-repo-name">{repo.name}</span>
+                  <code className="workspace-path">{repo.rel}</code>
+                </span>
+                {repo.hidden ? <span className="workspace-repo-state">已隐藏</span> : null}
+                <button
+                  className="mini-btn"
+                  disabled={!!busy || repo.rel === '.'}
+                  onClick={() => void toggleRepo(repo)}
+                  title={repo.rel === '.' ? '工作区根仓库不能隐藏' : repo.hidden ? '恢复显示' : '从手机视图隐藏'}
+                >
+                  {busy === `repo:${repo.id}` ? '…' : repo.hidden ? '显示' : '隐藏'}
+                </button>
+              </div>
+            ))}
+            {workspaceRepos && workspaceRepos.repos.length === 0 ? <p className="hint">这个工作区没有仓库。</p> : null}
+          </>
+        ) : null}
+      </Sheet>
 
       <SectionTitle>安装到手机</SectionTitle>
       <div className="panel">

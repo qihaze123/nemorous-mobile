@@ -239,3 +239,12 @@ type WorkspacesResponse struct {
 	Workspaces []WorkspaceSummary `json:"workspaces"`
 	Repos      []WorkspaceRepo    `json:"repos"`
 }
+
+// WorkspaceReposResponse is the repository list for one workspace, including
+// repositories hidden from the mobile view.
+type WorkspaceReposResponse struct {
+	Root   string          `json:"root"`
+	Name   string          `json:"name"`
+	Active bool            `json:"active"`
+	Repos  []WorkspaceRepo `json:"repos"`
+}
