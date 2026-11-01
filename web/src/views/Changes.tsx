@@ -480,20 +480,18 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
                   </div>
                 </div>
               ) : (
-                <div className="change-tree">
-                  <ChangeTree
-                    nodes={tree}
-                    depth={0}
-                    repo={repo}
-                    section={section.key}
-                    selected={selected}
-                    collapsed={collapsedDirs}
-                    onToggleDir={toggleDir}
-                    onToggleFile={(file) => toggleFile(repo.id, file)}
-                    onToggleFiles={(list, select) => setFiles(repo, list, select)}
-                    onOpen={(file) => openDiff(repo, file, section.key)}
-                  />
-                </div>
+                <ChangeTree
+                  nodes={tree}
+                  depth={0}
+                  repo={repo}
+                  section={section.key}
+                  selected={selected}
+                  collapsed={collapsedDirs}
+                  onToggleDir={toggleDir}
+                  onToggleFile={(file) => toggleFile(repo.id, file)}
+                  onToggleFiles={(list, select) => setFiles(repo, list, select)}
+                  onOpen={(file) => openDiff(repo, file, section.key)}
+                />
               )}
             </div>
           )
