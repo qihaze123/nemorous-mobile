@@ -1,4 +1,4 @@
-import { createContext, forwardRef, useCallback, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createContext, forwardRef, useCallback, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 import type { FileChange, RepoHealth } from './types'
 
@@ -160,6 +160,8 @@ export function ImmersiveDock({
   )
 }
 
+const IMMERSIVE_BAR_KEY = 'nemorous.immersiveBar'
+
 export function ImmersiveDiffBar({
   onPrevChange,
   onNextChange,
@@ -182,28 +184,176 @@ export function ImmersiveDiffBar({
   onExit: () => void
 }) {
   const label = Number.isInteger(fontSize) ? String(fontSize) : fontSize.toFixed(1)
+  const layerRef = useRef<HTMLDivElement>(null)
+  const barRef = useRef<HTMLDivElement>(null)
+  const drag = useRef<{
+    id: number
+    startX: number
+    startY: number
+    x: number
+    y: number
+    maxX: number
+    maxY: number
+    lastX: number
+    lastY: number
+  } | null>(null)
+  const [position, setPosition] = useState<{ x: number; y: number } | null>(null)
+  const [dragging, setDragging] = useState(false)
+
+  const bounds = () => {
+    const layer = layerRef.current
+    const bar = barRef.current
+    if (!layer || !bar) return { maxX: 0, maxY: 0 }
+    return {
+      maxX: Math.max(0, layer.clientWidth - bar.offsetWidth),
+      maxY: Math.max(0, layer.clientHeight - bar.offsetHeight),
+    }
+  }
+
+  const clamp = (value: number, max: number) => Math.min(max, Math.max(0, value))
+
+  const restore = () => {
+    const { maxX, maxY } = bounds()
+    let saved: { x?: number; y?: number } | null = null
+    try {
+      saved = JSON.parse(localStorage.getItem(IMMERSIVE_BAR_KEY) ?? 'null')
+    } catch {
+      saved = null
+    }
+    const x = typeof saved?.x === 'number' ? saved.x : 0
+    const y = typeof saved?.y === 'number' ? saved.y : 0
+    setPosition({
+      x: clamp(x, 1) * maxX,
+      y: clamp(y, 1) * maxY,
+    })
+  }
+
+  const save = (next: { x: number; y: number }) => {
+    const { maxX, maxY } = bounds()
+    try {
+      localStorage.setItem(IMMERSIVE_BAR_KEY, JSON.stringify({
+        x: maxX > 0 ? clamp(next.x, maxX) / maxX : 0,
+        y: maxY > 0 ? clamp(next.y, maxY) / maxY : 0,
+      }))
+    } catch {
+      /* storage unavailable */
+    }
+  }
+
+  useLayoutEffect(() => {
+    restore()
+    const observer = new ResizeObserver(() => restore())
+    if (layerRef.current) observer.observe(layerRef.current)
+    if (barRef.current) observer.observe(barRef.current)
+    const onFullscreen = () => restore()
+    document.addEventListener('fullscreenchange', onFullscreen)
+    return () => {
+      observer.disconnect()
+      document.removeEventListener('fullscreenchange', onFullscreen)
+    }
+    // The bar is mounted only while immersive; its geometry can change when
+    // entering fullscreen or rotating.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const startDrag = (event: ReactPointerEvent<HTMLSpanElement>) => {
+    const layer = layerRef.current
+    const bar = barRef.current
+    if (!layer || !bar || !position) return
+    event.preventDefault()
+    event.stopPropagation()
+    const layerRect = layer.getBoundingClientRect()
+    const barRect = bar.getBoundingClientRect()
+    const { maxX, maxY } = bounds()
+    drag.current = {
+      id: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      x: barRect.left - layerRect.left,
+      y: barRect.top - layerRect.top,
+      maxX,
+      maxY,
+      lastX: barRect.left - layerRect.left,
+      lastY: barRect.top - layerRect.top,
+    }
+    event.currentTarget.setPointerCapture(event.pointerId)
+    setDragging(true)
+  }
+
+  const moveDrag = (event: ReactPointerEvent<HTMLSpanElement>) => {
+    const d = drag.current
+    if (!d || d.id !== event.pointerId) return
+    event.preventDefault()
+    const next = {
+      x: clamp(d.x + event.clientX - d.startX, d.maxX),
+      y: clamp(d.y + event.clientY - d.startY, d.maxY),
+    }
+    d.lastX = next.x
+    d.lastY = next.y
+    setPosition(next)
+  }
+
+  const endDrag = (event: ReactPointerEvent<HTMLSpanElement>) => {
+    const d = drag.current
+    if (!d || d.id !== event.pointerId) return
+    drag.current = null
+    event.currentTarget.releasePointerCapture?.(event.pointerId)
+    setDragging(false)
+    save({ x: d.lastX, y: d.lastY })
+  }
+
+  const resetPosition = () => {
+    const next = { x: 0, y: 0 }
+    setPosition(next)
+    save(next)
+  }
+
   return (
-    <div className="immersive-nav immersive-diff-bar" role="toolbar" aria-label="沉浸 Diff 控制">
-      <button className="nav-icon" onClick={onPrevChange} title="上一处改动" aria-label="上一处改动">
-        <Icon name="up" size={15} />
-      </button>
-      <button className="nav-icon" onClick={onNextChange} title="下一处改动" aria-label="下一处改动">
-        <Icon name="down" size={15} />
-      </button>
-      <button className="nav-icon" onClick={onPrevFile} disabled={!canPrevFile} title="上一个文件" aria-label="上一个文件">
-        <Icon name="left" size={15} />
-      </button>
-      <button className="nav-icon" onClick={onNextFile} disabled={!canNextFile} title="下一个文件" aria-label="下一个文件">
-        <Icon name="right" size={15} />
-      </button>
-      <span className="dock-sep" aria-hidden="true" />
-      <button className="nav-icon font-step" onClick={() => onFontSize(fontSize - 1)} disabled={fontSize <= 6} title="减小字号" aria-label="减小字号">A−</button>
-      <span className="dock-size" aria-live="polite">{label}</span>
-      <button className="nav-icon font-step" onClick={() => onFontSize(fontSize + 1)} disabled={fontSize >= 20} title="增大字号" aria-label="增大字号">A+</button>
-      <span className="dock-sep" aria-hidden="true" />
-      <button className="nav-icon" onClick={onExit} title="退出沉浸查看" aria-label="退出沉浸查看">
-        <Icon name="close" size={15} />
-      </button>
+    <div className="immersive-nav-layer" ref={layerRef}>
+      <div
+        ref={barRef}
+        className={`immersive-nav immersive-diff-bar ${dragging ? 'dragging' : ''}`}
+        style={{
+          left: position?.x ?? 0,
+          top: position?.y ?? 0,
+          visibility: position ? 'visible' : 'hidden',
+        }}
+        role="toolbar"
+        aria-label="沉浸 Diff 控制"
+      >
+        <span
+          className="immersive-drag"
+          role="button"
+          tabIndex={0}
+          aria-label="拖动控制条；双击复位"
+          title="拖动位置；双击复位"
+          onPointerDown={startDrag}
+          onPointerMove={moveDrag}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+          onDoubleClick={resetPosition}
+        >⠿</span>
+        <button className="nav-icon" onClick={onPrevChange} title="上一处改动" aria-label="上一处改动">
+          <Icon name="up" size={15} />
+        </button>
+        <button className="nav-icon" onClick={onNextChange} title="下一处改动" aria-label="下一处改动">
+          <Icon name="down" size={15} />
+        </button>
+        <button className="nav-icon" onClick={onPrevFile} disabled={!canPrevFile} title="上一个文件" aria-label="上一个文件">
+          <Icon name="left" size={15} />
+        </button>
+        <button className="nav-icon" onClick={onNextFile} disabled={!canNextFile} title="下一个文件" aria-label="下一个文件">
+          <Icon name="right" size={15} />
+        </button>
+        <span className="dock-sep" aria-hidden="true" />
+        <button className="nav-icon font-step" onClick={() => onFontSize(fontSize - 1)} disabled={fontSize <= 6} title="减小字号" aria-label="减小字号">A−</button>
+        <span className="dock-size" aria-live="polite">{label}</span>
+        <button className="nav-icon font-step" onClick={() => onFontSize(fontSize + 1)} disabled={fontSize >= 20} title="增大字号" aria-label="增大字号">A+</button>
+        <span className="dock-sep" aria-hidden="true" />
+        <button className="nav-icon" onClick={onExit} title="退出沉浸查看" aria-label="退出沉浸查看">
+          <Icon name="close" size={15} />
+        </button>
+      </div>
     </div>
   )
 }

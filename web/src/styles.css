@@ -3849,15 +3849,23 @@ h1 {
   letter-spacing: -0.04em;
 }
 
-.immersive-nav {
+.immersive-nav-layer {
   position: fixed;
   top: calc(env(safe-area-inset-top) + 8px);
-  left: max(8px, env(safe-area-inset-left));
+  right: calc(env(safe-area-inset-right) + 8px);
+  bottom: calc(env(safe-area-inset-bottom) + 8px);
+  left: calc(env(safe-area-inset-left) + 8px);
+  z-index: 70;
+  pointer-events: none;
+}
+
+.immersive-nav {
+  position: absolute;
   z-index: 70;
   display: flex;
   align-items: center;
   gap: 2px;
-  max-width: calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right));
+  max-width: 100%;
   overflow-x: auto;
   padding: 3px;
   border: 1px solid var(--border);
@@ -3866,7 +3874,32 @@ h1 {
   box-shadow: 0 8px 24px rgb(0 0 0 / 20%);
   backdrop-filter: blur(16px);
   opacity: 0.86;
+  pointer-events: auto;
   scrollbar-width: none;
+}
+
+.immersive-drag {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 28px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.immersive-drag:active,
+.immersive-nav.dragging .immersive-drag {
+  color: var(--fg);
+  cursor: grabbing;
+}
+
+.immersive-nav.dragging {
+  opacity: 1;
 }
 
 .immersive-nav::-webkit-scrollbar {
