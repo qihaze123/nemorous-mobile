@@ -4245,3 +4245,23 @@ h1 {
   width: 15px;
   height: 15px;
 }
+
+.file-tree-body,
+.file-tree-head,
+.file-tree {
+  min-width: 0;
+  width: 100%;
+}
+
+.file-tree {
+  overflow-x: hidden;
+}
+
+.file-tree .tree-row,
+.file-tree .tree-row span {
+  min-width: 0;
+}
+
+.file-tree .tree-row span {
+  flex: 1;
+}
