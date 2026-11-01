@@ -3573,11 +3573,9 @@ h1 {
 @keyframes inline-tools-in {
   from {
     opacity: 0;
-    transform: translateX(8px);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
   }
 }
 
@@ -4449,4 +4447,8 @@ h1 {
 
 .commit-file-tools .inline-tools {
   justify-content: flex-end;
+}
+
+.commit-file-tools {
+  gap: 2px;
 }
