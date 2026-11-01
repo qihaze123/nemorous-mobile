@@ -3,6 +3,7 @@ import type { BranchList, BranchesResponse, Commit, CommitDetail, CommitFile, Wo
 import { api } from '../api'
 import { back, go, replace, useDebounced, useDiffFontSize, useImmersive } from '../hooks'
 import { Empty, Icon, ImmersiveDiffBar, ImmersiveDock, MultiPatchView, PatchView, SectionTitle, Sheet, Spinner, ago, dayKey, repoColor, timeOf, useToast, type PatchViewHandle } from '../components'
+import { TreeLevel, buildTree } from './Code'
 import { languageOf } from '../syntax'
 
 interface CommitFilters {
@@ -632,6 +633,8 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
   const [immersive, setImmersive] = useImmersive()
   const [diffFontSize, setDiffFontSize] = useDiffFontSize()
   const [fontPanelOpen, setFontPanelOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('nemorous.commitFileSidebar') !== 'closed')
+  const [treeExpanded, setTreeExpanded] = useState<Set<string>>(new Set())
   const diffRoot = useRef<HTMLDivElement>(null)
   const patchRef = useRef<PatchViewHandle>(null)
 
@@ -769,9 +772,63 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
     return () => removeEventListener('keydown', onKey)
   })
 
+  const commitTree = useMemo(() => buildTree((detail?.files ?? []).map((file) => file.path)), [detail])
+  useEffect(() => {
+    if (!path) return
+    setTreeExpanded((prev) => {
+      const next = new Set(prev)
+      let prefix = ''
+      for (const part of path.split('/').slice(0, -1)) {
+        prefix = prefix ? `${prefix}/${part}` : part
+        next.add(prefix)
+      }
+      return next
+    })
+  }, [path])
+
+  const toggleTree = (key: string) => {
+    setTreeExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  const toggleSidebar = () => {
+    setSidebarOpen((open) => {
+      localStorage.setItem('nemorous.commitFileSidebar', open ? 'closed' : 'open')
+      return !open
+    })
+  }
+
   return (
-    <div className={`screen fill-screen commit-file-screen ${immersive ? 'immersive' : ''}`}>
+    <div className={`file-page ${immersive ? 'immersive' : ''} ${sidebarOpen ? 'sidebar-open' : ''}`}>
+      <aside className={`file-tree-sidebar ${sidebarOpen ? 'open' : ''}`}>
+        <div className="file-tree-body">
+          <div className="file-tree-head">提交文件</div>
+          <div className="tree file-tree">
+            {detail ? (
+              <TreeLevel
+                nodes={commitTree}
+                depth={0}
+                expanded={treeExpanded}
+                onToggle={toggleTree}
+                onOpen={(next) => replace(`#/commit-file?repo=${encodeURIComponent(repoId)}&hash=${encodeURIComponent(hash)}&path=${encodeURIComponent(next)}`)}
+                activePath={path}
+              />
+            ) : (
+              <Spinner label="读取提交文件…" />
+            )}
+          </div>
+        </div>
+      </aside>
+      <div className="file-main">
+        <div className={`screen fill-screen commit-file-screen ${immersive ? 'immersive' : ''}`}>
       <header className="topbar commit-diff-header">
+        <button className="icon-btn sidebar-toggle" onClick={toggleSidebar} aria-label="提交文件目录">
+          <Icon name="panel" />
+        </button>
         <button className="icon-btn" onClick={() => back(`#/commit?repo=${repoId}&hash=${hash}`)} aria-label="返回提交">
           <Icon name="back" />
         </button>
@@ -897,6 +954,8 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
           font={{ size: diffFontSize, min: 6, max: 20, onChange: setDiffFontSize }}
         />
       ) : null}
+        </div>
+      </div>
     </div>
   )
 }

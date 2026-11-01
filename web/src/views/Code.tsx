@@ -215,14 +215,14 @@ export function CodeScreen({ ws }: { ws: Workspace }) {
 
 /* ---------------- file tree ---------------- */
 
-interface TreeNode {
+export interface TreeNode {
   name: string
   path: string
   dir: boolean
   children: TreeNode[]
 }
 
-function buildTree(paths: string[]): TreeNode[] {
+export function buildTree(paths: string[]): TreeNode[] {
   const root: TreeNode[] = []
   for (const p of paths) {
     const parts = p.split('/')
@@ -248,7 +248,7 @@ function buildTree(paths: string[]): TreeNode[] {
   return root
 }
 
-function TreeLevel({
+export function TreeLevel({
   nodes,
   depth,
   expanded,
