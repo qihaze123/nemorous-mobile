@@ -788,6 +788,9 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
   const allDirs = useMemo(() => collectDirPaths(commitTree), [commitTree])
   const allOpen = allDirs.length > 0 && allDirs.every((dir) => treeExpanded.has(dir))
   useEffect(() => {
+    setTreeExpanded(new Set(allDirs))
+  }, [allDirs])
+  useEffect(() => {
     if (!path) return
     setTreeExpanded((prev) => {
       const next = new Set(prev)

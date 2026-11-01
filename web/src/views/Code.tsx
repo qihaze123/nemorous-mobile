@@ -454,6 +454,10 @@ function FileTreePanel({
   const allOpen = allDirs.length > 0 && allDirs.every((dir) => expanded.has(dir))
 
   useEffect(() => {
+    setExpanded(new Set(allDirs))
+  }, [allDirs])
+
+  useEffect(() => {
     if (!path) return
     setExpanded((prev) => {
       const next = new Set(prev)
