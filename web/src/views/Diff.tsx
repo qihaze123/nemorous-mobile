@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DiffResult, Workspace } from '../types'
 import { api } from '../api'
-import { back, go, replace, useDiffFontSize, useImmersive } from '../hooks'
-import { Icon, ImmersiveDiffBar, ImmersiveDock, PatchView, Spinner, StatusLetter, repoColor, type PatchViewHandle } from '../components'
+import { back, go, replace, useDiffFontSize, useImmersive, useSidebarWidth } from '../hooks'
+import { Icon, ImmersiveDiffBar, ImmersiveDock, PatchView, SidebarResizer, Spinner, StatusLetter, repoColor, type PatchViewHandle } from '../components'
 import { languageOf } from '../syntax'
 
 function DiffSidebar({
@@ -11,12 +11,18 @@ function DiffSidebar({
   path,
   staged,
   open,
+  width,
+  onWidth,
+  onClose,
 }: {
   ws: Workspace
   repoId: string
   path: string
   staged: boolean
   open: boolean
+  width: number
+  onWidth: (next: number) => void
+  onClose: () => void
 }) {
   const groups = [
     {
@@ -35,8 +41,13 @@ function DiffSidebar({
     },
   ]
   return (
-    <aside className={`diff-sidebar ${open ? 'open' : ''}`}>
-      <div className="diff-sidebar-head">文件</div>
+    <aside className={`diff-sidebar ${open ? 'open' : ''}`} style={{ width }}>
+      <div className="diff-sidebar-head">
+        <span>文件</span>
+        <button className="icon-btn" onClick={onClose} aria-label="收起文件栏">
+          <Icon name="left" size={15} />
+        </button>
+      </div>
       {groups.map((group) => {
         const count = group.repos.reduce((n, g) => n + g.files.length, 0)
         return (
@@ -77,6 +88,7 @@ function DiffSidebar({
         )
       })}
       {groups.every((g) => g.repos.length === 0) ? <p className="hint">工作区没有改动。</p> : null}
+      <SidebarResizer width={width} onWidth={onWidth} />
     </aside>
   )
 }
@@ -108,6 +120,7 @@ export function DiffScreen({
   const diffRoot = useRef<HTMLDivElement>(null)
   const patchRef = useRef<PatchViewHandle>(null)
   const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('nemorous.sidebar') !== 'closed')
+  const [sidebarWidth, setSidebarWidth] = useSidebarWidth('nemorous.diffSidebarWidth')
 
   const navFiles = useMemo(() => {
     const out: { repoId: string; path: string; staged: boolean }[] = []
@@ -263,8 +276,8 @@ export function DiffScreen({
   }
 
   return (
-    <div className={`diff-page ${immersive ? 'immersive' : ''}`}>
-      <DiffSidebar ws={ws} repoId={repoId} path={path} staged={staged} open={sidebarOpen} />
+    <div className={`diff-page ${immersive ? 'immersive' : ''} ${sidebarOpen ? 'sidebar-open' : ''}`}>
+      <DiffSidebar ws={ws} repoId={repoId} path={path} staged={staged} open={sidebarOpen} width={sidebarWidth} onWidth={setSidebarWidth} onClose={toggleSidebar} />
       <div className="diff-main">
         <div className={`screen diff-screen fill-screen ${immersive ? 'immersive' : ''}`}>
           <header className="topbar commit-diff-header">

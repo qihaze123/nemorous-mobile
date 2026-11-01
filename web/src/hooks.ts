@@ -133,6 +133,19 @@ export function useDiffFontSize() {
   return [fontSize, setFontSize] as const
 }
 
+export function useSidebarWidth(key = 'nemorous.sidebarWidth', initial = 264) {
+  const [width, setWidthState] = useState(() => {
+    const saved = Number(localStorage.getItem(key))
+    return saved >= 160 && saved <= 560 ? saved : initial
+  })
+  const setWidth = (next: number) => {
+    const clamped = Math.min(560, Math.max(160, Math.round(next)))
+    setWidthState(clamped)
+    localStorage.setItem(key, String(clamped))
+  }
+  return [width, setWidth] as const
+}
+
 export function useImmersive() {
   const [immersive, setImmersive] = useState(false)
   const requestedFullscreen = useRef(false)

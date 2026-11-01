@@ -4173,3 +4173,75 @@ h1 {
 .file-page.immersive .file-tree-sidebar {
   display: none !important;
 }
+
+/* Resizable landscape sidebars */
+.file-tree-sidebar,
+.diff-sidebar {
+  position: relative;
+}
+
+.sidebar-resizer {
+  display: none;
+  position: absolute;
+  top: 0;
+  right: -5px;
+  z-index: 6;
+  width: 10px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.sidebar-resizer:hover,
+.sidebar-resizer:active {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.file-tree-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.file-tree-head .icon-btn {
+  width: 24px;
+  height: 24px;
+}
+
+.file-tree-head .icon-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+@media (orientation: landscape) {
+  .sidebar-resizer {
+    display: block;
+  }
+
+  .file-page.sidebar-open .sidebar-toggle,
+  .diff-page.sidebar-open .sidebar-toggle {
+    display: none;
+  }
+}
+
+.file-tree-sidebar {
+  overflow: visible;
+}
+
+.diff-sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.diff-sidebar-head .icon-btn {
+  width: 24px;
+  height: 24px;
+}
+
+.diff-sidebar-head .icon-btn svg {
+  width: 15px;
+  height: 15px;
+}

@@ -2,8 +2,8 @@ import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } fr
 import hljs from 'highlight.js/lib/common'
 import type { FileContent, RepoFiles, SearchMatch, SearchResult, Workspace } from '../types'
 import { api } from '../api'
-import { back, go, replace, useDebounced, useImmersive } from '../hooks'
-import { Empty, Icon, ImmersiveDock, SectionTitle, Spinner, repoColor, useToast } from '../components'
+import { back, go, replace, useDebounced, useImmersive, useSidebarWidth } from '../hooks'
+import { Empty, Icon, ImmersiveDock, SectionTitle, SidebarResizer, Spinner, repoColor, useToast } from '../components'
 import { languageOf } from '../syntax'
 
 function fileName(path: string) {
@@ -391,11 +391,13 @@ function FileTreePanel({
   path,
   rev,
   onOpen,
+  onClose,
 }: {
   repoId: string
   path: string
   rev?: string
   onOpen: (path: string) => void
+  onClose: () => void
 }) {
   const [files, setFiles] = useState<string[]>([])
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -441,7 +443,12 @@ function FileTreePanel({
 
   return (
     <div className="file-tree-body">
-      <div className="file-tree-head">文件</div>
+      <div className="file-tree-head">
+        <span>文件</span>
+        <button className="icon-btn" onClick={onClose} aria-label="收起目录">
+          <Icon name="left" />
+        </button>
+      </div>
       {error ? <p className="hint danger-text">{error}</p> : null}
       {files.length === 0 && !error ? <Spinner label="读取文件索引…" /> : null}
       <div className="tree file-tree">
@@ -462,6 +469,7 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
   const [immersive, setImmersive] = useImmersive()
   const [fontPanelOpen, setFontPanelOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('nemorous.fileSidebar') !== 'closed')
+  const [sidebarWidth, setSidebarWidth] = useSidebarWidth('nemorous.fileSidebarWidth')
   const [fontSize, setFontSizeState] = useState(() => {
     const saved = Number(localStorage.getItem('nemorous.codeFontSize'))
     return saved >= 6 && saved <= 22 ? saved : 13
@@ -547,8 +555,9 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
 
   return (
     <div className={`file-page ${immersive ? 'immersive' : ''} ${sidebarOpen ? 'sidebar-open' : ''}`}>
-      <aside className={`file-tree-sidebar ${sidebarOpen ? 'open' : ''}`}>
-        <FileTreePanel repoId={repoId} path={path} rev={rev} onOpen={openTreeFile} />
+      <aside className={`file-tree-sidebar ${sidebarOpen ? 'open' : ''}`} style={{ width: sidebarWidth }}>
+        <FileTreePanel repoId={repoId} path={path} rev={rev} onOpen={openTreeFile} onClose={toggleSidebar} />
+        <SidebarResizer width={sidebarWidth} onWidth={setSidebarWidth} />
       </aside>
       <div className="file-main">
         <div className={`screen file-screen fill-screen ${immersive ? 'immersive' : ''}`} style={codeStyle}>

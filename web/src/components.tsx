@@ -359,6 +359,39 @@ export function ImmersiveDiffBar({
   )
 }
 
+export function SidebarResizer({ width, onWidth }: { width: number; onWidth: (next: number) => void }) {
+  const start = useRef<{ x: number; width: number; id: number } | null>(null)
+  const onDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    start.current = { x: event.clientX, width, id: event.pointerId }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+  const onMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const value = start.current
+    if (!value || value.id !== event.pointerId) return
+    event.preventDefault()
+    onWidth(value.width + event.clientX - value.x)
+  }
+  const onUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!start.current || start.current.id !== event.pointerId) return
+    start.current = null
+    event.currentTarget.releasePointerCapture?.(event.pointerId)
+  }
+  return (
+    <div
+      className="sidebar-resizer"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="拖动调整目录宽度"
+      onPointerDown={onDown}
+      onPointerMove={onMove}
+      onPointerUp={onUp}
+      onPointerCancel={onUp}
+    />
+  )
+}
+
 type ToastKind = 'ok' | 'error' | 'info'
 interface ToastItem {
   id: number

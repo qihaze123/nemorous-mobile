@@ -1,8 +1,8 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { BranchList, BranchesResponse, Commit, CommitDetail, CommitFile, Workspace } from '../types'
 import { api } from '../api'
-import { back, go, replace, useDebounced, useDiffFontSize, useImmersive } from '../hooks'
-import { Empty, Icon, ImmersiveDiffBar, ImmersiveDock, MultiPatchView, PatchView, SectionTitle, Sheet, Spinner, ago, dayKey, repoColor, timeOf, useToast, type PatchViewHandle } from '../components'
+import { back, go, replace, useDebounced, useDiffFontSize, useImmersive, useSidebarWidth } from '../hooks'
+import { Empty, Icon, ImmersiveDiffBar, ImmersiveDock, MultiPatchView, PatchView, SectionTitle, Sheet, SidebarResizer, Spinner, ago, dayKey, repoColor, timeOf, useToast, type PatchViewHandle } from '../components'
 import { TreeLevel, buildTree } from './Code'
 import { languageOf } from '../syntax'
 
@@ -634,6 +634,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
   const [diffFontSize, setDiffFontSize] = useDiffFontSize()
   const [fontPanelOpen, setFontPanelOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('nemorous.commitFileSidebar') !== 'closed')
+  const [sidebarWidth, setSidebarWidth] = useSidebarWidth('nemorous.commitFileSidebarWidth')
   const [treeExpanded, setTreeExpanded] = useState<Set<string>>(new Set())
   const diffRoot = useRef<HTMLDivElement>(null)
   const patchRef = useRef<PatchViewHandle>(null)
@@ -804,9 +805,14 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
 
   return (
     <div className={`file-page ${immersive ? 'immersive' : ''} ${sidebarOpen ? 'sidebar-open' : ''}`}>
-      <aside className={`file-tree-sidebar ${sidebarOpen ? 'open' : ''}`}>
+      <aside className={`file-tree-sidebar ${sidebarOpen ? 'open' : ''}`} style={{ width: sidebarWidth }}>
         <div className="file-tree-body">
-          <div className="file-tree-head">提交文件</div>
+          <div className="file-tree-head">
+            <span>提交文件</span>
+            <button className="icon-btn" onClick={toggleSidebar} aria-label="收起目录">
+              <Icon name="left" />
+            </button>
+          </div>
           <div className="tree file-tree">
             {detail ? (
               <TreeLevel
@@ -822,6 +828,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
             )}
           </div>
         </div>
+        <SidebarResizer width={sidebarWidth} onWidth={setSidebarWidth} />
       </aside>
       <div className="file-main">
         <div className={`screen fill-screen commit-file-screen ${immersive ? 'immersive' : ''}`}>
