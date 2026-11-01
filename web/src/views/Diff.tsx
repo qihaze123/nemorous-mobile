@@ -333,7 +333,9 @@ export function DiffScreen({
                 </button>
                 <span className="diff-position">{navIndex >= 0 ? `${navIndex + 1}/${navFiles.length}` : ''}</span>
                 <div className="commit-file-tools">
-                  <button className="nav-icon nav-tool font-tool" onClick={() => setFontPanelOpen((open) => !open)} aria-label="字号" aria-pressed={fontPanelOpen} title="字号">Aa</button>
+                  {toolsOpen ? (
+                    <button className="nav-icon nav-tool font-tool" onClick={() => setFontPanelOpen((open) => !open)} aria-label="字号" aria-pressed={fontPanelOpen} title="字号">Aa</button>
+                  ) : null}
                   {toolsOpen ? (
                     <div className="inline-tools">
                       <div className="segmented diff-style nav-style">

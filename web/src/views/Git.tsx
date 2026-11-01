@@ -900,7 +900,9 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
             </button>
             <span className="diff-position">{index >= 0 ? `${index + 1}/${detail.files.length}` : ''}</span>
             <div className="commit-file-tools">
-              <button className="nav-icon nav-tool font-tool" onClick={() => setFontPanelOpen((open) => !open)} aria-label="字号" aria-pressed={fontPanelOpen} title="字号">Aa</button>
+              {toolsOpen ? (
+                <button className="nav-icon nav-tool font-tool" onClick={() => setFontPanelOpen((open) => !open)} aria-label="字号" aria-pressed={fontPanelOpen} title="字号">Aa</button>
+              ) : null}
               {toolsOpen ? (
                 <div className="inline-tools">
                   <div className="segmented diff-style nav-style">
