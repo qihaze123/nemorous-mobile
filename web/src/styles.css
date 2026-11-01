@@ -4633,3 +4633,24 @@ h1 {
 .file-actions .font-toggle {
   font-size: 10px;
 }
+
+.file-topbar {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+}
+
+.file-topbar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.file-topbar .file-head {
+  width: 100%;
+}
+
+.file-topbar .file-title {
+  overflow-wrap: anywhere;
+}

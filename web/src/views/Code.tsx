@@ -629,38 +629,40 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
       </aside>
       <div className="file-main">
         <div className={`screen file-screen fill-screen ${immersive ? 'immersive' : ''}`} style={codeStyle}>
-          <header className="topbar">
-            <button className="icon-btn sidebar-toggle" onClick={toggleSidebar} aria-label="文件目录">
-              <Icon name="panel" />
-            </button>
-            <button
-              className="icon-btn"
-              onClick={() => {
-            if (repoId && rev) {
-              back(`#/commit-file?repo=${encodeURIComponent(repoId)}&hash=${encodeURIComponent(rev)}&path=${encodeURIComponent(path)}`)
-            } else {
-              back('#/code')
-            }
-          }}
-          aria-label="返回"
-        >
-          <Icon name="back" />
-        </button>
-        <div className="grow file-head">
-          <div className="eyebrow">{repoId ? '文件' : ''}</div>
-          <h1 className="file-title">{path}</h1>
-          {rev ? <span className="pill">{rev}</span> : null}
-        </div>
-        <div className="file-actions">
-          <button className="icon-btn" onClick={() => setImmersive(true)} aria-label="沉浸查看" title="沉浸查看">
-            <Icon name="expand" />
-          </button>
-          <button className="icon-btn font-toggle" onClick={() => setFontPanelOpen((open) => !open)} aria-label="字号" aria-pressed={fontPanelOpen} title="字号">Aa</button>
-          <button className="icon-btn" onClick={() => void copy()} aria-label="复制">
-            <Icon name="copy" />
-          </button>
-        </div>
-      </header>
+          <header className="topbar file-topbar">
+            <div className="file-topbar-row">
+              <button className="icon-btn sidebar-toggle" onClick={toggleSidebar} aria-label="文件目录">
+                <Icon name="panel" />
+              </button>
+              <button
+                className="icon-btn"
+                onClick={() => {
+                  if (repoId && rev) {
+                    back(`#/commit-file?repo=${encodeURIComponent(repoId)}&hash=${encodeURIComponent(rev)}&path=${encodeURIComponent(path)}`)
+                  } else {
+                    back('#/code')
+                  }
+                }}
+                aria-label="返回"
+              >
+                <Icon name="back" />
+              </button>
+              <span className="grow" />
+              <div className="file-actions">
+                <button className="icon-btn" onClick={() => setImmersive(true)} aria-label="沉浸查看" title="沉浸查看">
+                  <Icon name="expand" />
+                </button>
+                <button className="icon-btn font-toggle" onClick={() => setFontPanelOpen((open) => !open)} aria-label="字号" aria-pressed={fontPanelOpen} title="字号">Aa</button>
+                <button className="icon-btn" onClick={() => void copy()} aria-label="复制">
+                  <Icon name="copy" />
+                </button>
+              </div>
+            </div>
+            <div className="file-head">
+              <div className="eyebrow">{repoId ? '文件' : ''}</div>
+              <h1 className="file-title">{path}</h1>
+            </div>
+          </header>
 
       {error ? <div className="error-banner"><Icon name="warning" size={15} /> {error}</div> : null}
       {!file && !error ? <Spinner label="读取文件…" /> : null}
