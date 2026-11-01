@@ -30,14 +30,16 @@ type Options struct {
 
 // App owns the workspace configuration shared by all handlers.
 type App struct {
-	Root     string
-	Token    string
-	StateDir string
-	repos    []Repo
-	devices  *deviceStore
-	pairs    *pairStore
-	presets  *presetStore
-	hub      *Hub
+	Root       string
+	Token      string
+	StateDir   string
+	repos      []Repo
+	mu         sync.RWMutex
+	devices    *deviceStore
+	pairs      *pairStore
+	presets    *presetStore
+	workspaces *workspaceStore
+	hub        *Hub
 }
 
 // New discovers the workspace and returns the application core with the
@@ -83,9 +85,28 @@ func NewWithOptions(root string, opts Options) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	workspaces, err := newWorkspaceStore(stateDir, abs)
+	if err != nil {
+		return nil, err
+	}
+	_, active := workspaces.list()
+	repos, err = Discover(active)
+	if err != nil {
+		// A persisted workspace may have been removed or become unreadable.
+		// Fall back to the workspace supplied on the command line.
+		if active != abs {
+			_ = workspaces.activate(abs)
+			active = abs
+			repos, err = Discover(abs)
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
 	return &App{
-		Root: abs, Token: opts.Token, StateDir: stateDir,
-		repos: repos, devices: devices, pairs: pairs, presets: presets, hub: newHub(),
+		Root: active, Token: opts.Token, StateDir: stateDir,
+		repos: repos, devices: devices, pairs: pairs, presets: presets,
+		workspaces: workspaces, hub: newHub(),
 	}, nil
 }
 
@@ -94,10 +115,20 @@ func (a *App) PairCode() (string, time.Time) {
 	return a.pairs.current()
 }
 
-func (a *App) Repos() []Repo { return a.repos }
+func (a *App) snapshot() (string, []Repo) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.Root, append([]Repo(nil), a.repos...)
+}
+
+func (a *App) Repos() []Repo {
+	_, repos := a.snapshot()
+	return repos
+}
 
 func (a *App) repo(id string) (Repo, error) {
-	for _, r := range a.repos {
+	_, repos := a.snapshot()
+	for _, r := range repos {
 		if r.ID == id {
 			return r, nil
 		}
@@ -106,10 +137,11 @@ func (a *App) repo(id string) (Repo, error) {
 }
 
 func (a *App) Workspace(ctx context.Context) Workspace {
-	states := inspectAll(ctx, a.repos, 8)
+	root, repos := a.snapshot()
+	states := inspectAll(ctx, repos, 8)
 	return Workspace{
-		Name:        filepath.Base(a.Root),
-		Root:        a.Root,
+		Name:        filepath.Base(root),
+		Root:        root,
 		Repos:       states,
 		GeneratedAt: time.Now().Unix(),
 	}
@@ -543,7 +575,7 @@ func checkoutRepo(ctx context.Context, repo Repo, branch string, create bool) Op
 func (a *App) Batch(ctx context.Context, action string, ids []string, branch string, create bool) ([]OpResult, error) {
 	var selected []Repo
 	if len(ids) == 0 {
-		selected = a.repos
+		selected = a.Repos()
 	} else {
 		for _, id := range ids {
 			repo, err := a.repo(id)
@@ -694,7 +726,7 @@ func (a *App) StashPop(ctx context.Context, id string) (OpResult, error) {
 
 func (a *App) resolveRepos(ids []string) ([]Repo, error) {
 	if len(ids) == 0 {
-		return a.repos, nil
+		return a.Repos(), nil
 	}
 	repos := make([]Repo, 0, len(ids))
 	for _, id := range ids {
@@ -805,7 +837,7 @@ type LogFilter struct {
 func (a *App) Branches(ctx context.Context) BranchesResponse {
 	byRepo := map[string][]string{}
 	union := map[string]bool{}
-	for _, repo := range a.repos {
+	for _, repo := range a.Repos() {
 		out, err := gitOK(ctx, repo.Path, inspectTimeout,
 			"for-each-ref", "--sort=-committerdate", "--format=%(refname:short)", "refs/heads")
 		if err != nil {
@@ -842,7 +874,7 @@ func (a *App) Logs(ctx context.Context, f LogFilter) ([]Commit, error) {
 	}
 	var repos []Repo
 	if len(f.Repos) == 0 {
-		repos = a.repos
+		repos = a.Repos()
 	} else {
 		for _, id := range f.Repos {
 			repo, err := a.repo(id)
@@ -1213,7 +1245,7 @@ func (a *App) Search(ctx context.Context, query, mode string, regex, caseSensiti
 	}
 	var repos []Repo
 	if len(ids) == 0 {
-		repos = a.repos
+		repos = a.Repos()
 	} else {
 		for _, id := range ids {
 			repo, err := a.repo(id)

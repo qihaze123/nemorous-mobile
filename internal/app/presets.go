@@ -116,7 +116,8 @@ func (s *presetStore) delete(root, name string) bool {
 
 // Presets returns this workspace's saved branch combinations.
 func (a *App) Presets() PresetsResponse {
-	return PresetsResponse{Presets: a.presets.list(a.Root)}
+	root, _ := a.snapshot()
+	return PresetsResponse{Presets: a.presets.list(root)}
 }
 
 // SavePreset records the current branch combination under a name.
@@ -143,7 +144,8 @@ func (a *App) SavePreset(name string, branches map[string]string) (BranchPreset,
 		return BranchPreset{}, errors.New("没有可保存的分支")
 	}
 	preset := BranchPreset{Name: name, Branches: clean, UpdatedAt: time.Now().Unix()}
-	if err := a.presets.save(a.Root, preset); err != nil {
+	root, _ := a.snapshot()
+	if err := a.presets.save(root, preset); err != nil {
 		return BranchPreset{}, err
 	}
 	return preset, nil
@@ -155,13 +157,15 @@ func (a *App) DeletePreset(name string) (bool, error) {
 	if name == "" {
 		return false, errors.New("预设名称不能为空")
 	}
-	return a.presets.delete(a.Root, name), nil
+	root, _ := a.snapshot()
+	return a.presets.delete(root, name), nil
 }
 
 // ApplyPreset switches each repository in the preset to its recorded branch.
 // Dirty repositories are skipped by checkoutRepo.
 func (a *App) ApplyPreset(ctx context.Context, name string) ([]OpResult, error) {
-	preset, ok := a.presets.get(a.Root, sanitizePresetName(name))
+	root, _ := a.snapshot()
+	preset, ok := a.presets.get(root, sanitizePresetName(name))
 	if !ok {
 		return nil, errors.New("预设不存在")
 	}

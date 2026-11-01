@@ -9,7 +9,7 @@ import (
 )
 
 // Version is stamped into the health response and the UI footer.
-const Version = "0.2.7"
+const Version = "0.3.0"
 
 // APIHandler returns the routed, authenticated JSON API.
 func (a *App) APIHandler() http.Handler {
@@ -17,6 +17,9 @@ func (a *App) APIHandler() http.Handler {
 	mux.HandleFunc("GET /api/health", a.handleHealth)
 	mux.HandleFunc("POST /api/pair", a.handlePair)
 	mux.HandleFunc("GET /api/workspace", a.authed(a.handleWorkspace))
+	mux.HandleFunc("GET /api/workspaces", a.authed(a.handleWorkspaces))
+	mux.HandleFunc("POST /api/workspaces", a.authed(a.handleAddWorkspace))
+	mux.HandleFunc("POST /api/workspaces/select", a.authed(a.handleSelectWorkspace))
 	mux.HandleFunc("GET /api/repos/{id}", a.authed(a.handleRepo))
 	mux.HandleFunc("GET /api/repos/{id}/diff", a.authed(a.handleDiff))
 	mux.HandleFunc("POST /api/repos/{id}/stage", a.authed(a.handleStage))
@@ -118,6 +121,43 @@ func (a *App) handleHealth(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) handleWorkspace(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, a.Workspace(r.Context()))
+}
+
+func (a *App) handleWorkspaces(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, a.Workspaces(r.Context()))
+}
+
+func (a *App) handleAddWorkspace(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Path   string `json:"path"`
+		Create bool   `json:"create"`
+	}
+	if err := decode(r, &req); err != nil {
+		a.fail(w, err)
+		return
+	}
+	res, err := a.AddWorkspace(r.Context(), req.Path, req.Create)
+	if err != nil {
+		a.fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
+}
+
+func (a *App) handleSelectWorkspace(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Path string `json:"path"`
+	}
+	if err := decode(r, &req); err != nil {
+		a.fail(w, err)
+		return
+	}
+	res, err := a.SelectWorkspace(r.Context(), req.Path)
+	if err != nil {
+		a.fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
 }
 
 func (a *App) handleRepo(w http.ResponseWriter, r *http.Request) {

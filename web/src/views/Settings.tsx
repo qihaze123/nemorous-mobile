@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { BranchPreset, DevicesResponse, PairCodeResponse, PresetsResponse, Workspace } from '../types'
+import type { BranchPreset, DevicesResponse, PairCodeResponse, PresetsResponse, Workspace, WorkspacesResponse } from '../types'
 import { api, clearPairing, deviceName, getServer, getTheme, post, setTheme } from '../api'
 import { canFullscreen, canInstall, enterFullscreen, INSTALL_EVENT, installApp, isSecureContext, isStandalone } from '../pwa'
-import { Icon, SectionTitle, Spinner, ago, useToast } from '../components'
+import { Icon, SectionTitle, Sheet, Spinner, ago, useToast } from '../components'
 
 const THEMES = [
   { id: 'auto', label: '跟随系统' },
@@ -14,6 +14,10 @@ export function SettingsScreen({ ws }: { ws: Workspace }) {
   const [devices, setDevices] = useState<DevicesResponse | null>(null)
   const [pair, setPair] = useState<PairCodeResponse | null>(null)
   const [presets, setPresets] = useState<BranchPreset[]>([])
+  const [workspaces, setWorkspaces] = useState<WorkspacesResponse | null>(null)
+  const [workspaceOpen, setWorkspaceOpen] = useState(false)
+  const [workspacePath, setWorkspacePath] = useState('')
+  const [workspaceCreate, setWorkspaceCreate] = useState(false)
   const [presetName, setPresetName] = useState('')
   const [installable, setInstallable] = useState(canInstall())
   const [standalone, setStandalone] = useState(isStandalone())
@@ -28,14 +32,16 @@ export function SettingsScreen({ ws }: { ws: Workspace }) {
     setLoading(true)
     setError('')
     try {
-      const [devicesRes, pairRes, presetsRes] = await Promise.all([
+      const [devicesRes, pairRes, presetsRes, workspacesRes] = await Promise.all([
         api<DevicesResponse>('/api/devices'),
         api<PairCodeResponse>('/api/pair/code'),
         api<PresetsResponse>('/api/presets'),
+        api<WorkspacesResponse>('/api/workspaces'),
       ])
       setDevices(devicesRes)
       setPair(pairRes)
       setPresets(presetsRes.presets ?? [])
+      setWorkspaces(workspacesRes)
     } catch (err) {
       setError(err instanceof Error ? err.message : '读取设备失败')
     } finally {
@@ -101,6 +107,31 @@ export function SettingsScreen({ ws }: { ws: Workspace }) {
     }
   }
 
+  const switchWorkspace = async (path: string) => {
+    if (busy) return
+    setBusy(`workspace:${path}`)
+    try {
+      await post('/api/workspaces/select', { path })
+      location.reload()
+    } catch (err) {
+      notify(err instanceof Error ? err.message : '切换工作区失败', 'error')
+      setBusy('')
+    }
+  }
+
+  const addWorkspace = async () => {
+    const path = workspacePath.trim()
+    if (!path) return
+    setBusy('workspace:add')
+    try {
+      await post('/api/workspaces', { path, create: workspaceCreate })
+      location.reload()
+    } catch (err) {
+      notify(err instanceof Error ? err.message : '添加工作区失败', 'error')
+      setBusy('')
+    }
+  }
+
   const install = async () => {
     try {
       const accepted = await installApp()
@@ -143,6 +174,65 @@ export function SettingsScreen({ ws }: { ws: Workspace }) {
           <h1>连接与外观</h1>
         </div>
       </header>
+
+      <SectionTitle>工作区</SectionTitle>
+      <div className="panel workspace-panel">
+        {workspaces?.workspaces.map((item) => (
+          <button
+            key={item.root}
+            className={`workspace-row ${item.active ? 'on' : ''}`}
+            disabled={!!busy || item.active}
+            onClick={() => void switchWorkspace(item.root)}
+          >
+            <span className="workspace-main">
+              <span className="workspace-name">
+                {item.name}
+                {item.active ? <em>当前</em> : null}
+              </span>
+              <code className="workspace-path">{item.root}</code>
+            </span>
+            <span className="workspace-count">{item.repos} 仓库</span>
+            <Icon name={item.active ? 'check' : busy === `workspace:${item.root}` ? 'refresh' : 'chevron'} size={15} />
+          </button>
+        ))}
+        {!workspaces ? <Spinner label="读取工作区…" /> : null}
+        <button className="btn ghost block" onClick={() => setWorkspaceOpen(true)}>
+          <Icon name="plus" size={15} /> 添加 / 创建工作区
+        </button>
+        <p className="hint">切换工作区会刷新当前页面；所有已配对设备共享同一活动工作区。</p>
+      </div>
+
+      <Sheet
+        open={workspaceOpen}
+        title="添加或创建工作区"
+        onClose={() => { if (!busy) setWorkspaceOpen(false) }}
+        footer={
+          <>
+            <button className="btn ghost" disabled={!!busy} onClick={() => setWorkspaceOpen(false)}>取消</button>
+            <button className="btn primary" disabled={!!busy || !workspacePath.trim()} onClick={() => void addWorkspace()}>
+              {busy === 'workspace:add' ? '处理中…' : '添加并切换'}
+            </button>
+          </>
+        }
+      >
+        <label className="field">
+          <span>工作区目录（绝对路径）</span>
+          <input
+            className="text-input"
+            value={workspacePath}
+            onChange={(e) => setWorkspacePath(e.target.value)}
+            placeholder="/Users/you/code"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+          />
+        </label>
+        <label className="check-row">
+          <input type="checkbox" checked={workspaceCreate} onChange={(e) => setWorkspaceCreate(e.target.checked)} />
+          <span>目录不存在时创建空目录</span>
+        </label>
+        <p className="hint">添加后，本机所有已配对设备都能访问该目录下的 Git 仓库。空工作区需要先在电脑端放入或克隆仓库。</p>
+      </Sheet>
 
       <SectionTitle>安装到手机</SectionTitle>
       <div className="panel">

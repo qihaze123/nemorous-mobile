@@ -179,3 +179,15 @@ export interface PresetsResponse {
   presets: BranchPreset[]
 }
 
+export interface WorkspaceSummary {
+  root: string
+  name: string
+  repos: number
+  active: boolean
+}
+
+export interface WorkspacesResponse {
+  active: string
+  workspaces: WorkspaceSummary[]
+}
+

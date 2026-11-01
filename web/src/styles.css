@@ -3954,3 +3954,74 @@ h1 {
 .commit-file-nav .inline-tools {
   flex: 1 1 auto;
 }
+
+.workspace-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.workspace-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 1px solid var(--border-soft);
+  background: none;
+  color: var(--fg);
+  text-align: left;
+}
+
+.workspace-row:last-of-type {
+  border-bottom: 0;
+}
+
+.workspace-row.on {
+  color: var(--muted);
+}
+
+.workspace-row:disabled {
+  opacity: 0.75;
+}
+
+.workspace-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.workspace-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.workspace-name em {
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 500;
+}
+
+.workspace-path {
+  overflow: hidden;
+  color: var(--muted);
+  font: 9.5px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-count {
+  flex: none;
+  color: var(--muted);
+  font-size: 10.5px;
+}

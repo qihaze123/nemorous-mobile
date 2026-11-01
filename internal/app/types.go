@@ -215,3 +215,17 @@ type BranchPreset struct {
 type PresetsResponse struct {
 	Presets []BranchPreset `json:"presets"`
 }
+
+// WorkspaceSummary is one selectable workspace root.
+type WorkspaceSummary struct {
+	Root   string `json:"root"`
+	Name   string `json:"name"`
+	Repos  int    `json:"repos"`
+	Active bool   `json:"active"`
+}
+
+// WorkspacesResponse lists all known workspaces and the active root.
+type WorkspacesResponse struct {
+	Active     string             `json:"active"`
+	Workspaces []WorkspaceSummary `json:"workspaces"`
+}
