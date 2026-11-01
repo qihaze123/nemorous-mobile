@@ -139,6 +139,11 @@ export function usePinchZoom(
   setValue: (value: number) => void,
   enabled = true,
 ) {
+  const getValueRef = useRef(getValue)
+  const setValueRef = useRef(setValue)
+  getValueRef.current = getValue
+  setValueRef.current = setValue
+
   useEffect(() => {
     const element = target.current
     if (!enabled || !element) return
@@ -154,7 +159,7 @@ export function usePinchZoom(
     const onStart = (event: TouchEvent) => {
       if (event.touches.length !== 2) return
       startDistance = distance(event.touches)
-      startValue = getValue()
+      startValue = getValueRef.current()
       active = startDistance > 0
       if (active) event.preventDefault()
     }
@@ -162,23 +167,48 @@ export function usePinchZoom(
       if (!active || event.touches.length !== 2) return
       event.preventDefault()
       const next = distance(event.touches)
-      if (startDistance > 0 && next > 0) setValue(startValue * (next / startDistance))
+      if (startDistance > 0 && next > 0) setValueRef.current(startValue * (next / startDistance))
     }
     const onEnd = () => {
       active = false
       startDistance = 0
     }
+    // Safari exposes pinch as GestureEvents; Chrome/Android use TouchEvents.
+    const onGestureStart = (event: Event) => {
+      const gesture = event as Event & { scale?: number }
+      startValue = getValueRef.current()
+      startDistance = 1
+      active = true
+      gesture.preventDefault()
+    }
+    const onGestureChange = (event: Event) => {
+      const gesture = event as Event & { scale?: number }
+      if (!active) return
+      gesture.preventDefault()
+      const scale = gesture.scale ?? 1
+      if (scale > 0) setValueRef.current(startValue * scale)
+    }
+    const onGestureEnd = (event: Event) => {
+      event.preventDefault()
+      onEnd()
+    }
     element.addEventListener('touchstart', onStart, { passive: false })
     element.addEventListener('touchmove', onMove, { passive: false })
     element.addEventListener('touchend', onEnd)
     element.addEventListener('touchcancel', onEnd)
+    element.addEventListener('gesturestart', onGestureStart, { passive: false } as AddEventListenerOptions)
+    element.addEventListener('gesturechange', onGestureChange, { passive: false } as AddEventListenerOptions)
+    element.addEventListener('gestureend', onGestureEnd, { passive: false } as AddEventListenerOptions)
     return () => {
       element.removeEventListener('touchstart', onStart)
       element.removeEventListener('touchmove', onMove)
       element.removeEventListener('touchend', onEnd)
       element.removeEventListener('touchcancel', onEnd)
+      element.removeEventListener('gesturestart', onGestureStart)
+      element.removeEventListener('gesturechange', onGestureChange)
+      element.removeEventListener('gestureend', onGestureEnd)
     }
-  }, [target, enabled, getValue, setValue])
+  }, [target, enabled])
 }
 
 export function useSidebarWidth(key = 'nemorous.sidebarWidth', initial = 264) {
