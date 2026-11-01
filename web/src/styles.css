@@ -4678,3 +4678,20 @@ h1 {
   min-height: 0;
   max-height: none;
 }
+
+.repo-sub code {
+  overflow-x: auto;
+  text-overflow: clip;
+  scrollbar-width: none;
+}
+
+.repo-sub code::-webkit-scrollbar,
+.branch-row span::-webkit-scrollbar {
+  display: none;
+}
+
+.branch-row span {
+  overflow-x: auto;
+  text-overflow: clip;
+  scrollbar-width: none;
+}

@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { BranchList, BranchesResponse, Commit, CommitDetail, CommitFile, OpResult, Workspace } from '../types'
-import { api, post } from '../api'
+import type { BranchList, BranchesResponse, Commit, CommitDetail, CommitFile, Workspace } from '../types'
+import { api } from '../api'
 import { back, go, replace, useDebounced, useDiffFontSize, useImmersive, usePinchZoom, useSidebarWidth, useSidebarZoom } from '../hooks'
 import { Empty, Icon, ImmersiveDiffBar, ImmersiveDock, MultiPatchView, PatchView, SectionTitle, Sheet, SidebarResizer, Spinner, ago, dayKey, repoColor, timeOf, useToast, type PatchViewHandle } from '../components'
 import { TreeLevel, buildTree, collectDirPaths, type TreeFileMeta } from './Code'
@@ -153,7 +153,7 @@ export function GitScreen({ ws }: { ws: Workspace }) {
               </span>
               <span className="repo-sub">
                 <Icon name="branch" size={13} />
-                <code>{repo.branch || '(无分支)'}</code>
+                <code title={repo.branch || '(无分支)'}>{repo.branch || '(无分支)'}</code>
                 {repo.ahead > 0 ? <em className="ahead">↑{repo.ahead}</em> : null}
                 {repo.behind > 0 ? <em className="behind">↓{repo.behind}</em> : null}
               </span>
@@ -301,10 +301,6 @@ export function GitScreen({ ws }: { ws: Workspace }) {
       <RepoSheet
         repoId={repoSheet}
         onClose={() => setRepoSheet(null)}
-        onSelectBranch={(repoId, branch) => {
-          setFilters((prev) => ({ ...prev, repoId, branch }))
-          setRepoSheet(null)
-        }}
         notify={notify}
       />
 
@@ -316,53 +312,26 @@ export function GitScreen({ ws }: { ws: Workspace }) {
 function RepoSheet({
   repoId,
   onClose,
-  onSelectBranch,
   notify,
 }: {
   repoId: string | null
   onClose: () => void
-  onSelectBranch: (repoId: string, branch: string) => void
   notify: (text: string, kind?: 'ok' | 'error' | 'info') => void
 }) {
   const [detail, setDetail] = useState<BranchList | null>(null)
   const [loading, setLoading] = useState(false)
-  const [busy, setBusy] = useState('')
-
-  const load = () => {
-    if (!repoId) return
-    setLoading(true)
-    api<BranchList>(`/api/repos/${repoId}`)
-      .then(setDetail)
-      .catch((err) => notify(err instanceof Error ? err.message : '读取仓库失败', 'error'))
-      .finally(() => setLoading(false))
-  }
 
   useEffect(() => {
     if (!repoId) {
       setDetail(null)
       return
     }
-    load()
-  }, [repoId])
-
-  const switchBranch = async (branch: string) => {
-    if (!repoId || busy) return
-    setBusy(branch)
-    try {
-      const result = await post<OpResult>(`/api/repos/${repoId}/checkout`, { branch, create: false })
-      if (result.status === 'OK') {
-        notify(result.message || `已切换到 ${branch}`, 'ok')
-        onSelectBranch(repoId, branch)
-        load()
-      } else {
-        notify(result.message || '切换分支失败', 'error')
-      }
-    } catch (err) {
-      notify(err instanceof Error ? err.message : '切换分支失败', 'error')
-    } finally {
-      setBusy('')
-    }
-  }
+    setLoading(true)
+    api<BranchList>(`/api/repos/${repoId}`)
+      .then(setDetail)
+      .catch((err) => notify(err instanceof Error ? err.message : '读取仓库失败', 'error'))
+      .finally(() => setLoading(false))
+  }, [repoId, notify])
 
   const branches = detail?.branches ?? []
   const remotes = (detail?.remotes ?? []).filter((r) => !r.endsWith('/HEAD'))
@@ -374,7 +343,7 @@ function RepoSheet({
         <>
           <div className="repo-detail-head">
             <span className="repo-sub">
-              <Icon name="branch" size={14} /> <code>{detail.repo.branch}</code>
+              <Icon name="branch" size={14} /> <code title={detail.repo.branch}>{detail.repo.branch}</code>
             </span>
             {detail.repo.ahead > 0 ? <span className="pill">待推送 {detail.repo.ahead}</span> : null}
             {detail.repo.behind > 0 ? <span className="pill">落后 {detail.repo.behind}</span> : null}
@@ -383,30 +352,10 @@ function RepoSheet({
           <SectionTitle>本地分支</SectionTitle>
           <div className="branch-list">
             {branches.map((b) => (
-              <div
-                key={b}
-                className={`branch-row ${b === detail.repo.branch ? 'current' : ''}`}
-                role="button"
-                tabIndex={0}
-                onClick={() => onSelectBranch(repoId!, b)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') onSelectBranch(repoId!, b)
-                }}
-              >
+              <div key={b} className={`branch-row ${b === detail.repo.branch ? 'current' : ''}`}>
                 <Icon name="branch" size={15} />
-                <span>{b}</span>
-                {b === detail.repo.branch ? <em>当前</em> : (
-                  <button
-                    className="mini-btn"
-                    disabled={!!busy}
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      void switchBranch(b)
-                    }}
-                  >
-                    {busy === b ? '切换中…' : '切换'}
-                  </button>
-                )}
+                <span title={b}>{b}</span>
+                {b === detail.repo.branch ? <em>当前</em> : null}
               </div>
             ))}
             {branches.length === 0 ? <p className="hint">没有本地分支。</p> : null}
@@ -419,13 +368,13 @@ function RepoSheet({
                 {remotes.map((r) => (
                   <div key={r} className="branch-row remote">
                     <Icon name="branch" size={15} />
-                    <span>{r}</span>
+                    <span title={r}>{r}</span>
                   </div>
                 ))}
               </div>
             </>
           ) : null}
-          <p className="hint">点分支筛选提交历史；点「切换」只切换这个仓库，有未提交改动会安全跳过。</p>
+          <p className="hint">此处只查看分支；筛选历史请用提交页筛选，切换分支请到改动页的 Git 操作。</p>
         </>
       ) : null}
     </Sheet>

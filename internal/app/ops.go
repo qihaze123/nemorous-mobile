@@ -978,6 +978,9 @@ func (a *App) Logs(ctx context.Context, f LogFilter) ([]Commit, error) {
 				"--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%ae%x1f%at"}
 			if f.Branch != "" {
 				args = append(args, f.Branch)
+			} else {
+				// "All branches" must read the full ref graph, not just HEAD.
+				args = append(args, "--all")
 			}
 			if path != "" {
 				args = append(args, "--", path)
