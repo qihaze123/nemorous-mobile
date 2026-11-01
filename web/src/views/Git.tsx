@@ -510,6 +510,7 @@ export function CommitScreen({ repoId, hash }: { repoId: string; hash: string })
   const [dots, setDots] = useState<Set<string>>(new Set())
   const [error, setError] = useState('')
   const notify = useToast()
+  const [messageExpanded, setMessageExpanded] = useState(false)
   const treeRef = useRef<HTMLDivElement>(null)
   const rowEls = useRef(new Map<string, HTMLElement>())
   const registerRow = useCallback((key: string, el: HTMLElement | null) => {
@@ -544,6 +545,7 @@ export function CommitScreen({ repoId, hash }: { repoId: string; hash: string })
   useEffect(() => {
     setDetail(null)
     setCollapsed(new Set())
+    setMessageExpanded(false)
     api<CommitDetail>(`/api/repos/${repoId}/commits/${hash}`)
       .then(setDetail)
       .catch((err) => setError(err instanceof Error ? err.message : '读取提交失败'))
@@ -559,14 +561,14 @@ export function CommitScreen({ repoId, hash }: { repoId: string; hash: string })
         </button>
         <div className="grow">
           <div className="eyebrow">提交详情</div>
-          <h1 className="file-title">{detail?.commit.subject ?? hash.slice(0, 8)}</h1>
+          <h1 className="file-title">{detail?.commit.short ?? hash.slice(0, 8)}</h1>
         </div>
       </header>
       {error ? <div className="error-banner">{error}</div> : null}
       {!detail && !error ? <Spinner label="读取提交…" /> : null}
       {detail ? (
         <>
-          <div className="commit-message-card">
+          <div className={`commit-message-card ${messageExpanded ? 'expanded' : ''}`}>
             <div className="commit-message-head">
               <div className="commit-message-subject">{detail.commit.subject}</div>
               <button
@@ -583,7 +585,21 @@ export function CommitScreen({ repoId, hash }: { repoId: string; hash: string })
                 }}
               >复制</button>
             </div>
-            {detail.commit.body ? <pre className="commit-message-body">{detail.commit.body}</pre> : null}
+            {detail.commit.body ? (
+              <>
+                <pre className={`commit-message-body ${messageExpanded ? 'expanded' : 'collapsed'}`}>{detail.commit.body}</pre>
+                {detail.commit.body.length > 220 ? (
+                  <button
+                    className="commit-message-toggle"
+                    onClick={() => setMessageExpanded((value) => !value)}
+                    aria-expanded={messageExpanded}
+                  >
+                    <Icon name={messageExpanded ? 'up' : 'down'} size={14} />
+                    {messageExpanded ? '收起正文' : '展开全部正文'}
+                  </button>
+                ) : null}
+              </>
+            ) : null}
           </div>
           <div className="commit-card">
             <div className="commit-meta-grid">
