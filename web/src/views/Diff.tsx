@@ -3,6 +3,7 @@ import type { DiffResult, Workspace } from '../types'
 import { api } from '../api'
 import { back, go, replace, useDiffFontSize, useImmersive } from '../hooks'
 import { Icon, ImmersiveDiffBar, ImmersiveDock, PatchView, Spinner, StatusLetter, repoColor, type PatchViewHandle } from '../components'
+import { languageOf } from '../syntax'
 
 function DiffSidebar({
   ws,
@@ -371,7 +372,7 @@ export function DiffScreen({
                 </div>
               ) : null}
               <div className="commit-file-diff-page idea-diff" ref={diffRoot}>
-                <PatchView ref={patchRef} patch={diff.patch} binary={diff.binary} style={diffStyle} idea folded={folded} focusChange="first" fontSize={diffFontSize} />
+                <PatchView ref={patchRef} patch={diff.patch} binary={diff.binary} style={diffStyle} idea folded={folded} focusChange="first" fontSize={diffFontSize} language={languageOf(path)} />
               </div>
             </>
           ) : null}

@@ -4,20 +4,7 @@ import type { FileContent, RepoFiles, SearchMatch, SearchResult, Workspace } fro
 import { api } from '../api'
 import { back, go, useDebounced, useImmersive } from '../hooks'
 import { Empty, Icon, ImmersiveDock, SectionTitle, Spinner, repoColor, useToast } from '../components'
-
-const LANG_BY_EXT: Record<string, string> = {
-  ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript', mjs: 'javascript', cjs: 'javascript',
-  go: 'go', py: 'python', rs: 'rust', java: 'java', kt: 'kotlin', kts: 'kotlin', swift: 'swift',
-  sh: 'bash', bash: 'bash', zsh: 'bash', fish: 'bash', json: 'json', yaml: 'yaml', yml: 'yaml',
-  css: 'css', scss: 'scss', less: 'less', html: 'xml', vue: 'xml', svelte: 'xml', xml: 'xml',
-  md: 'markdown', markdown: 'markdown', sql: 'sql', toml: 'ini', ini: 'ini', conf: 'ini',
-  c: 'c', h: 'c', cc: 'cpp', cpp: 'cpp', hpp: 'cpp', cs: 'csharp', php: 'php', rb: 'ruby',
-  dockerfile: 'dockerfile', makefile: 'makefile', gradle: 'groovy', lua: 'lua', r: 'r', dart: 'dart',
-}
-
-const SPECIAL_NAMES: Record<string, string> = {
-  Dockerfile: 'dockerfile', Makefile: 'makefile', Jenkinsfile: 'groovy', Gemfile: 'ruby',
-}
+import { languageOf } from '../syntax'
 
 function fileName(path: string) {
   const i = path.lastIndexOf('/')
@@ -27,13 +14,6 @@ function fileName(path: string) {
 function dirPath(path: string) {
   const i = path.lastIndexOf('/')
   return i < 0 ? '' : path.slice(0, i + 1)
-}
-
-function languageOf(path: string): string {
-  const name = path.slice(path.lastIndexOf('/') + 1)
-  if (SPECIAL_NAMES[name]) return SPECIAL_NAMES[name]
-  const ext = name.includes('.') ? name.slice(name.lastIndexOf('.') + 1).toLowerCase() : ''
-  return LANG_BY_EXT[ext] ?? 'plaintext'
 }
 
 function escapeHtml(s: string) {

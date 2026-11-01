@@ -3,6 +3,7 @@ import type { BranchList, BranchesResponse, Commit, CommitDetail, CommitFile, Wo
 import { api } from '../api'
 import { back, go, replace, useDebounced, useDiffFontSize, useImmersive } from '../hooks'
 import { Empty, Icon, ImmersiveDiffBar, ImmersiveDock, MultiPatchView, PatchView, SectionTitle, Sheet, Spinner, ago, dayKey, repoColor, timeOf, useToast, type PatchViewHandle } from '../components'
+import { languageOf } from '../syntax'
 
 interface CommitFilters {
   repoId: string
@@ -871,7 +872,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
             </div>
           ) : null}
           <div className="commit-file-diff-page idea-diff" ref={diffRoot}>
-            <PatchView ref={patchRef} patch={chunks.get(path) ?? ''} style={diffStyle} idea folded={folded} focusChange={atLast ? 'last' : 'first'} fontSize={diffFontSize} />
+            <PatchView ref={patchRef} patch={chunks.get(path) ?? ''} style={diffStyle} idea folded={folded} focusChange={atLast ? 'last' : 'first'} fontSize={diffFontSize} language={languageOf(path)} />
           </div>
         </>
       ) : null}

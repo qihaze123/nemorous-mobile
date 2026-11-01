@@ -1,6 +1,7 @@
-import { createContext, forwardRef, useCallback, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { Fragment, createContext, forwardRef, useCallback, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 import type { FileChange, RepoHealth } from './types'
+import { languageOf, syntaxSegments } from './syntax'
 
 /* ---------- icons ---------- */
 
@@ -735,6 +736,66 @@ function foldAnchorFor(el: HTMLElement, source: HTMLElement, side?: 'before' | '
   return { key, offset: anchor.getBoundingClientRect().top - el.getBoundingClientRect().top }
 }
 
+function SyntaxCode({
+  text,
+  language,
+  segments,
+  markClass = 'word-add',
+}: {
+  text: string
+  language?: string
+  segments?: WordSegment[]
+  markClass?: string
+}) {
+  const parts = useMemo(() => {
+    const syntax = syntaxSegments(text, language ?? '')
+    if (!segments?.length) {
+      return syntax.map((segment) => ({ text: segment.text, className: segment.className, changed: false }))
+    }
+    const changed = new Array<boolean>(text.length).fill(false)
+    let offset = 0
+    for (const segment of segments) {
+      if (segment.changed) {
+        for (let i = offset; i < offset + segment.text.length && i < changed.length; i++) changed[i] = true
+      }
+      offset += segment.text.length
+    }
+    const out: { text: string; className?: string; changed: boolean }[] = []
+    let position = 0
+    for (const segment of syntax) {
+      let current = ''
+      let currentClass = segment.className
+      let currentChanged = changed[position] ?? false
+      for (let i = 0; i < segment.text.length; i++) {
+        const flag = changed[position + i] ?? false
+        if (flag !== currentChanged) {
+          if (current) out.push({ text: current, className: currentClass, changed: currentChanged })
+          current = ''
+          currentChanged = flag
+        }
+        current += segment.text[i]
+      }
+      if (current) out.push({ text: current, className: currentClass, changed: currentChanged })
+      position += segment.text.length
+    }
+    return out
+  }, [text, language, segments])
+
+  return (
+    <>
+      {parts.map((part, index) =>
+        part.changed ? (
+          <mark key={index} className={markClass}>{part.text}</mark>
+        ) : part.className ? (
+          <span key={index} className={part.className}>{part.text}</span>
+        ) : (
+          <Fragment key={index}>{part.text}</Fragment>
+        ),
+      )}
+    </>
+  )
+}
+
 const DIFF_OVERSCAN = 12
 const DIFF_VIRTUAL_THRESHOLD = 200
 
@@ -751,8 +812,8 @@ export interface PatchViewHandle {
   currentLine(): number | undefined
 }
 
-export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: boolean; style?: 'unified' | 'split'; idea?: boolean; folded?: boolean; focusChange?: 'first' | 'last'; fontSize?: number }>(function PatchView(
-  { patch, binary, style = 'unified', idea = false, folded = false, focusChange = 'first', fontSize = 12 },
+export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: boolean; style?: 'unified' | 'split'; idea?: boolean; folded?: boolean; focusChange?: 'first' | 'last'; fontSize?: number; language?: string }>(function PatchView(
+  { patch, binary, style = 'unified', idea = false, folded = false, focusChange = 'first', fontSize = 12, language = '' },
   ref,
 ) {
   const lineHeight = Math.round(fontSize * 5 / 3)
@@ -1012,7 +1073,10 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
               return (
                 <div key={index} className="diff-line split-one-side add" style={rowStyle(index)} data-change-key={`a:${right.no ?? ''}:${right.text}`}>
                   <span className="gutter new changed">{right.no ?? ''}</span>
-                  <span className="code">{right.kind === 'add' ? '+' : right.kind === 'ctx' ? ' ' : ''}{right.text}</span>
+                  <span className="code">
+                    {right.kind === 'add' ? '+' : right.kind === 'ctx' ? ' ' : ''}
+                    <SyntaxCode text={right.text} language={language} segments={idea ? right.segments : undefined} markClass="word-add" />
+                  </span>
                 </div>
               )
             }
@@ -1020,7 +1084,10 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
               return (
                 <div key={index} className="diff-line split-one-side del" style={rowStyle(index)} data-change-key={`d:${left.no ?? ''}:${left.text}`}>
                   <span className="gutter old changed">{left.no ?? ''}</span>
-                  <span className="code">{left.kind === 'del' ? '-' : left.kind === 'ctx' ? ' ' : ''}{left.text}</span>
+                  <span className="code">
+                    {left.kind === 'del' ? '-' : left.kind === 'ctx' ? ' ' : ''}
+                    <SyntaxCode text={left.text} language={language} segments={idea ? left.segments : undefined} markClass="word-del" />
+                  </span>
                 </div>
               )
             }
@@ -1038,9 +1105,25 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
                   ) : null}
                   {left.no ?? ''}
                 </span>
-                <span className={`split-code ${left.kind}`}>{left.kind === 'del' ? '-' : left.kind === 'ctx' ? ' ' : ''}{idea && left.segments ? left.segments.map((segment, j) => segment.changed ? <mark key={j} className="word-del">{segment.text}</mark> : segment.text) : left.text}</span>
+                <span className={`split-code ${left.kind}`}>
+                  {left.kind === 'del' ? '-' : left.kind === 'ctx' ? ' ' : ''}
+                  <SyntaxCode
+                    text={left.text}
+                    language={language}
+                    segments={idea ? left.segments : undefined}
+                    markClass="word-del"
+                  />
+                </span>
                 <span className={`split-gutter ${right.kind}`}>{right.no ?? ''}</span>
-                <span className={`split-code ${right.kind}`}>{right.kind === 'add' ? '+' : right.kind === 'ctx' ? ' ' : ''}{idea && right.segments ? right.segments.map((segment, j) => segment.changed ? <mark key={j} className="word-add">{segment.text}</mark> : segment.text) : right.text}</span>
+                <span className={`split-code ${right.kind}`}>
+                  {right.kind === 'add' ? '+' : right.kind === 'ctx' ? ' ' : ''}
+                  <SyntaxCode
+                    text={right.text}
+                    language={language}
+                    segments={idea ? right.segments : undefined}
+                    markClass="word-add"
+                  />
+                </span>
               </div>
             )
           }
@@ -1076,9 +1159,13 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
                 )
               ) : null}
               <span className="code">
-                {idea && wordChanges[index]
-                  ? wordChanges[index]!.map((segment, j) => segment.changed ? <mark key={j} className={`word-${line.kind}`}>{segment.text}</mark> : segment.text)
-                  : `${idea ? '' : line.kind === 'add' ? '+' : line.kind === 'del' ? '-' : line.kind === 'ctx' ? ' ' : ''}${line.text}`}
+                {!idea ? (line.kind === 'add' ? '+' : line.kind === 'del' ? '-' : line.kind === 'ctx' ? ' ' : '') : null}
+                <SyntaxCode
+                  text={line.text}
+                  language={line.kind === 'hunk' || line.kind === 'meta' ? '' : language}
+                  segments={idea ? wordChanges[index] : undefined}
+                  markClass={`word-${line.kind}`}
+                />
               </span>
             </div>
           )
@@ -1279,9 +1366,12 @@ export function MultiPatchView({
                   <span className={`marker ${row.line.kind}`}>{row.line.kind === 'add' ? '+' : row.line.kind === 'del' ? '−' : ''}</span>
                 )}
                 <span className="code">
-                  {row.words
-                    ? row.words.map((segment, j) => segment.changed ? <mark key={j} className={`word-${row.line.kind}`}>{segment.text}</mark> : segment.text)
-                    : row.line.text}
+                  <SyntaxCode
+                    text={row.line.text}
+                    language={row.line.kind === 'hunk' || row.line.kind === 'meta' ? '' : languageOf(row.file.path)}
+                    segments={row.words}
+                    markClass={`word-${row.line.kind}`}
+                  />
                 </span>
               </div>
             ),
