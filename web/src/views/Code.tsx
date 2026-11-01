@@ -648,7 +648,6 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
             </button>
             <div className="grow file-head">
               <h1 className="file-title">{path}</h1>
-              {rev ? <span className="pill">{rev}</span> : null}
             </div>
             <div className="file-actions">
               <button className="icon-btn" onClick={() => setImmersive(true)} aria-label="沉浸查看" title="沉浸查看">
