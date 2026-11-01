@@ -183,11 +183,20 @@ export interface WorkspaceSummary {
   root: string
   name: string
   repos: number
+  hidden: number
   active: boolean
+}
+
+export interface WorkspaceRepo {
+  id: string
+  name: string
+  rel: string
+  hidden: boolean
 }
 
 export interface WorkspacesResponse {
   active: string
   workspaces: WorkspaceSummary[]
+  repos: WorkspaceRepo[]
 }
 

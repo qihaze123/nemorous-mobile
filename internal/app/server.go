@@ -9,7 +9,7 @@ import (
 )
 
 // Version is stamped into the health response and the UI footer.
-const Version = "0.3.0"
+const Version = "0.3.1"
 
 // APIHandler returns the routed, authenticated JSON API.
 func (a *App) APIHandler() http.Handler {
@@ -20,6 +20,7 @@ func (a *App) APIHandler() http.Handler {
 	mux.HandleFunc("GET /api/workspaces", a.authed(a.handleWorkspaces))
 	mux.HandleFunc("POST /api/workspaces", a.authed(a.handleAddWorkspace))
 	mux.HandleFunc("POST /api/workspaces/select", a.authed(a.handleSelectWorkspace))
+	mux.HandleFunc("POST /api/workspaces/visibility", a.authed(a.handleWorkspaceVisibility))
 	mux.HandleFunc("GET /api/repos/{id}", a.authed(a.handleRepo))
 	mux.HandleFunc("GET /api/repos/{id}/diff", a.authed(a.handleDiff))
 	mux.HandleFunc("POST /api/repos/{id}/stage", a.authed(a.handleStage))
@@ -153,6 +154,23 @@ func (a *App) handleSelectWorkspace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res, err := a.SelectWorkspace(r.Context(), req.Path)
+	if err != nil {
+		a.fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
+}
+
+func (a *App) handleWorkspaceVisibility(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Repo   string `json:"repo"`
+		Hidden bool   `json:"hidden"`
+	}
+	if err := decode(r, &req); err != nil {
+		a.fail(w, err)
+		return
+	}
+	res, err := a.SetRepoHidden(r.Context(), req.Repo, req.Hidden)
 	if err != nil {
 		a.fail(w, err)
 		return

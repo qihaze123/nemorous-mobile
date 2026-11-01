@@ -34,6 +34,7 @@ type App struct {
 	Token      string
 	StateDir   string
 	repos      []Repo
+	allRepos   []Repo
 	mu         sync.RWMutex
 	devices    *deviceStore
 	pairs      *pairStore
@@ -105,7 +106,8 @@ func NewWithOptions(root string, opts Options) (*App, error) {
 	}
 	return &App{
 		Root: active, Token: opts.Token, StateDir: stateDir,
-		repos: repos, devices: devices, pairs: pairs, presets: presets,
+		repos: workspaces.visible(active, repos), allRepos: repos,
+		devices: devices, pairs: pairs, presets: presets,
 		workspaces: workspaces, hub: newHub(),
 	}, nil
 }
@@ -119,6 +121,12 @@ func (a *App) snapshot() (string, []Repo) {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	return a.Root, append([]Repo(nil), a.repos...)
+}
+
+func (a *App) snapshotAll() (string, []Repo) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.Root, append([]Repo(nil), a.allRepos...)
 }
 
 func (a *App) Repos() []Repo {

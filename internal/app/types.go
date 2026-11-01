@@ -221,11 +221,21 @@ type WorkspaceSummary struct {
 	Root   string `json:"root"`
 	Name   string `json:"name"`
 	Repos  int    `json:"repos"`
+	Hidden int    `json:"hidden"`
 	Active bool   `json:"active"`
+}
+
+// WorkspaceRepo is a repository in the active workspace, including hidden ones.
+type WorkspaceRepo struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Rel    string `json:"rel"`
+	Hidden bool   `json:"hidden"`
 }
 
 // WorkspacesResponse lists all known workspaces and the active root.
 type WorkspacesResponse struct {
 	Active     string             `json:"active"`
 	Workspaces []WorkspaceSummary `json:"workspaces"`
+	Repos      []WorkspaceRepo    `json:"repos"`
 }

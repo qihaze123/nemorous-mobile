@@ -12,8 +12,9 @@ import (
 )
 
 type workspaceFile struct {
-	Roots  []string `json:"roots"`
-	Active string   `json:"active"`
+	Roots  []string            `json:"roots"`
+	Active string              `json:"active"`
+	Hidden map[string][]string `json:"hidden,omitempty"`
 }
 
 type workspaceStore struct {
@@ -21,6 +22,7 @@ type workspaceStore struct {
 	path   string
 	roots  []string
 	active string
+	hidden map[string][]string
 }
 
 func newWorkspaceStore(stateDir, initial string) (*workspaceStore, error) {
@@ -28,6 +30,7 @@ func newWorkspaceStore(stateDir, initial string) (*workspaceStore, error) {
 		path:   filepath.Join(stateDir, "workspaces.json"),
 		roots:  []string{},
 		active: initial,
+		hidden: map[string][]string{},
 	}
 	data, err := os.ReadFile(s.path)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -41,6 +44,9 @@ func newWorkspaceStore(stateDir, initial string) (*workspaceStore, error) {
 		s.roots = append(s.roots, file.Roots...)
 		if file.Active != "" {
 			s.active = file.Active
+		}
+		if file.Hidden != nil {
+			s.hidden = file.Hidden
 		}
 	}
 	seen := map[string]bool{}
@@ -64,7 +70,7 @@ func newWorkspaceStore(stateDir, initial string) (*workspaceStore, error) {
 }
 
 func (s *workspaceStore) saveLocked() error {
-	data, err := json.MarshalIndent(workspaceFile{Roots: s.roots, Active: s.active}, "", "  ")
+	data, err := json.MarshalIndent(workspaceFile{Roots: s.roots, Active: s.active, Hidden: s.hidden}, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -111,6 +117,45 @@ func (s *workspaceStore) add(root string) error {
 	return s.saveLocked()
 }
 
+func (s *workspaceStore) hiddenFor(root string) []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.hidden[root]...)
+}
+
+func (s *workspaceStore) hide(root, repo string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	root, err := filepath.Abs(root)
+	if err != nil {
+		return err
+	}
+	for _, h := range s.hidden[root] {
+		if h == repo {
+			return nil
+		}
+	}
+	s.hidden[root] = append(s.hidden[root], repo)
+	return s.saveLocked()
+}
+
+func (s *workspaceStore) show(root, repo string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	root, err := filepath.Abs(root)
+	if err != nil {
+		return err
+	}
+	out := s.hidden[root][:0]
+	for _, h := range s.hidden[root] {
+		if h != repo {
+			out = append(out, h)
+		}
+	}
+	s.hidden[root] = out
+	return s.saveLocked()
+}
+
 func (s *workspaceStore) activate(root string) error {
 	abs, err := filepath.Abs(root)
 	if err != nil {
@@ -127,24 +172,48 @@ func (s *workspaceStore) activate(root string) error {
 	return errors.New("工作区不存在，请先添加")
 }
 
+func (s *workspaceStore) visible(root string, repos []Repo) []Repo {
+	hidden := map[string]bool{}
+	for _, h := range s.hiddenFor(root) {
+		hidden[filepath.Clean(h)] = true
+	}
+	out := make([]Repo, 0, len(repos))
+	for _, repo := range repos {
+		if hidden[filepath.Clean(repo.Rel)] || hidden[repo.ID] {
+			continue
+		}
+		out = append(out, repo)
+	}
+	return out
+}
+
 // Workspaces lists every known workspace and the active one.
 func (a *App) Workspaces(ctx context.Context) WorkspacesResponse {
 	roots, active := a.workspaces.list()
-	root, repos := a.snapshot()
-	res := WorkspacesResponse{Active: active, Workspaces: make([]WorkspaceSummary, 0, len(roots))}
-	activeRepos := 0
+	root, all := a.snapshotAll()
+	visible := a.workspaces.visible(root, all)
+	res := WorkspacesResponse{Active: active, Workspaces: make([]WorkspaceSummary, 0, len(roots)), Repos: []WorkspaceRepo{}}
 	if active == root {
-		activeRepos = len(repos)
+		hidden := map[string]bool{}
+		for _, h := range a.workspaces.hiddenFor(root) {
+			hidden[filepath.Clean(h)] = true
+		}
+		for _, repo := range all {
+			res.Repos = append(res.Repos, WorkspaceRepo{
+				ID: repo.ID, Name: repo.Name, Rel: repo.Rel,
+				Hidden: hidden[filepath.Clean(repo.Rel)] || hidden[repo.ID],
+			})
+		}
 	}
-	for _, root := range roots {
-		count := 0
-		if root == active {
-			count = activeRepos
-		} else if repos, err := Discover(root); err == nil {
-			count = len(repos)
+	for _, item := range roots {
+		count, hiddenCount := 0, len(a.workspaces.hiddenFor(item))
+		if item == active {
+			count = len(visible)
+		} else if repos, err := Discover(item); err == nil {
+			count = len(a.workspaces.visible(item, repos))
 		}
 		res.Workspaces = append(res.Workspaces, WorkspaceSummary{
-			Root: root, Name: filepath.Base(root), Repos: count, Active: root == active,
+			Root: item, Name: filepath.Base(item), Repos: count, Hidden: hiddenCount, Active: item == active,
 		})
 	}
 	return res
@@ -153,7 +222,8 @@ func (a *App) Workspaces(ctx context.Context) WorkspacesResponse {
 func (a *App) setActiveWorkspace(root string, repos []Repo) {
 	a.mu.Lock()
 	a.Root = root
-	a.repos = repos
+	a.allRepos = repos
+	a.repos = a.workspaces.visible(root, repos)
 	a.mu.Unlock()
 	a.hub.notify()
 }
@@ -219,5 +289,37 @@ func (a *App) SelectWorkspace(ctx context.Context, raw string) (WorkspacesRespon
 		return WorkspacesResponse{}, err
 	}
 	a.setActiveWorkspace(abs, repos)
+	return a.Workspaces(ctx), nil
+}
+
+// SetRepoHidden hides or restores a repository in the active workspace.
+func (a *App) SetRepoHidden(ctx context.Context, id string, hidden bool) (WorkspacesResponse, error) {
+	root, all := a.snapshotAll()
+	var target *Repo
+	for i := range all {
+		if all[i].ID == id || all[i].Rel == id {
+			target = &all[i]
+			break
+		}
+	}
+	if target == nil {
+		return WorkspacesResponse{}, errors.New("仓库不存在")
+	}
+	if target.Rel == "." {
+		return WorkspacesResponse{}, errors.New("工作区根仓库不能隐藏")
+	}
+	var err error
+	if hidden {
+		err = a.workspaces.hide(root, target.Rel)
+	} else {
+		err = a.workspaces.show(root, target.Rel)
+	}
+	if err != nil {
+		return WorkspacesResponse{}, err
+	}
+	a.mu.Lock()
+	a.repos = a.workspaces.visible(root, all)
+	a.mu.Unlock()
+	a.hub.notify()
 	return a.Workspaces(ctx), nil
 }

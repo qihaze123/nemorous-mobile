@@ -57,3 +57,55 @@ func TestWorkspaceAddSelectAndPersist(t *testing.T) {
 		t.Fatalf("created workspace missing: %v", err)
 	}
 }
+
+func TestWorkspaceHiddenReposPersist(t *testing.T) {
+	ctx := context.Background()
+	state := t.TempDir()
+	root := t.TempDir()
+	newRepo(t, root, "repo-a", false)
+	newRepo(t, root, "repo-b", false)
+	app, err := NewWithOptions(root, Options{StateDir: state, PairCode: "123456"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ws := app.Workspace(ctx)
+	if len(ws.Repos) != 2 {
+		t.Fatalf("visible repos = %d, want 2", len(ws.Repos))
+	}
+	var id string
+	for _, repo := range ws.Repos {
+		if repo.Name == "repo-a" {
+			id = repo.ID
+		}
+	}
+	res, err := app.SetRepoHidden(ctx, id, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(app.Workspace(ctx).Repos) != 1 {
+		t.Fatalf("visible after hide = %d, want 1", len(app.Workspace(ctx).Repos))
+	}
+	found := false
+	for _, repo := range res.Repos {
+		if repo.Name == "repo-a" && repo.Hidden {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("hidden repo missing from response: %+v", res.Repos)
+	}
+
+	app, err = NewWithOptions(root, Options{StateDir: state, PairCode: "123456"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(app.Workspace(ctx).Repos) != 1 {
+		t.Fatalf("hidden state not restored")
+	}
+	if _, err := app.SetRepoHidden(ctx, id, false); err != nil {
+		t.Fatal(err)
+	}
+	if len(app.Workspace(ctx).Repos) != 2 {
+		t.Fatalf("show did not restore repo")
+	}
+}

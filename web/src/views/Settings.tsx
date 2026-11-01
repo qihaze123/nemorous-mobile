@@ -107,6 +107,18 @@ export function SettingsScreen({ ws }: { ws: Workspace }) {
     }
   }
 
+  const toggleRepo = async (repo: string, hidden: boolean) => {
+    if (busy) return
+    setBusy(`repo:${repo}`)
+    try {
+      await post('/api/workspaces/visibility', { repo, hidden })
+      location.reload()
+    } catch (err) {
+      notify(err instanceof Error ? err.message : '更新可见性失败', 'error')
+      setBusy('')
+    }
+  }
+
   const switchWorkspace = async (path: string) => {
     if (busy) return
     setBusy(`workspace:${path}`)
@@ -191,7 +203,9 @@ export function SettingsScreen({ ws }: { ws: Workspace }) {
               </span>
               <code className="workspace-path">{item.root}</code>
             </span>
-            <span className="workspace-count">{item.repos} 仓库</span>
+            <span className="workspace-count">
+              {item.repos} 仓库{item.hidden ? ` · ${item.hidden} 隐藏` : ''}
+            </span>
             <Icon name={item.active ? 'check' : busy === `workspace:${item.root}` ? 'refresh' : 'chevron'} size={15} />
           </button>
         ))}
@@ -233,6 +247,29 @@ export function SettingsScreen({ ws }: { ws: Workspace }) {
         </label>
         <p className="hint">添加后，本机所有已配对设备都能访问该目录下的 Git 仓库。空工作区需要先在电脑端放入或克隆仓库。</p>
       </Sheet>
+
+      <SectionTitle>仓库可见性</SectionTitle>
+      <div className="panel">
+        <p className="hint">隐藏只影响手机视图，不会删除仓库、改动或文件。工作区根仓库不能隐藏。</p>
+        {workspaces?.repos.map((repo) => (
+          <div className={`workspace-repo-row ${repo.hidden ? 'hidden' : ''}`} key={repo.id}>
+            <span className="workspace-repo-main">
+              <span className="workspace-repo-name">{repo.name}</span>
+              <code className="workspace-path">{repo.rel}</code>
+            </span>
+            {repo.hidden ? <span className="workspace-repo-state">已隐藏</span> : null}
+            <button
+              className="mini-btn"
+              disabled={!!busy || repo.rel === '.'}
+              onClick={() => void toggleRepo(repo.id, !repo.hidden)}
+              title={repo.rel === '.' ? '工作区根仓库不能隐藏' : repo.hidden ? '恢复显示' : '从手机视图隐藏'}
+            >
+              {busy === `repo:${repo.id}` ? '…' : repo.hidden ? '显示' : '隐藏'}
+            </button>
+          </div>
+        ))}
+        {workspaces?.repos.length === 0 ? <p className="hint">当前工作区没有仓库。</p> : null}
+      </div>
 
       <SectionTitle>安装到手机</SectionTitle>
       <div className="panel">
