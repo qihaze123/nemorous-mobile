@@ -4083,3 +4083,23 @@ h1 {
   color: var(--muted);
   font-size: 10.5px;
 }
+
+.change-section-head .section-action {
+  margin-left: auto;
+  padding: 4px 9px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+  font-size: 10.5px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.change-section-head .section-action:active {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.change-section-head .section-action:disabled {
+  opacity: 0.5;
+}

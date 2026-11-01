@@ -166,8 +166,12 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
     ]
   }, [ws])
 
-  const allFiles = useMemo(() => sections.flatMap((section) => section.files), [sections])
-  const totalFiles = allFiles.length
+  // A file can appear in both sections when it is partially staged and then
+  // modified again; the workspace summary counts distinct repo/path entries.
+  const totalFiles = useMemo(
+    () => new Set(sections.flatMap((section) => section.repos.flatMap(({ repo, files }) => files.map((file) => fileKey(repo.id, file.path))))).size,
+    [sections],
+  )
   const totalConflicts = ws.repos.reduce((n, r) => n + r.conflictCount, 0)
 
   const keys = useMemo(() => {
@@ -274,6 +278,39 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
     return count === files.length ? 'all' : 'some'
   }
 
+  const selectedInSection = (section: Section) =>
+    section.repos.flatMap(({ repo, files }) =>
+      files.filter((file) => selected.has(fileKey(repo.id, file.path))).map((file) => ({ repo, file })),
+    )
+
+  const applySectionSelection = async (section: Section) => {
+    const picked = selectedInSection(section)
+    if (picked.length === 0 || busy) return
+    setBusy(true)
+    try {
+      const byRepo = new Map<string, string[]>()
+      for (const { repo, file } of picked) {
+        const paths = byRepo.get(repo.id) ?? []
+        paths.push(file.path)
+        byRepo.set(repo.id, paths)
+      }
+      await Promise.all([...byRepo].map(([repoId, paths]) =>
+        post(`/api/repos/${repoId}/${section.key === 'staged' ? 'unstage' : 'stage'}`, { paths }),
+      ))
+      setSelected((prev) => {
+        const next = new Set(prev)
+        for (const { repo, file } of picked) next.delete(fileKey(repo.id, file.path))
+        return next
+      })
+      notify(section.key === 'staged' ? `已取消暂存 ${picked.length} 个文件` : `已暂存 ${picked.length} 个文件`, 'ok')
+      await refresh()
+    } catch (err) {
+      notify(err instanceof Error ? err.message : '操作失败', 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const submit = async () => {
     if (!message.trim() || groups.length === 0) return
     setBusy(true)
@@ -364,6 +401,15 @@ export function ChangesScreen({ ws, refresh }: { ws: Workspace; refresh: () => P
           <TriCheckbox state={sectionState} label={`选择全部${section.title}文件`} onToggle={toggleSection} />
           <span className={`section-name ${section.key === 'staged' ? 'staged' : ''}`}>{section.title}</span>
           <span className="section-count">{section.files.length}</span>
+          {selectedInSection(section).length > 0 ? (
+            <button
+              className="section-action"
+              disabled={busy}
+              onClick={() => void applySectionSelection(section)}
+            >
+              {busy ? '…' : section.key === 'staged' ? '取消暂存' : '暂存已选'}
+            </button>
+          ) : null}
         </div>
 
         {section.repos.map(({ repo, files }) => {
