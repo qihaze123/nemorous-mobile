@@ -4333,3 +4333,14 @@ h1 {
     left: calc(var(--sidebar-width, 264px) + max(8px, env(safe-area-inset-left)));
   }
 }
+
+/* In immersive mode the app owns pinch scaling for code/sidebar. */
+.screen.immersive .code-scroll,
+.screen.immersive .patch-viewport,
+.file-page.immersive .file-tree-sidebar {
+  touch-action: pan-x pan-y;
+}
+
+.diff-page.immersive .diff-sidebar {
+  touch-action: pan-x pan-y;
+}

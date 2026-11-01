@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } fr
 import hljs from 'highlight.js/lib/common'
 import type { FileContent, RepoFiles, SearchMatch, SearchResult, Workspace } from '../types'
 import { api } from '../api'
-import { back, go, replace, useDebounced, useImmersive, useSidebarWidth } from '../hooks'
+import { back, go, replace, useDebounced, useImmersive, usePinchZoom, useSidebarWidth } from '../hooks'
 import { Empty, Icon, ImmersiveDock, SectionTitle, SidebarResizer, Spinner, repoColor, useToast } from '../components'
 import { languageOf } from '../syntax'
 
@@ -512,6 +512,7 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
   const [fontPanelOpen, setFontPanelOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('nemorous.fileSidebar') !== 'closed')
   const [sidebarWidth, setSidebarWidth] = useSidebarWidth('nemorous.fileSidebarWidth')
+  const sidebarRef = useRef<HTMLElement>(null)
   const [fontSize, setFontSizeState] = useState(() => {
     const saved = Number(localStorage.getItem('nemorous.codeFontSize'))
     return saved >= 6 && saved <= 22 ? saved : 13
@@ -526,6 +527,9 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
     setFontSizeState(clamped)
     localStorage.setItem('nemorous.codeFontSize', String(clamped))
   }
+
+  usePinchZoom(scrollRef, () => fontSize, setFontSize, immersive)
+  usePinchZoom(sidebarRef, () => sidebarWidth, setSidebarWidth, immersive && sidebarOpen)
 
   useEffect(() => {
     setFile(null)
@@ -597,7 +601,7 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
 
   return (
     <div className={`file-page ${immersive ? 'immersive' : ''} ${sidebarOpen ? 'sidebar-open' : ''}`}>
-      <aside className={`file-tree-sidebar ${sidebarOpen ? 'open' : ''}`} style={{ width: sidebarWidth }}>
+      <aside ref={sidebarRef} className={`file-tree-sidebar ${sidebarOpen ? 'open' : ''}`} style={{ width: sidebarWidth }}>
         <FileTreePanel repoId={repoId} path={path} rev={rev} onOpen={openTreeFile} onClose={toggleSidebar} />
         <SidebarResizer width={sidebarWidth} onWidth={setSidebarWidth} />
       </aside>
