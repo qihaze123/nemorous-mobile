@@ -4265,3 +4265,14 @@ h1 {
 .file-tree .tree-row span {
   flex: 1;
 }
+
+.file-tree .tree-row {
+  min-height: 28px;
+  gap: 5px;
+  font-size: 12px;
+}
+
+.file-tree .tree-row svg {
+  width: 14px;
+  height: 14px;
+}

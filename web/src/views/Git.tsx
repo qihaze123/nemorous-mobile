@@ -3,7 +3,7 @@ import type { BranchList, BranchesResponse, Commit, CommitDetail, CommitFile, Wo
 import { api } from '../api'
 import { back, go, replace, useDebounced, useDiffFontSize, useImmersive, useSidebarWidth } from '../hooks'
 import { Empty, Icon, ImmersiveDiffBar, ImmersiveDock, MultiPatchView, PatchView, SectionTitle, Sheet, SidebarResizer, Spinner, ago, dayKey, repoColor, timeOf, useToast, type PatchViewHandle } from '../components'
-import { TreeLevel, buildTree } from './Code'
+import { TreeLevel, buildTree, collectDirPaths } from './Code'
 import { languageOf } from '../syntax'
 
 interface CommitFilters {
@@ -774,6 +774,8 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
   })
 
   const commitTree = useMemo(() => buildTree((detail?.files ?? []).map((file) => file.path)), [detail])
+  const allDirs = useMemo(() => collectDirPaths(commitTree), [commitTree])
+  const allOpen = allDirs.length > 0 && allDirs.every((dir) => treeExpanded.has(dir))
   useEffect(() => {
     if (!path) return
     setTreeExpanded((prev) => {
@@ -809,6 +811,14 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
         <div className="file-tree-body">
           <div className="file-tree-head">
             <span>提交文件</span>
+            <button
+              className="icon-btn"
+              onClick={() => setTreeExpanded(allOpen ? new Set() : new Set(allDirs))}
+              aria-label={allOpen ? '收起全部文件夹' : '展开全部文件夹'}
+              title={allOpen ? '收起全部文件夹' : '展开全部文件夹'}
+            >
+              <Icon name={allOpen ? 'up' : 'down'} size={15} />
+            </button>
             <button className="icon-btn" onClick={toggleSidebar} aria-label="收起目录">
               <Icon name="left" />
             </button>

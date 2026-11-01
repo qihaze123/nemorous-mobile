@@ -248,6 +248,19 @@ export function buildTree(paths: string[]): TreeNode[] {
   return root
 }
 
+export function collectDirPaths(nodes: TreeNode[]): string[] {
+  const out: string[] = []
+  const walk = (level: TreeNode[]) => {
+    for (const node of level) {
+      if (!node.dir) continue
+      out.push(node.path)
+      walk(node.children)
+    }
+  }
+  walk(nodes)
+  return out
+}
+
 export function TreeLevel({
   nodes,
   depth,
@@ -418,6 +431,8 @@ function FileTreePanel({
   }, [repoId, rev])
 
   const tree = useMemo(() => buildTree(files), [files])
+  const allDirs = useMemo(() => collectDirPaths(tree), [tree])
+  const allOpen = allDirs.length > 0 && allDirs.every((dir) => expanded.has(dir))
 
   useEffect(() => {
     if (!path) return
@@ -445,6 +460,14 @@ function FileTreePanel({
     <div className="file-tree-body">
       <div className="file-tree-head">
         <span>文件</span>
+        <button
+          className="icon-btn"
+          onClick={() => setExpanded(allOpen ? new Set() : new Set(allDirs))}
+          aria-label={allOpen ? '收起全部文件夹' : '展开全部文件夹'}
+          title={allOpen ? '收起全部文件夹' : '展开全部文件夹'}
+        >
+          <Icon name={allOpen ? 'up' : 'down'} size={15} />
+        </button>
         <button className="icon-btn" onClick={onClose} aria-label="收起目录">
           <Icon name="left" />
         </button>
