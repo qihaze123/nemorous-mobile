@@ -136,9 +136,11 @@ export function SectionTitle({ children, action }: { children: ReactNode; action
 export function ImmersiveDock({
   onExit,
   font,
+  exitLabel = '退出沉浸查看',
 }: {
   onExit: () => void
   font?: { size: number; min: number; max: number; onChange: (next: number) => void }
+  exitLabel?: string
 }) {
   const label = font ? (Number.isInteger(font.size) ? String(font.size) : font.size.toFixed(1)) : ''
   return (
@@ -151,7 +153,7 @@ export function ImmersiveDock({
           <span className="dock-sep" aria-hidden="true" />
         </>
       ) : null}
-      <button className="dock-btn exit" onClick={onExit} aria-label="退出沉浸查看" title="退出沉浸查看（Esc）">
+      <button className="dock-btn exit" onClick={onExit} aria-label={exitLabel} title={exitLabel}>
         <Icon name="close" size={16} />
       </button>
     </div>

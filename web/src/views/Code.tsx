@@ -411,6 +411,7 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
   const [file, setFile] = useState<FileContent | null>(null)
   const [error, setError] = useState('')
   const [immersive, setImmersive] = useImmersive()
+  const [fontPanelOpen, setFontPanelOpen] = useState(false)
   const [fontSize, setFontSizeState] = useState(() => {
     const saved = Number(localStorage.getItem('nemorous.codeFontSize'))
     return saved >= 10 && saved <= 22 ? saved : 13
@@ -506,6 +507,7 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
         <button className="icon-btn" onClick={() => setImmersive(true)} aria-label="沉浸查看" title="沉浸查看">
           <Icon name="expand" />
         </button>
+        <button className="icon-btn font-toggle" onClick={() => setFontPanelOpen((open) => !open)} aria-label="字号" aria-pressed={fontPanelOpen} title="字号">Aa</button>
         <button className="icon-btn" onClick={() => void copy()} aria-label="复制">
           <Icon name="copy" />
         </button>
@@ -542,9 +544,13 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
         </>
       ) : null}
       <div className="screen-bottom-space" />
-      {immersive && file && !file.binary ? (
+      {(immersive || fontPanelOpen) && file && !file.binary ? (
         <ImmersiveDock
-          onExit={() => setImmersive(false)}
+          onExit={() => {
+            if (immersive) setImmersive(false)
+            else setFontPanelOpen(false)
+          }}
+          exitLabel={immersive ? '退出沉浸查看' : '关闭字号调整'}
           font={{ size: fontSize, min: 10, max: 22, onChange: setFontSize }}
         />
       ) : null}
