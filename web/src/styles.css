@@ -4276,3 +4276,28 @@ h1 {
   width: 14px;
   height: 14px;
 }
+
+/* Diff/tree sidebars: preserve status colors and allow horizontal panning
+   instead of truncating long paths. */
+.file-tree {
+  overflow: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.file-tree::-webkit-scrollbar {
+  display: none;
+}
+
+.file-tree .tree-row {
+  width: max-content;
+  min-width: 100%;
+}
+
+.file-tree .tree-row span {
+  flex: none;
+}
+
+.file-tree .tree-row .tree-name {
+  white-space: nowrap;
+}

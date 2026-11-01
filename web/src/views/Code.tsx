@@ -261,6 +261,12 @@ export function collectDirPaths(nodes: TreeNode[]): string[] {
   return out
 }
 
+export interface TreeFileMeta {
+  status?: string
+  added?: number
+  deleted?: number
+}
+
 export function TreeLevel({
   nodes,
   depth,
@@ -268,6 +274,7 @@ export function TreeLevel({
   onToggle,
   onOpen,
   activePath,
+  fileMeta,
 }: {
   nodes: TreeNode[]
   depth: number
@@ -275,6 +282,7 @@ export function TreeLevel({
   onToggle: (path: string) => void
   onOpen: (path: string) => void
   activePath?: string
+  fileMeta?: Map<string, TreeFileMeta>
 }) {
   return (
     <>
@@ -297,7 +305,7 @@ export function TreeLevel({
                 <span>{node.name}</span>
               </div>
               {expanded.has(node.path) ? (
-                <TreeLevel nodes={node.children} depth={depth + 1} expanded={expanded} onToggle={onToggle} onOpen={onOpen} activePath={activePath} />
+                <TreeLevel nodes={node.children} depth={depth + 1} expanded={expanded} onToggle={onToggle} onOpen={onOpen} activePath={activePath} fileMeta={fileMeta} />
               ) : null}
             </>
           ) : (
@@ -311,8 +319,19 @@ export function TreeLevel({
                 if (e.key === 'Enter') onOpen(node.path)
               }}
             >
-              <Icon name="file" size={15} />
-              <span>{node.name}</span>
+              {(() => {
+                const meta = fileMeta?.get(node.path)
+                if (!meta?.status) return <Icon name="file" size={15} />
+                const status = meta.status.slice(0, 1)
+                return <span className={`status-letter s-${status === '?' ? 'untracked' : status}`}>{status}</span>
+              })()}
+              <span className="tree-name">{node.name}</span>
+              {fileMeta?.get(node.path)?.added || fileMeta?.get(node.path)?.deleted ? (
+                <span className="file-stats">
+                  {(fileMeta.get(node.path)?.added ?? 0) > 0 ? <em className="plus">+{fileMeta.get(node.path)?.added}</em> : null}
+                  {(fileMeta.get(node.path)?.deleted ?? 0) > 0 ? <em className="minus">−{fileMeta.get(node.path)?.deleted}</em> : null}
+                </span>
+              ) : null}
             </div>
           )}
         </Fragment>

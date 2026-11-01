@@ -3,7 +3,7 @@ import type { BranchList, BranchesResponse, Commit, CommitDetail, CommitFile, Wo
 import { api } from '../api'
 import { back, go, replace, useDebounced, useDiffFontSize, useImmersive, useSidebarWidth } from '../hooks'
 import { Empty, Icon, ImmersiveDiffBar, ImmersiveDock, MultiPatchView, PatchView, SectionTitle, Sheet, SidebarResizer, Spinner, ago, dayKey, repoColor, timeOf, useToast, type PatchViewHandle } from '../components'
-import { TreeLevel, buildTree, collectDirPaths } from './Code'
+import { TreeLevel, buildTree, collectDirPaths, type TreeFileMeta } from './Code'
 import { languageOf } from '../syntax'
 
 interface CommitFilters {
@@ -774,6 +774,13 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
   })
 
   const commitTree = useMemo(() => buildTree((detail?.files ?? []).map((file) => file.path)), [detail])
+  const commitFileMeta = useMemo(() => {
+    const meta = new Map<string, TreeFileMeta>()
+    for (const file of detail?.files ?? []) {
+      meta.set(file.path, { status: file.status, added: file.added, deleted: file.deleted })
+    }
+    return meta
+  }, [detail])
   const allDirs = useMemo(() => collectDirPaths(commitTree), [commitTree])
   const allOpen = allDirs.length > 0 && allDirs.every((dir) => treeExpanded.has(dir))
   useEffect(() => {
@@ -832,6 +839,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
                 onToggle={toggleTree}
                 onOpen={(next) => replace(`#/commit-file?repo=${encodeURIComponent(repoId)}&hash=${encodeURIComponent(hash)}&path=${encodeURIComponent(next)}`)}
                 activePath={path}
+                fileMeta={commitFileMeta}
               />
             ) : (
               <Spinner label="读取提交文件…" />
