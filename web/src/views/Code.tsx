@@ -665,6 +665,11 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
         </>
       ) : null}
       <div className="screen-bottom-space" />
+      {immersive && !sidebarOpen ? (
+        <button className="immersive-sidebar-toggle" onClick={toggleSidebar} aria-label="展开文件栏" title="展开文件栏">
+          <Icon name="panel" size={17} />
+        </button>
+      ) : null}
       {(immersive || fontPanelOpen) && file && !file.binary ? (
         <ImmersiveDock
           onExit={() => {

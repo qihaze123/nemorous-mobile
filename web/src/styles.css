@@ -3737,8 +3737,8 @@ h1 {
   max-height: none;
 }
 
-.diff-page.immersive .diff-sidebar {
-  display: none !important;
+.diff-page.immersive .diff-sidebar:not(.open) {
+  display: none;
 }
 
 .diff-page.immersive .diff-main > .screen {
@@ -4170,8 +4170,8 @@ h1 {
   }
 }
 
-.file-page.immersive .file-tree-sidebar {
-  display: none !important;
+.file-page.immersive .file-tree-sidebar:not(.open) {
+  display: none;
 }
 
 /* Resizable landscape sidebars */
@@ -4300,4 +4300,36 @@ h1 {
 
 .file-tree .tree-row .tree-name {
   white-space: nowrap;
+}
+
+
+.immersive-sidebar-toggle {
+  display: none;
+  position: fixed;
+  left: max(8px, env(safe-area-inset-left));
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 72;
+  width: 34px;
+  height: 38px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg-elev) 82%, transparent);
+  color: var(--muted);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 20%);
+  backdrop-filter: blur(16px);
+  opacity: 0.8;
+}
+
+@media (orientation: landscape) {
+  .immersive-sidebar-toggle {
+    display: grid;
+  }
+
+  .diff-page.immersive.sidebar-open .immersive-nav-layer,
+  .file-page.immersive.sidebar-open .immersive-nav-layer {
+    left: calc(var(--sidebar-width, 264px) + max(8px, env(safe-area-inset-left)));
+  }
 }

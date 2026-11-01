@@ -276,7 +276,7 @@ export function DiffScreen({
   }
 
   return (
-    <div className={`diff-page ${immersive ? 'immersive' : ''} ${sidebarOpen ? 'sidebar-open' : ''}`}>
+    <div className={`diff-page ${immersive ? 'immersive' : ''} ${sidebarOpen ? 'sidebar-open' : ''}`} style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}>
       <DiffSidebar ws={ws} repoId={repoId} path={path} staged={staged} open={sidebarOpen} width={sidebarWidth} onWidth={setSidebarWidth} onClose={toggleSidebar} />
       <div className="diff-main">
         <div className={`screen diff-screen fill-screen ${immersive ? 'immersive' : ''}`}>
@@ -402,6 +402,11 @@ export function DiffScreen({
               onFontSize={setDiffFontSize}
               onExit={() => setImmersive(false)}
             />
+          ) : null}
+          {immersive && !sidebarOpen ? (
+            <button className="immersive-sidebar-toggle" onClick={toggleSidebar} aria-label="展开文件栏" title="展开文件栏">
+              <Icon name="panel" size={17} />
+            </button>
           ) : null}
           {!immersive && fontPanelOpen ? (
             <ImmersiveDock

@@ -813,7 +813,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
   }
 
   return (
-    <div className={`file-page ${immersive ? 'immersive' : ''} ${sidebarOpen ? 'sidebar-open' : ''}`}>
+    <div className={`file-page ${immersive ? 'immersive' : ''} ${sidebarOpen ? 'sidebar-open' : ''}`} style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}>
       <aside className={`file-tree-sidebar ${sidebarOpen ? 'open' : ''}`} style={{ width: sidebarWidth }}>
         <div className="file-tree-body">
           <div className="file-tree-head">
@@ -971,6 +971,11 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
           onFontSize={setDiffFontSize}
           onExit={() => setImmersive(false)}
         />
+      ) : null}
+      {immersive && !sidebarOpen ? (
+        <button className="immersive-sidebar-toggle" onClick={toggleSidebar} aria-label="展开文件栏" title="展开文件栏">
+          <Icon name="panel" size={17} />
+        </button>
       ) : null}
       {!immersive && fontPanelOpen ? (
         <ImmersiveDock
