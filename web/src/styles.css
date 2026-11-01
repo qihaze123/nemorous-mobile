@@ -4388,3 +4388,10 @@ h1 {
     padding-left: 0;
   }
 }
+
+.file-tree-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}

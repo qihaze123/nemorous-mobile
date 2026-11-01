@@ -825,17 +825,19 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
         <div className="file-tree-body">
           <div className="file-tree-head">
             <span>提交文件</span>
-            <button
-              className="icon-btn"
-              onClick={() => setTreeExpanded(allOpen ? new Set() : new Set(allDirs))}
-              aria-label={allOpen ? '收起全部文件夹' : '展开全部文件夹'}
-              title={allOpen ? '收起全部文件夹' : '展开全部文件夹'}
-            >
-              <Icon name={allOpen ? 'up' : 'down'} size={15} />
-            </button>
-            <button className="icon-btn" onClick={toggleSidebar} aria-label="收起目录">
-              <Icon name="left" />
-            </button>
+            <div className="file-tree-actions">
+              <button
+                className="icon-btn"
+                onClick={() => setTreeExpanded(allOpen ? new Set() : new Set(allDirs))}
+                aria-label={allOpen ? '收起全部文件夹' : '展开全部文件夹'}
+                title={allOpen ? '收起全部文件夹' : '展开全部文件夹'}
+              >
+                <Icon name={allOpen ? 'up' : 'down'} size={15} />
+              </button>
+              <button className="icon-btn" onClick={toggleSidebar} aria-label="收起目录">
+                <Icon name="left" />
+              </button>
+            </div>
           </div>
           <div className="tree file-tree">
             {detail ? (
