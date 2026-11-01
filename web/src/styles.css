@@ -4344,3 +4344,36 @@ h1 {
 .diff-page.immersive .diff-sidebar {
   touch-action: pan-x pan-y;
 }
+
+/* Sidebar text zoom (independent from sidebar width). */
+.file-tree .tree-row {
+  font-size: var(--tree-font-size, 12px);
+}
+
+.file-tree .tree-row .status-letter {
+  font-size: max(7px, calc(var(--tree-font-size, 12px) - 1px));
+}
+
+.file-tree .tree-row .file-stats {
+  font-size: max(7px, calc(var(--tree-font-size, 12px) - 2px));
+}
+
+.file-tree .tree-row .tree-name {
+  line-height: 1.35;
+}
+
+.diff-sidebar-title {
+  font-size: var(--tree-font-size, 11.5px);
+}
+
+.diff-sidebar-repo-name {
+  font-size: calc(var(--tree-font-size, 12px) - 1px);
+}
+
+.diff-sidebar-file {
+  font-size: var(--tree-font-size, 12px);
+}
+
+.diff-sidebar-path {
+  font-size: calc(var(--tree-font-size, 12px) - 1.5px);
+}

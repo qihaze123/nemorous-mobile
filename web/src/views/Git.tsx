@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { BranchList, BranchesResponse, Commit, CommitDetail, CommitFile, Workspace } from '../types'
 import { api } from '../api'
-import { back, go, replace, useDebounced, useDiffFontSize, useImmersive, usePinchZoom, useSidebarWidth } from '../hooks'
+import { back, go, replace, useDebounced, useDiffFontSize, useImmersive, usePinchZoom, useSidebarWidth, useTreeFontSize } from '../hooks'
 import { Empty, Icon, ImmersiveDiffBar, ImmersiveDock, MultiPatchView, PatchView, SectionTitle, Sheet, SidebarResizer, Spinner, ago, dayKey, repoColor, timeOf, useToast, type PatchViewHandle } from '../components'
 import { TreeLevel, buildTree, collectDirPaths, type TreeFileMeta } from './Code'
 import { languageOf } from '../syntax'
@@ -635,12 +635,13 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
   const [fontPanelOpen, setFontPanelOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('nemorous.commitFileSidebar') !== 'closed')
   const [sidebarWidth, setSidebarWidth] = useSidebarWidth('nemorous.commitFileSidebarWidth')
+  const [treeFontSize, setTreeFontSize] = useTreeFontSize()
   const sidebarRef = useRef<HTMLElement>(null)
   const [treeExpanded, setTreeExpanded] = useState<Set<string>>(new Set())
   const diffRoot = useRef<HTMLDivElement>(null)
   const patchRef = useRef<PatchViewHandle>(null)
   usePinchZoom(diffRoot, () => diffFontSize, setDiffFontSize, immersive)
-  usePinchZoom(sidebarRef, () => sidebarWidth, setSidebarWidth, immersive && sidebarOpen)
+  usePinchZoom(sidebarRef, () => treeFontSize, setTreeFontSize, immersive && sidebarOpen)
 
   useEffect(() => {
     setDiffStyle('unified')
@@ -817,7 +818,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
 
   return (
     <div className={`file-page ${immersive ? 'immersive' : ''} ${sidebarOpen ? 'sidebar-open' : ''}`} style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}>
-      <aside ref={sidebarRef} className={`file-tree-sidebar ${sidebarOpen ? 'open' : ''}`} style={{ width: sidebarWidth }}>
+      <aside ref={sidebarRef} className={`file-tree-sidebar ${sidebarOpen ? 'open' : ''}`} style={{ width: sidebarWidth, '--tree-font-size': `${treeFontSize}px` } as React.CSSProperties}>
         <div className="file-tree-body">
           <div className="file-tree-head">
             <span>提交文件</span>

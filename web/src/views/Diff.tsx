@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type Ref } from 'react'
 import type { DiffResult, Workspace } from '../types'
 import { api } from '../api'
-import { back, go, replace, useDiffFontSize, useImmersive, usePinchZoom, useSidebarWidth } from '../hooks'
+import { back, go, replace, useDiffFontSize, useImmersive, usePinchZoom, useSidebarWidth, useTreeFontSize } from '../hooks'
 import { Icon, ImmersiveDiffBar, ImmersiveDock, PatchView, SidebarResizer, Spinner, StatusLetter, repoColor, type PatchViewHandle } from '../components'
 import { languageOf } from '../syntax'
 
@@ -15,6 +15,7 @@ function DiffSidebar({
   onWidth,
   onClose,
   asideRef,
+  treeFontSize,
 }: {
   ws: Workspace
   repoId: string
@@ -25,6 +26,7 @@ function DiffSidebar({
   onWidth: (next: number) => void
   onClose: () => void
   asideRef?: Ref<HTMLElement>
+  treeFontSize: number
 }) {
   const groups = [
     {
@@ -43,7 +45,7 @@ function DiffSidebar({
     },
   ]
   return (
-    <aside ref={asideRef} className={`diff-sidebar ${open ? 'open' : ''}`} style={{ width }}>
+    <aside ref={asideRef} className={`diff-sidebar ${open ? 'open' : ''}`} style={{ width, '--tree-font-size': `${treeFontSize}px` } as React.CSSProperties}>
       <div className="diff-sidebar-head">
         <span>文件</span>
         <button className="icon-btn" onClick={onClose} aria-label="收起文件栏">
@@ -123,9 +125,10 @@ export function DiffScreen({
   const patchRef = useRef<PatchViewHandle>(null)
   const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('nemorous.sidebar') !== 'closed')
   const [sidebarWidth, setSidebarWidth] = useSidebarWidth('nemorous.diffSidebarWidth')
+  const [treeFontSize, setTreeFontSize] = useTreeFontSize()
   const sidebarRef = useRef<HTMLElement>(null)
   usePinchZoom(diffRoot, () => diffFontSize, setDiffFontSize, immersive)
-  usePinchZoom(sidebarRef, () => sidebarWidth, setSidebarWidth, immersive && sidebarOpen)
+  usePinchZoom(sidebarRef, () => treeFontSize, setTreeFontSize, immersive && sidebarOpen)
 
   const navFiles = useMemo(() => {
     const out: { repoId: string; path: string; staged: boolean }[] = []
@@ -282,7 +285,7 @@ export function DiffScreen({
 
   return (
     <div className={`diff-page ${immersive ? 'immersive' : ''} ${sidebarOpen ? 'sidebar-open' : ''}`} style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}>
-      <DiffSidebar ws={ws} repoId={repoId} path={path} staged={staged} open={sidebarOpen} width={sidebarWidth} onWidth={setSidebarWidth} onClose={toggleSidebar} asideRef={sidebarRef} />
+      <DiffSidebar ws={ws} repoId={repoId} path={path} staged={staged} open={sidebarOpen} width={sidebarWidth} onWidth={setSidebarWidth} onClose={toggleSidebar} asideRef={sidebarRef} treeFontSize={treeFontSize} />
       <div className="diff-main">
         <div className={`screen diff-screen fill-screen ${immersive ? 'immersive' : ''}`}>
           <header className="topbar commit-diff-header">
