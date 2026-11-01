@@ -4430,3 +4430,23 @@ h1 {
 .ft-make { color: #6e7681; }
 .ft-config { color: #8b98a9; }
 .ft-file { color: var(--muted); }
+
+.commit-file-tools .inline-tools {
+  flex: 1 1 0;
+  width: 0;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.commit-file-tools {
+  flex: 1 1 0;
+}
+
+.commit-file-tools {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.commit-file-tools .inline-tools {
+  justify-content: flex-end;
+}

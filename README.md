@@ -148,7 +148,7 @@ go build -o nemorous-mobile .
 终端会打印：
 
 ```text
-Nemorous Mobile 0.3.23
+Nemorous Mobile 0.3.24
 工作区: /Users/you/code（6 个仓库）
 配对码: 123456（19:42 前有效）
 手机打开: http://192.168.1.5:8787/?pair=123456

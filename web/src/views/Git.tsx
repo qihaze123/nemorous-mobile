@@ -826,9 +826,6 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
           <div className="file-tree-head">
             <span>提交文件</span>
             <div className="file-tree-actions">
-              <button className="icon-btn" onClick={toggleSidebar} aria-label="收起目录">
-                <Icon name="left" />
-              </button>
               <button
                 className="icon-btn"
                 onClick={() => setTreeExpanded(allOpen ? new Set() : new Set(allDirs))}
@@ -836,6 +833,9 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
                 title={allOpen ? '收起全部文件夹' : '展开全部文件夹'}
               >
                 <Icon name={allOpen ? 'up' : 'down'} size={15} />
+              </button>
+              <button className="icon-btn" onClick={toggleSidebar} aria-label="收起目录">
+                <Icon name="left" />
               </button>
             </div>
           </div>
@@ -901,6 +901,9 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
             <span className="diff-position">{index >= 0 ? `${index + 1}/${detail.files.length}` : ''}</span>
             <div className="commit-file-tools">
               <button className="nav-icon nav-tool font-tool" onClick={() => setFontPanelOpen((open) => !open)} aria-label="字号" aria-pressed={fontPanelOpen} title="字号">Aa</button>
+              <button className="nav-icon tools-toggle" onClick={toggleTools} aria-label={toolsOpen ? '收起附加操作' : '展开附加操作'} aria-expanded={toolsOpen}>
+                <Icon name={toolsOpen ? 'left' : 'right'} size={15} />
+              </button>
               {toolsOpen ? (
                 <div className="inline-tools">
                   <div className="segmented diff-style nav-style">
@@ -933,9 +936,6 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
                   </button>
                 </div>
               ) : null}
-              <button className="nav-icon tools-toggle" onClick={toggleTools} aria-label={toolsOpen ? '收起附加操作' : '展开附加操作'} aria-expanded={toolsOpen}>
-                <Icon name={toolsOpen ? 'right' : 'left'} size={15} />
-              </button>
             </div>
           </div>
           {findOpen ? (
