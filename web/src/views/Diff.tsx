@@ -45,14 +45,14 @@ function DiffSidebar({
     },
   ]
   return (
-    <aside ref={asideRef} className={`diff-sidebar ${open ? 'open' : ''}`} style={{ width }}>
+    <aside ref={asideRef} className={`diff-sidebar ${open ? 'open' : ''}`} style={{ width: width / zoom, zoom } as React.CSSProperties}>
+      <div className="diff-sidebar-zoom">
       <div className="diff-sidebar-head">
         <span>文件</span>
         <button className="icon-btn" onClick={onClose} aria-label="收起文件栏">
           <Icon name="left" size={15} />
         </button>
       </div>
-      <div className="diff-sidebar-zoom" style={{ zoom, width: `${100 / zoom}%` } as React.CSSProperties}>
       {groups.map((group) => {
         const count = group.repos.reduce((n, g) => n + g.files.length, 0)
         return (

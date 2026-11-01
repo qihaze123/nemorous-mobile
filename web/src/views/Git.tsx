@@ -818,7 +818,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
 
   return (
     <div className={`file-page ${immersive ? 'immersive' : ''} ${sidebarOpen ? 'sidebar-open' : ''}`} style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}>
-      <aside ref={sidebarRef} className={`file-tree-sidebar ${sidebarOpen ? 'open' : ''}`} style={{ width: sidebarWidth }}>
+      <aside ref={sidebarRef} className={`file-tree-sidebar ${sidebarOpen ? 'open' : ''}`} style={{ width: sidebarWidth / sidebarZoom, zoom: sidebarZoom } as React.CSSProperties}>
         <div className="file-tree-body">
           <div className="file-tree-head">
             <span>提交文件</span>
@@ -834,7 +834,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
               <Icon name="left" />
             </button>
           </div>
-          <div className="tree file-tree" style={{ zoom: sidebarZoom, width: `${100 / sidebarZoom}%` } as React.CSSProperties}>
+          <div className="tree file-tree">
             {detail ? (
               <TreeLevel
                 nodes={commitTree}
