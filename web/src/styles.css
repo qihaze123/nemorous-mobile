@@ -4664,3 +4664,17 @@ h1 {
 .code-meta .meta-actions .font-toggle {
   font-size: 9.5px;
 }
+
+/* Diff content fills the remaining screen instead of stopping at 70vh. */
+.fill-screen > .commit-file-diff-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.fill-screen > .commit-file-diff-page > .patch-viewport {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
