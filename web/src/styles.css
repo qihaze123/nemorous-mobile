@@ -4641,3 +4641,26 @@ h1 {
 .code-meta > .md-toggle + .file-actions {
   margin-left: 4px;
 }
+
+.code-meta {
+  align-items: center;
+}
+
+.code-meta .meta-actions {
+  gap: 2px;
+}
+
+.code-meta .meta-actions .icon-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+}
+
+.code-meta .meta-actions .icon-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+.code-meta .meta-actions .font-toggle {
+  font-size: 9.5px;
+}
