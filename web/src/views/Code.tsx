@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } fr
 import hljs from 'highlight.js/lib/common'
 import type { FileContent, RepoFiles, SearchMatch, SearchResult, Workspace } from '../types'
 import { api } from '../api'
-import { back, go, replace, useDebounced, useImmersive, usePinchZoom, useSidebarWidth, useTreeFontSize } from '../hooks'
+import { back, go, replace, useDebounced, useImmersive, usePinchZoom, useSidebarWidth, useSidebarZoom } from '../hooks'
 import { Empty, Icon, ImmersiveDock, SectionTitle, SidebarResizer, Spinner, repoColor, useToast } from '../components'
 import { languageOf } from '../syntax'
 
@@ -424,12 +424,14 @@ function FileTreePanel({
   rev,
   onOpen,
   onClose,
+  zoom,
 }: {
   repoId: string
   path: string
   rev?: string
   onOpen: (path: string) => void
   onClose: () => void
+  zoom: number
 }) {
   const [files, setFiles] = useState<string[]>([])
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -493,7 +495,7 @@ function FileTreePanel({
       </div>
       {error ? <p className="hint danger-text">{error}</p> : null}
       {files.length === 0 && !error ? <Spinner label="读取文件索引…" /> : null}
-      <div className="tree file-tree">
+      <div className="tree file-tree" style={{ zoom, width: `${100 / zoom}%` } as CSSProperties}>
         <TreeLevel nodes={tree} depth={0} expanded={expanded} onToggle={toggle} onOpen={onOpen} activePath={path} />
       </div>
     </div>
@@ -512,7 +514,7 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
   const [fontPanelOpen, setFontPanelOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('nemorous.fileSidebar') !== 'closed')
   const [sidebarWidth, setSidebarWidth] = useSidebarWidth('nemorous.fileSidebarWidth')
-  const [treeFontSize, setTreeFontSize] = useTreeFontSize()
+  const [sidebarZoom, setSidebarZoom] = useSidebarZoom()
   const sidebarRef = useRef<HTMLElement>(null)
   const [fontSize, setFontSizeState] = useState(() => {
     const saved = Number(localStorage.getItem('nemorous.codeFontSize'))
@@ -530,7 +532,7 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
   }
 
   usePinchZoom(scrollRef, () => fontSize, setFontSize, immersive)
-  usePinchZoom(sidebarRef, () => treeFontSize, setTreeFontSize, immersive && sidebarOpen)
+  usePinchZoom(sidebarRef, () => sidebarZoom, setSidebarZoom, immersive && sidebarOpen)
 
   useEffect(() => {
     setFile(null)
@@ -602,8 +604,8 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
 
   return (
     <div className={`file-page ${immersive ? 'immersive' : ''} ${sidebarOpen ? 'sidebar-open' : ''}`}>
-      <aside ref={sidebarRef} className={`file-tree-sidebar ${sidebarOpen ? 'open' : ''}`} style={{ width: sidebarWidth, '--tree-font-size': `${treeFontSize}px` } as CSSProperties}>
-        <FileTreePanel repoId={repoId} path={path} rev={rev} onOpen={openTreeFile} onClose={toggleSidebar} />
+      <aside ref={sidebarRef} className={`file-tree-sidebar ${sidebarOpen ? 'open' : ''}`} style={{ width: sidebarWidth }}>
+        <FileTreePanel repoId={repoId} path={path} rev={rev} onOpen={openTreeFile} onClose={toggleSidebar} zoom={sidebarZoom} />
         <SidebarResizer width={sidebarWidth} onWidth={setSidebarWidth} />
       </aside>
       <div className="file-main">

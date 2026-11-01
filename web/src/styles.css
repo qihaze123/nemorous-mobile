@@ -4377,3 +4377,7 @@ h1 {
 .diff-sidebar-path {
   font-size: calc(var(--tree-font-size, 12px) - 1.5px);
 }
+
+.diff-sidebar-zoom {
+  min-width: 0;
+}

@@ -211,17 +211,17 @@ export function usePinchZoom(
   }, [target, enabled])
 }
 
-export function useTreeFontSize(initial = 12) {
-  const [size, setSizeState] = useState(() => {
-    const saved = Number(localStorage.getItem('nemorous.treeFontSize'))
-    return saved >= 8 && saved <= 20 ? saved : initial
+export function useSidebarZoom(initial = 1) {
+  const [zoom, setZoomState] = useState(() => {
+    const saved = Number(localStorage.getItem('nemorous.sidebarZoom'))
+    return saved >= 0.6 && saved <= 1.6 ? saved : initial
   })
-  const setSize = (next: number) => {
-    const clamped = Math.min(20, Math.max(8, Math.round(next * 2) / 2))
-    setSizeState(clamped)
-    localStorage.setItem('nemorous.treeFontSize', String(clamped))
+  const setZoom = (next: number) => {
+    const clamped = Math.min(1.6, Math.max(0.6, Math.round(next * 20) / 20))
+    setZoomState(clamped)
+    localStorage.setItem('nemorous.sidebarZoom', String(clamped))
   }
-  return [size, setSize] as const
+  return [zoom, setZoom] as const
 }
 
 export function useSidebarWidth(key = 'nemorous.sidebarWidth', initial = 264) {
