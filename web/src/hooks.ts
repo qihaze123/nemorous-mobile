@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 export type Screen = 'changes' | 'code' | 'git' | 'settings' | 'diff' | 'file' | 'commit' | 'commit-file' | 'commit-patch' | 'tree'
 
@@ -122,14 +122,53 @@ export function repoQuery(repoId: string, path: string, extra?: Record<string, s
 
 export function useImmersive() {
   const [immersive, setImmersive] = useState(false)
+  const requestedFullscreen = useRef(false)
+
   useEffect(() => {
-    if (!immersive) return
+    if (!immersive) {
+      if (requestedFullscreen.current) {
+        requestedFullscreen.current = false
+        if (document.fullscreenElement) void document.exitFullscreen().catch(() => {})
+      }
+      return
+    }
+    const root = document.documentElement
+    let active = true
+    if (root.requestFullscreen && !document.fullscreenElement) {
+      const request = root.requestFullscreen({ navigationUI: 'hide' })
+      if (request) {
+        void request.then(() => {
+          if (!active) {
+            if (document.fullscreenElement) void document.exitFullscreen().catch(() => {})
+            return
+          }
+          requestedFullscreen.current = true
+        }).catch(() => {
+          /* iOS Safari and desktop browsers may reject; CSS mode still works. */
+        })
+      }
+    }
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setImmersive(false)
     }
     addEventListener('keydown', onKey)
-    return () => removeEventListener('keydown', onKey)
+    return () => {
+      active = false
+      removeEventListener('keydown', onKey)
+    }
   }, [immersive])
+
+  useEffect(() => {
+    const onChange = () => {
+      if (!document.fullscreenElement && requestedFullscreen.current) {
+        requestedFullscreen.current = false
+        setImmersive(false)
+      }
+    }
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [])
+
   return [immersive, setImmersive] as const
 }
 
