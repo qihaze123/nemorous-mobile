@@ -26,6 +26,33 @@ export interface SyntaxSegment {
   className?: string
 }
 
+function enrichSQL(segments: SyntaxSegment[]): SyntaxSegment[] {
+  const out: SyntaxSegment[] = []
+  for (const segment of segments) {
+    if (segment.className?.includes('hljs-comment') || segment.className?.includes('hljs-string')) {
+      out.push(segment)
+      continue
+    }
+    if (segment.className) {
+      out.push(segment)
+      continue
+    }
+    const pattern = /(#\{[^}]+\}|:[A-Za-z_]\w*)|([A-Za-z_]\w*(?=\s*\())/g
+    let last = 0
+    let match: RegExpExecArray | null
+    while ((match = pattern.exec(segment.text))) {
+      if (match.index > last) out.push({ text: segment.text.slice(last, match.index) })
+      out.push({
+        text: match[0],
+        className: match[1] ? 'hljs-variable' : 'hljs-function',
+      })
+      last = match.index + match[0].length
+    }
+    if (last < segment.text.length) out.push({ text: segment.text.slice(last) })
+  }
+  return out
+}
+
 const segmentCache = new Map<string, SyntaxSegment[]>()
 const MAX_CACHE = 4000
 
@@ -75,6 +102,7 @@ export function syntaxSegments(text: string, language: string): SyntaxSegment[] 
   let segments: SyntaxSegment[]
   try {
     segments = tokenizeHighlighted(hljs.highlight(text, { language, ignoreIllegals: true }).value)
+    if (language === 'sql') segments = enrichSQL(segments)
   } catch {
     segments = [{ text }]
   }

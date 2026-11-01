@@ -1,7 +1,7 @@
 {
   "name": "nemorous-mobile-web",
   "private": true,
-  "version": "0.3.28",
+  "version": "0.3.29",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,7 +12,9 @@
     "predev": "npm run types"
   },
   "dependencies": {
+    "dompurify": "^3.4.17",
     "highlight.js": "^11.10.0",
+    "marked": "^18.1.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

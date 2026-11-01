@@ -1,5 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import hljs from 'highlight.js/lib/common'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import type { FileContent, RepoFiles, SearchMatch, SearchResult, Workspace } from '../types'
 import { api } from '../api'
 import { back, go, replace, useDebounced, useImmersive, usePinchZoom, useSidebarWidth, useSidebarZoom } from '../hooks'
@@ -517,6 +519,7 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
   const [error, setError] = useState('')
   const [immersive, setImmersive] = useImmersive()
   const [fontPanelOpen, setFontPanelOpen] = useState(false)
+  const [markdownPreview, setMarkdownPreview] = useState(() => localStorage.getItem('nemorous.markdownPreview') !== 'source')
   const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('nemorous.fileSidebar') !== 'closed')
   const [sidebarWidth, setSidebarWidth] = useSidebarWidth('nemorous.fileSidebarWidth')
   const [sidebarZoom, setSidebarZoom] = useSidebarZoom()
@@ -565,10 +568,21 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
     }
   }, [file, canHighlight, path])
 
+  const isMarkdown = /\.(md|markdown)$/i.test(path)
+  const markdownHtml = useMemo(() => {
+    if (!file || !isMarkdown || file.binary) return ''
+    try {
+      const rendered = marked.parse(file.content, { async: false }) as string
+      return DOMPurify.sanitize(rendered)
+    } catch {
+      return ''
+    }
+  }, [file, isMarkdown])
+
   useEffect(() => {
-    if (!file || !lineParam || !scrollRef.current) return
+    if (!file || !lineParam || !scrollRef.current || (isMarkdown && markdownPreview)) return
     scrollRef.current.scrollTop = Math.max(0, (lineParam - 1) * lineHeight - 120)
-  }, [file, lineParam, lineHeight])
+  }, [file, lineParam, lineHeight, isMarkdown, markdownPreview])
 
   useEffect(() => {
     if (!immersive) return
@@ -656,24 +670,48 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
             <span>{languageOf(path)}</span>
             <span>{(file.size / 1024).toFixed(1)} KB</span>
             {lineParam ? <span>第 {lineParam} 行</span> : null}
-          </div>
-          <div className="code-scroll" ref={scrollRef}>
-            <div className="code-inner">
-              <div className="gutter-col" aria-hidden="true">
-                {Array.from({ length: lineCount }, (_, i) => (
-                  <div key={i} className={lineParam === i + 1 ? 'hit' : undefined}>{i + 1}</div>
-                ))}
+            {isMarkdown ? (
+              <div className="segmented md-toggle">
+                <button
+                  className={markdownPreview ? 'on' : ''}
+                  onClick={() => {
+                    setMarkdownPreview(true)
+                    localStorage.setItem('nemorous.markdownPreview', 'preview')
+                  }}
+                >预览</button>
+                <button
+                  className={!markdownPreview ? 'on' : ''}
+                  onClick={() => {
+                    setMarkdownPreview(false)
+                    localStorage.setItem('nemorous.markdownPreview', 'source')
+                  }}
+                >源码</button>
               </div>
-              <pre className="code-pre">
-                {canHighlight ? (
-                  <code className="hljs" dangerouslySetInnerHTML={{ __html: html }} />
-                ) : (
-                  <code className="hljs">{file.content}</code>
-                )}
-              </pre>
-            </div>
+            ) : null}
           </div>
-          {!canHighlight ? <p className="hint">文件较大，已关闭语法高亮（仍可完整查看）。</p> : null}
+          {isMarkdown && markdownPreview ? (
+            <div className="markdown-scroll" ref={scrollRef}>
+              <div className="markdown-body" dangerouslySetInnerHTML={{ __html: markdownHtml }} />
+            </div>
+          ) : (
+            <div className="code-scroll" ref={scrollRef}>
+              <div className="code-inner">
+                <div className="gutter-col" aria-hidden="true">
+                  {Array.from({ length: lineCount }, (_, i) => (
+                    <div key={i} className={lineParam === i + 1 ? 'hit' : undefined}>{i + 1}</div>
+                  ))}
+                </div>
+                <pre className="code-pre">
+                  {canHighlight ? (
+                    <code className="hljs" dangerouslySetInnerHTML={{ __html: html }} />
+                  ) : (
+                    <code className="hljs">{file.content}</code>
+                  )}
+                </pre>
+              </div>
+            </div>
+          )}
+          {!canHighlight && !(isMarkdown && markdownPreview) ? <p className="hint">文件较大，已关闭语法高亮（仍可完整查看）。</p> : null}
         </>
       ) : null}
       <div className="screen-bottom-space" />
