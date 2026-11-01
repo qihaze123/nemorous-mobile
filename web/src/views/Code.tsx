@@ -647,7 +647,6 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
               <Icon name="back" />
             </button>
             <div className="grow file-head">
-              <div className="eyebrow">{repoId ? '文件' : ''}</div>
               <h1 className="file-title">{path}</h1>
               {rev ? <span className="pill">{rev}</span> : null}
             </div>
