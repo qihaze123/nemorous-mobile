@@ -3529,6 +3529,22 @@ h1 {
 
 .commit-file-nav {
   gap: 4px;
+  min-width: 0;
+}
+
+.commit-file-nav .inline-tools {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.commit-file-nav .inline-tools::-webkit-scrollbar {
+  display: none;
+}
+
+.commit-file-tools .font-tool {
+  flex: none;
+  font-size: 10px;
 }
 
 .commit-file-nav.tools-open .diff-position {
@@ -3836,19 +3852,25 @@ h1 {
 .immersive-nav {
   position: fixed;
   top: calc(env(safe-area-inset-top) + 8px);
-  left: 50%;
-  transform: translateX(-50%);
+  left: max(8px, env(safe-area-inset-left));
   z-index: 70;
   display: flex;
   align-items: center;
   gap: 2px;
+  max-width: calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right));
+  overflow-x: auto;
   padding: 3px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: color-mix(in srgb, var(--bg-elev) 82%, transparent);
   box-shadow: 0 8px 24px rgb(0 0 0 / 20%);
   backdrop-filter: blur(16px);
-  opacity: 0.82;
+  opacity: 0.86;
+  scrollbar-width: none;
+}
+
+.immersive-nav::-webkit-scrollbar {
+  display: none;
 }
 
 .immersive-nav:hover,
@@ -3857,13 +3879,44 @@ h1 {
 }
 
 .immersive-nav .nav-icon {
-  width: 32px;
+  flex: none;
+  width: 30px;
   height: 28px;
   border: 0;
   background: none;
 }
 
+.immersive-nav .font-step {
+  width: 30px;
+  padding: 0;
+  font: 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.immersive-nav .dock-size {
+  min-width: 18px;
+  font-size: 9px;
+}
+
 .immersive-nav .nav-icon:hover,
 .immersive-nav .nav-icon:active {
   background: var(--surface);
+}
+
+.commit-file-tools .nav-tool,
+.commit-file-tools .tools-toggle,
+.inline-tools > * {
+  flex: none;
+}
+
+.diff-nav-row > .nav-icon {
+  flex: none;
+}
+
+.commit-file-tools {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.commit-file-nav .inline-tools {
+  flex: 1 1 auto;
 }

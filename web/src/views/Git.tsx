@@ -2,7 +2,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import type { BranchList, BranchesResponse, Commit, CommitDetail, CommitFile, Workspace } from '../types'
 import { api } from '../api'
 import { back, go, replace, useDebounced, useDiffFontSize, useImmersive } from '../hooks'
-import { Empty, Icon, ImmersiveDock, MultiPatchView, PatchView, SectionTitle, Sheet, Spinner, ago, dayKey, repoColor, timeOf, useToast, type PatchViewHandle } from '../components'
+import { Empty, Icon, ImmersiveDiffBar, ImmersiveDock, MultiPatchView, PatchView, SectionTitle, Sheet, Spinner, ago, dayKey, repoColor, timeOf, useToast, type PatchViewHandle } from '../components'
 
 interface CommitFilters {
   repoId: string
@@ -642,7 +642,6 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
     setFindActive(0)
     setToolsOpen(false)
     setFontPanelOpen(false)
-    setImmersive(false)
   }, [path])
 
   useEffect(() => {
@@ -786,7 +785,6 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
             </span>
           </div>
         </div>
-        <button className="icon-btn font-toggle" onClick={() => setFontPanelOpen((open) => !open)} aria-label="字号" aria-pressed={fontPanelOpen} title="字号">Aa</button>
         <button className="icon-btn" onClick={enterImmersive} aria-label="沉浸查看" title="沉浸查看">
           <Icon name="expand" />
         </button>
@@ -810,6 +808,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
             </button>
             <span className="diff-position">{index >= 0 ? `${index + 1}/${detail.files.length}` : ''}</span>
             <div className="commit-file-tools">
+              <button className="nav-icon nav-tool font-tool" onClick={() => setFontPanelOpen((open) => !open)} aria-label="字号" aria-pressed={fontPanelOpen} title="字号">Aa</button>
               {toolsOpen ? (
                 <div className="inline-tools">
                   <div className="segmented diff-style nav-style">
@@ -878,28 +877,22 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
       ) : null}
       <div className="screen-bottom-space" />
       {immersive ? (
-        <div className="immersive-nav" role="toolbar" aria-label="Diff 导航">
-          <button className="nav-icon" onClick={() => step(-1)} title="上一处改动" aria-label="上一处改动">
-            <Icon name="up" size={15} />
-          </button>
-          <button className="nav-icon" onClick={() => step(1)} title="下一处改动" aria-label="下一处改动">
-            <Icon name="down" size={15} />
-          </button>
-          <button className="nav-icon" onClick={() => jump(-1)} disabled={index <= 0} title="上一个文件" aria-label="上一个文件">
-            <Icon name="left" size={15} />
-          </button>
-          <button className="nav-icon" onClick={() => jump(1)} disabled={!detail || index >= detail.files.length - 1} title="下一个文件" aria-label="下一个文件">
-            <Icon name="right" size={15} />
-          </button>
-        </div>
+        <ImmersiveDiffBar
+          onPrevChange={() => step(-1)}
+          onNextChange={() => step(1)}
+          onPrevFile={() => jump(-1)}
+          onNextFile={() => jump(1)}
+          canPrevFile={index > 0}
+          canNextFile={!!detail && index >= 0 && index < detail.files.length - 1}
+          fontSize={diffFontSize}
+          onFontSize={setDiffFontSize}
+          onExit={() => setImmersive(false)}
+        />
       ) : null}
-      {immersive || fontPanelOpen ? (
+      {!immersive && fontPanelOpen ? (
         <ImmersiveDock
-          onExit={() => {
-            if (immersive) setImmersive(false)
-            else setFontPanelOpen(false)
-          }}
-          exitLabel={immersive ? '退出沉浸查看' : '关闭字号调整'}
+          onExit={() => setFontPanelOpen(false)}
+          exitLabel="关闭字号调整"
           font={{ size: diffFontSize, min: 6, max: 20, onChange: setDiffFontSize }}
         />
       ) : null}
@@ -944,7 +937,6 @@ export function CommitPatchScreen({ repoId, hash }: { repoId: string; hash: stri
           <h1 className="file-title">{detail?.commit.subject ?? hash.slice(0, 8)}</h1>
           <code className="commit-patch-hash">{detail?.commit.short ?? hash.slice(0, 7)}</code>
         </div>
-        <button className="icon-btn font-toggle" onClick={() => setFontPanelOpen((open) => !open)} aria-label="字号" aria-pressed={fontPanelOpen} title="字号">Aa</button>
         <button className="icon-btn" onClick={() => { setFontPanelOpen(false); setImmersive(true) }} aria-label="沉浸查看" title="沉浸查看">
           <Icon name="expand" />
         </button>
@@ -958,6 +950,7 @@ export function CommitPatchScreen({ repoId, hash }: { repoId: string; hash: stri
             <span className="plus">+{added}</span>
             <span className="minus">−{deleted}</span>
             <span className="grow" />
+            <button className="mini-btn font-toggle" onClick={() => setFontPanelOpen((open) => !open)} aria-label="字号" aria-pressed={fontPanelOpen} title="字号">Aa</button>
             <button
               className="mini-btn"
               onClick={() => {

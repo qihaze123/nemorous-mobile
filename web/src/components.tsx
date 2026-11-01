@@ -160,6 +160,54 @@ export function ImmersiveDock({
   )
 }
 
+export function ImmersiveDiffBar({
+  onPrevChange,
+  onNextChange,
+  onPrevFile,
+  onNextFile,
+  canPrevFile,
+  canNextFile,
+  fontSize,
+  onFontSize,
+  onExit,
+}: {
+  onPrevChange: () => void
+  onNextChange: () => void
+  onPrevFile: () => void
+  onNextFile: () => void
+  canPrevFile: boolean
+  canNextFile: boolean
+  fontSize: number
+  onFontSize: (next: number) => void
+  onExit: () => void
+}) {
+  const label = Number.isInteger(fontSize) ? String(fontSize) : fontSize.toFixed(1)
+  return (
+    <div className="immersive-nav immersive-diff-bar" role="toolbar" aria-label="沉浸 Diff 控制">
+      <button className="nav-icon" onClick={onPrevChange} title="上一处改动" aria-label="上一处改动">
+        <Icon name="up" size={15} />
+      </button>
+      <button className="nav-icon" onClick={onNextChange} title="下一处改动" aria-label="下一处改动">
+        <Icon name="down" size={15} />
+      </button>
+      <button className="nav-icon" onClick={onPrevFile} disabled={!canPrevFile} title="上一个文件" aria-label="上一个文件">
+        <Icon name="left" size={15} />
+      </button>
+      <button className="nav-icon" onClick={onNextFile} disabled={!canNextFile} title="下一个文件" aria-label="下一个文件">
+        <Icon name="right" size={15} />
+      </button>
+      <span className="dock-sep" aria-hidden="true" />
+      <button className="nav-icon font-step" onClick={() => onFontSize(fontSize - 1)} disabled={fontSize <= 6} title="减小字号" aria-label="减小字号">A−</button>
+      <span className="dock-size" aria-live="polite">{label}</span>
+      <button className="nav-icon font-step" onClick={() => onFontSize(fontSize + 1)} disabled={fontSize >= 20} title="增大字号" aria-label="增大字号">A+</button>
+      <span className="dock-sep" aria-hidden="true" />
+      <button className="nav-icon" onClick={onExit} title="退出沉浸查看" aria-label="退出沉浸查看">
+        <Icon name="close" size={15} />
+      </button>
+    </div>
+  )
+}
+
 type ToastKind = 'ok' | 'error' | 'info'
 interface ToastItem {
   id: number

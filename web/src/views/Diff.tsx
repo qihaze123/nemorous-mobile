@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DiffResult, Workspace } from '../types'
 import { api } from '../api'
 import { back, go, replace, useDiffFontSize, useImmersive } from '../hooks'
-import { Icon, ImmersiveDock, PatchView, Spinner, StatusLetter, repoColor, type PatchViewHandle } from '../components'
+import { Icon, ImmersiveDiffBar, ImmersiveDock, PatchView, Spinner, StatusLetter, repoColor, type PatchViewHandle } from '../components'
 
 function DiffSidebar({
   ws,
@@ -284,7 +284,6 @@ export function DiffScreen({
                 </span>
               </div>
             </div>
-            <button className="icon-btn font-toggle" onClick={() => setFontPanelOpen((open) => !open)} aria-label="字号" aria-pressed={fontPanelOpen} title="字号">Aa</button>
             <button className="icon-btn" onClick={enterImmersive} aria-label="沉浸查看" title="沉浸查看">
               <Icon name="expand" />
             </button>
@@ -309,6 +308,7 @@ export function DiffScreen({
                 </button>
                 <span className="diff-position">{navIndex >= 0 ? `${navIndex + 1}/${navFiles.length}` : ''}</span>
                 <div className="commit-file-tools">
+                  <button className="nav-icon nav-tool font-tool" onClick={() => setFontPanelOpen((open) => !open)} aria-label="字号" aria-pressed={fontPanelOpen} title="字号">Aa</button>
                   {toolsOpen ? (
                     <div className="inline-tools">
                       <div className="segmented diff-style nav-style">
@@ -377,28 +377,22 @@ export function DiffScreen({
           ) : null}
           <div className="screen-bottom-space" />
           {immersive ? (
-            <div className="immersive-nav" role="toolbar" aria-label="Diff 导航">
-              <button className="nav-icon" onClick={() => stepChange(-1)} title="上一处改动" aria-label="上一处改动">
-                <Icon name="up" size={15} />
-              </button>
-              <button className="nav-icon" onClick={() => stepChange(1)} title="下一处改动" aria-label="下一处改动">
-                <Icon name="down" size={15} />
-              </button>
-              <button className="nav-icon" onClick={() => jumpFile(-1)} disabled={navIndex <= 0} title="上一个文件" aria-label="上一个文件">
-                <Icon name="left" size={15} />
-              </button>
-              <button className="nav-icon" onClick={() => jumpFile(1)} disabled={navIndex < 0 || navIndex >= navFiles.length - 1} title="下一个文件" aria-label="下一个文件">
-                <Icon name="right" size={15} />
-              </button>
-            </div>
+            <ImmersiveDiffBar
+              onPrevChange={() => stepChange(-1)}
+              onNextChange={() => stepChange(1)}
+              onPrevFile={() => jumpFile(-1)}
+              onNextFile={() => jumpFile(1)}
+              canPrevFile={navIndex > 0}
+              canNextFile={navIndex >= 0 && navIndex < navFiles.length - 1}
+              fontSize={diffFontSize}
+              onFontSize={setDiffFontSize}
+              onExit={() => setImmersive(false)}
+            />
           ) : null}
-          {immersive || fontPanelOpen ? (
+          {!immersive && fontPanelOpen ? (
             <ImmersiveDock
-              onExit={() => {
-                if (immersive) setImmersive(false)
-                else setFontPanelOpen(false)
-              }}
-              exitLabel={immersive ? '退出沉浸查看' : '关闭字号调整'}
+              onExit={() => setFontPanelOpen(false)}
+              exitLabel="关闭字号调整"
               font={{ size: diffFontSize, min: 6, max: 20, onChange: setDiffFontSize }}
             />
           ) : null}
