@@ -4103,3 +4103,23 @@ h1 {
 .change-section-head .section-action:disabled {
   opacity: 0.5;
 }
+
+/* Keep repositories visually above their file lists: a subtle parent band
+   plus an indented rail makes the repo → file relationship explicit. */
+.repo-block-head {
+  background: color-mix(in srgb, var(--surface) 24%, transparent);
+}
+
+.repo-block > .list-scroll {
+  margin-left: 26px;
+  border-left: 1px solid var(--border-soft);
+}
+
+.repo-block > .list-scroll .list-row {
+  padding-left: 8px;
+}
+
+.repo-block > .change-tree {
+  margin-left: 26px;
+  border-left: 1px solid var(--border-soft);
+}
