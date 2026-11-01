@@ -3,7 +3,7 @@ import hljs from 'highlight.js/lib/common'
 import type { FileContent, RepoFiles, SearchMatch, SearchResult, Workspace } from '../types'
 import { api } from '../api'
 import { back, go, replace, useDebounced, useImmersive, usePinchZoom, useSidebarWidth, useSidebarZoom } from '../hooks'
-import { Empty, Icon, ImmersiveDock, SectionTitle, SidebarResizer, Spinner, repoColor, useToast } from '../components'
+import { Empty, FileTypeIcon, Icon, ImmersiveDock, SectionTitle, SidebarResizer, Spinner, repoColor, useToast } from '../components'
 import { languageOf } from '../syntax'
 
 function fileName(path: string) {
@@ -319,9 +319,10 @@ export function TreeLevel({
                 if (e.key === 'Enter') onOpen(node.path)
               }}
             >
+              <FileTypeIcon path={node.path} />
               {(() => {
                 const meta = fileMeta?.get(node.path)
-                if (!meta?.status) return <Icon name="file" size={15} />
+                if (!meta?.status) return null
                 const status = meta.status.slice(0, 1)
                 return <span className={`status-letter s-${status === '?' ? 'untracked' : status}`}>{status}</span>
               })()}

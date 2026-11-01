@@ -4395,3 +4395,38 @@ h1 {
   align-items: center;
   gap: 2px;
 }
+
+.file-type-icon {
+  flex: none;
+  width: 20px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 8.5px;
+  font-weight: 750;
+  line-height: 1;
+  text-align: center;
+  letter-spacing: -0.04em;
+  color: var(--muted);
+}
+
+.ft-java { color: #e76f00; }
+.ft-kotlin { color: #a97bff; }
+.ft-go { color: #00add8; }
+.ft-python { color: #3572a5; }
+.ft-rust { color: #dea584; }
+.ft-typescript { color: #3178c6; }
+.ft-javascript { color: #e3b341; }
+.ft-json { color: #7ee787; }
+.ft-yaml { color: #d2a8ff; }
+.ft-xml, .ft-html { color: #58a6ff; }
+.ft-sql { color: #39c5cf; }
+.ft-markdown { color: #9aa7b8; }
+.ft-shell { color: #3fb950; }
+.ft-css { color: #56b6c2; }
+.ft-c, .ft-cpp, .ft-csharp { color: #b392f0; }
+.ft-vue { color: #41b883; }
+.ft-svelte { color: #ff3e00; }
+.ft-groovy, .ft-scala { color: #4298b8; }
+.ft-docker { color: #2496ed; }
+.ft-make { color: #6e7681; }
+.ft-config { color: #8b98a9; }
+.ft-file { color: var(--muted); }

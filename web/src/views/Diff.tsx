@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type Ref } from 'react'
 import type { DiffResult, Workspace } from '../types'
 import { api } from '../api'
 import { back, go, replace, useDiffFontSize, useImmersive, usePinchZoom, useSidebarWidth, useSidebarZoom } from '../hooks'
-import { Icon, ImmersiveDiffBar, ImmersiveDock, PatchView, SidebarResizer, Spinner, StatusLetter, repoColor, type PatchViewHandle } from '../components'
+import { FileTypeIcon, Icon, ImmersiveDiffBar, ImmersiveDock, PatchView, SidebarResizer, Spinner, StatusLetter, repoColor, type PatchViewHandle } from '../components'
 import { languageOf } from '../syntax'
 
 function DiffSidebar({
@@ -83,6 +83,7 @@ function DiffSidebar({
                       title={file.path}
                     >
                       <StatusLetter file={file} />
+                      <FileTypeIcon path={file.path} />
                       <span className="diff-sidebar-path">{file.path}</span>
                     </button>
                   )

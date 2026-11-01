@@ -180,3 +180,9 @@
 
 - 目录树右上角的「展开全部 / 收起全部」和「收起目录」改为同一按钮组，紧挨在右上角。
 - 修复 flex `space-between` 把展开按钮挤到中间的问题。
+
+## 0.3.22 — 2026-11-01
+
+- 侧栏文件树增加按文件类型区分的彩色徽标：Java、Kotlin、Go、XML、SQL、JS/TS、JSON、YAML、Markdown、Shell 等。
+- 提交文件目录同时保留 `status-letter` 和增删统计；工作区 Diff 文件列表也显示类型徽标。
+- SQL Diff 已验证输出 keyword/type/number/string/comment 五类语法 token。

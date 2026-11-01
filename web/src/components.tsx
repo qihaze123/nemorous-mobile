@@ -2,6 +2,7 @@ import { Fragment, createContext, forwardRef, useCallback, useContext, useEffect
 import { flushSync } from 'react-dom'
 import type { FileChange, RepoHealth } from './types'
 import { languageOf, syntaxSegments } from './syntax'
+import { fileTypeOf } from './filetypes'
 
 /* ---------- icons ---------- */
 
@@ -390,6 +391,11 @@ export function SidebarResizer({ width, onWidth }: { width: number; onWidth: (ne
       onPointerCancel={onUp}
     />
   )
+}
+
+export function FileTypeIcon({ path }: { path: string }) {
+  const type = fileTypeOf(path)
+  return <span className={`file-type-icon ft-${type.kind}`} aria-hidden="true">{type.label}</span>
 }
 
 type ToastKind = 'ok' | 'error' | 'info'
