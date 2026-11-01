@@ -537,7 +537,6 @@ function foldAnchorFor(el: HTMLElement, source: HTMLElement, side?: 'before' | '
   return { key, offset: anchor.getBoundingClientRect().top - el.getBoundingClientRect().top }
 }
 
-const DIFF_LINE_HEIGHT = 20
 const DIFF_OVERSCAN = 12
 const DIFF_VIRTUAL_THRESHOLD = 200
 
@@ -554,10 +553,11 @@ export interface PatchViewHandle {
   currentLine(): number | undefined
 }
 
-export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: boolean; style?: 'unified' | 'split'; idea?: boolean; folded?: boolean; focusChange?: 'first' | 'last' }>(function PatchView(
-  { patch, binary, style = 'unified', idea = false, folded = false, focusChange = 'first' },
+export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: boolean; style?: 'unified' | 'split'; idea?: boolean; folded?: boolean; focusChange?: 'first' | 'last'; fontSize?: number }>(function PatchView(
+  { patch, binary, style = 'unified', idea = false, folded = false, focusChange = 'first', fontSize = 12 },
   ref,
 ) {
+  const lineHeight = Math.round(fontSize * 5 / 3)
   const rawLines = useMemo(() => parsePatch(patch), [patch])
   const [expandedFolds, setExpandedFolds] = useState<Set<string>>(new Set())
   const pendingFoldAnchor = useRef<{ key: string; offset: number; delta: number } | null>(null)
@@ -585,7 +585,7 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
     if (el) {
       const found = foldAnchorFor(el, source, side)
       const delta = side === 'before' && hidden && hidden > 1
-        ? (!expandedFolds.has(id) ? 1 : -1) * (hidden - 1) * (el.classList.contains('mp-viewport') ? MP_LINE_HEIGHT : DIFF_LINE_HEIGHT)
+        ? (!expandedFolds.has(id) ? 1 : -1) * (hidden - 1) * lineHeight
         : 0
       pendingFoldAnchor.current = found ? { ...found, delta } : (delta ? { key: '', offset: 0, delta } : null)
     }
@@ -635,6 +635,16 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
   }, [rows])
   const firstChangeRow = changeRows[0] ?? -1
 
+  const previousLineHeight = useRef(lineHeight)
+  useLayoutEffect(() => {
+    const el = viewport.current
+    if (el && previousLineHeight.current !== lineHeight) {
+      el.scrollTop = (el.scrollTop / previousLineHeight.current) * lineHeight
+      setScrollTop(el.scrollTop)
+    }
+    previousLineHeight.current = lineHeight
+  }, [lineHeight])
+
   useImperativeHandle(ref, () => ({
     scrollToChange(direction) {
       const el = viewport.current
@@ -644,27 +654,27 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
       if (direction > 0 && atBottom) return false
       let active = -1
       for (const index of changeRows) {
-        if (index * DIFF_LINE_HEIGHT <= top + 48) active = index
+        if (index * lineHeight <= top + 48) active = index
         else break
       }
       const target = direction > 0
         ? changeRows.find((index) => index > active)
         : [...changeRows].reverse().find((index) => index < active)
       if (target === undefined) return false
-      el.scrollTop = Math.max(0, target * DIFF_LINE_HEIGHT - 32)
+      el.scrollTop = Math.max(0, target * lineHeight - 32)
       return true
     },
     scrollToFirstChange() {
       const el = viewport.current
       if (!el || firstChangeRow < 0) return false
-      el.scrollTop = Math.max(0, firstChangeRow * DIFF_LINE_HEIGHT - 32)
+      el.scrollTop = Math.max(0, firstChangeRow * lineHeight - 32)
       return true
     },
     scrollToLastChange() {
       const el = viewport.current
       const last = changeRows[changeRows.length - 1]
       if (!el || last === undefined) return false
-      el.scrollTop = Math.max(0, last * DIFF_LINE_HEIGHT - 32)
+      el.scrollTop = Math.max(0, last * lineHeight - 32)
       return true
     },
     scrollToHunk(direction) {
@@ -673,24 +683,24 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
       const top = el.scrollTop
       const target =
         direction > 0
-          ? hunkRows.find((index) => index * DIFF_LINE_HEIGHT > top + 4)
-          : [...hunkRows].reverse().find((index) => index * DIFF_LINE_HEIGHT < top - 4)
+          ? hunkRows.find((index) => index * lineHeight > top + 4)
+          : [...hunkRows].reverse().find((index) => index * lineHeight < top - 4)
       if (target === undefined) return false
-      el.scrollTop = Math.max(0, target * DIFF_LINE_HEIGHT - 4)
+      el.scrollTop = Math.max(0, target * lineHeight - 4)
       return true
     },
     currentLine() {
       const el = viewport.current
       if (!el) return undefined
       const top = el.scrollTop + 1
-      const visible = hunkRows.find((index) => index * DIFF_LINE_HEIGHT >= top - 4)
-      if (visible !== undefined && visible * DIFF_LINE_HEIGHT < top + 80) {
+      const visible = hunkRows.find((index) => index * lineHeight >= top - 4)
+      if (visible !== undefined && visible * lineHeight < top + 80) {
         const value = rows[visible].hunkNew
         if (value !== undefined) return value
       }
       let hunk: number | undefined
       for (const index of hunkRows) {
-        if (index * DIFF_LINE_HEIGHT <= top) {
+        if (index * lineHeight <= top) {
           const value = rows[index].hunkNew
           if (value !== undefined) hunk = value
         } else {
@@ -698,7 +708,7 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
         }
       }
       if (hunk !== undefined) return hunk
-      const start = Math.max(0, Math.floor(el.scrollTop / DIFF_LINE_HEIGHT))
+      const start = Math.max(0, Math.floor(el.scrollTop / lineHeight))
       for (let i = start; i < rows.length; i++) {
         const row = rows[i]
         if (row.kind === 'split') {
@@ -710,7 +720,7 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
       }
       return undefined
     },
-  }), [changeRows, firstChangeRow, hunkRows, rows])
+  }), [changeRows, firstChangeRow, hunkRows, rows, lineHeight])
 
   useLayoutEffect(() => {
     const el = viewport.current
@@ -737,7 +747,7 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
     if (!el) return
     const target = focusChange === 'last' ? changeRows[changeRows.length - 1] : changeRows[0]
     if (target === undefined) return
-    el.scrollTop = Math.max(0, target * DIFF_LINE_HEIGHT - 32)
+    el.scrollTop = Math.max(0, target * lineHeight - 32)
   }, [focusChange, idea, patch])
 
   if (binary) return <Empty icon="warning" title="二进制文件" hint="手机端不展示二进制差异，请在桌面端查看。" />
@@ -746,14 +756,14 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
   let start = 0
   let end = rows.length
   if (virtual) {
-    start = Math.max(0, Math.floor(scrollTop / DIFF_LINE_HEIGHT) - DIFF_OVERSCAN)
-    end = Math.min(rows.length, Math.ceil((scrollTop + height) / DIFF_LINE_HEIGHT) + DIFF_OVERSCAN)
+    start = Math.max(0, Math.floor(scrollTop / lineHeight) - DIFF_OVERSCAN)
+    end = Math.min(rows.length, Math.ceil((scrollTop + height) / lineHeight) + DIFF_OVERSCAN)
   }
   const visible = virtual ? rows.slice(start, end) : rows
   const rowStyle = (index: number) =>
-    virtual ? { position: 'absolute' as const, top: index * DIFF_LINE_HEIGHT, left: 0, minWidth: '100%', width: 'max-content' } : undefined
+    virtual ? { position: 'absolute' as const, top: index * lineHeight, left: 0, minWidth: '100%', width: 'max-content' } : undefined
   const patchStyle = {
-    ...(virtual ? { height: rows.length * DIFF_LINE_HEIGHT } : {}),
+    ...(virtual ? { height: rows.length * lineHeight } : {}),
     ...(style === 'split'
       ? ({ '--split-old': `${splitWidths.old}ch`, '--split-new': `${splitWidths.new}ch` } as React.CSSProperties)
       : {}),
@@ -763,6 +773,7 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
     <div
       className="patch-viewport"
       ref={viewport}
+      style={{ '--diff-font-size': `${fontSize}px`, '--diff-line-height': `${lineHeight}px` } as React.CSSProperties}
       onScroll={(e) => {
         const top = e.currentTarget.scrollTop
         flushSync(() => setScrollTop(top))
@@ -901,18 +912,20 @@ type MultiRow =
     }
 
 const MP_FILE_HEIGHT = 32
-const MP_LINE_HEIGHT = 20
 const MP_OVERSCAN = 10
 
 export function MultiPatchView({
   files,
   collapsed,
   onToggleFile,
+  fontSize = 12,
 }: {
   files: MultiPatchFile[]
   collapsed: Set<string>
   onToggleFile: (path: string) => void
+  fontSize?: number
 }) {
+  const lineHeight = Math.round(fontSize * 5 / 3)
   const [expandedFolds, setExpandedFolds] = useState<Set<string>>(new Set())
   const pendingFoldAnchor = useRef<{ key: string; offset: number; delta: number } | null>(null)
   const [scrollTop, setScrollTop] = useState(0)
@@ -935,12 +948,12 @@ export function MultiPatchView({
       const hasNew = rawLines.some((line) => line.new !== undefined)
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i]
-        out.push({ kind: 'line', line, file, top, height: MP_LINE_HEIGHT, words: words[i], hasOld, hasNew })
-        top += MP_LINE_HEIGHT
+        out.push({ kind: 'line', line, file, top, height: lineHeight, words: words[i], hasOld, hasNew })
+        top += lineHeight
       }
     }
     return out
-  }, [files, collapsed, expandedFolds])
+  }, [files, collapsed, expandedFolds, lineHeight])
   const total = rows.length ? rows[rows.length - 1].top + rows[rows.length - 1].height : 0
 
   useEffect(() => {
@@ -992,7 +1005,7 @@ export function MultiPatchView({
     if (el) {
       const found = foldAnchorFor(el, source, side)
       const delta = side === 'before' && hidden && hidden > 1
-        ? (!expandedFolds.has(id) ? 1 : -1) * (hidden - 1) * (el.classList.contains('mp-viewport') ? MP_LINE_HEIGHT : DIFF_LINE_HEIGHT)
+        ? (!expandedFolds.has(id) ? 1 : -1) * (hidden - 1) * lineHeight
         : 0
       pendingFoldAnchor.current = found ? { ...found, delta } : (delta ? { key: '', offset: 0, delta } : null)
     }
@@ -1009,6 +1022,7 @@ export function MultiPatchView({
       <div
         className="mp-viewport"
         ref={viewport}
+        style={{ '--diff-font-size': `${fontSize}px`, '--diff-line-height': `${lineHeight}px` } as React.CSSProperties}
         onScroll={(e) => {
           const top = e.currentTarget.scrollTop
           setScrollTop(top)

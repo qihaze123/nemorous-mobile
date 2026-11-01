@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { BranchList, BranchesResponse, Commit, CommitDetail, CommitFile, Workspace } from '../types'
 import { api } from '../api'
-import { back, go, replace, useDebounced, useImmersive } from '../hooks'
+import { back, go, replace, useDebounced, useDiffFontSize, useImmersive } from '../hooks'
 import { Empty, Icon, ImmersiveDock, MultiPatchView, PatchView, SectionTitle, Sheet, Spinner, ago, dayKey, repoColor, timeOf, useToast, type PatchViewHandle } from '../components'
 
 interface CommitFilters {
@@ -629,6 +629,8 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
   const [copiedPath, setCopiedPath] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
   const [immersive, setImmersive] = useImmersive()
+  const [diffFontSize, setDiffFontSize] = useDiffFontSize()
+  const [fontPanelOpen, setFontPanelOpen] = useState(false)
   const diffRoot = useRef<HTMLDivElement>(null)
   const patchRef = useRef<PatchViewHandle>(null)
 
@@ -639,6 +641,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
     setFindOpen(false)
     setFindActive(0)
     setToolsOpen(false)
+    setFontPanelOpen(false)
     setImmersive(false)
   }, [path])
 
@@ -727,6 +730,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
   const enterImmersive = () => {
     setToolsOpen(false)
     setFindOpen(false)
+    setFontPanelOpen(false)
     setImmersive(true)
   }
 
@@ -782,6 +786,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
             </span>
           </div>
         </div>
+        <button className="icon-btn font-toggle" onClick={() => setFontPanelOpen((open) => !open)} aria-label="字号" aria-pressed={fontPanelOpen} title="字号">Aa</button>
         <button className="icon-btn" onClick={enterImmersive} aria-label="沉浸查看" title="沉浸查看">
           <Icon name="expand" />
         </button>
@@ -867,12 +872,37 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
             </div>
           ) : null}
           <div className="commit-file-diff-page idea-diff" ref={diffRoot}>
-            <PatchView ref={patchRef} patch={chunks.get(path) ?? ''} style={diffStyle} idea folded={folded} focusChange={atLast ? 'last' : 'first'} />
+            <PatchView ref={patchRef} patch={chunks.get(path) ?? ''} style={diffStyle} idea folded={folded} focusChange={atLast ? 'last' : 'first'} fontSize={diffFontSize} />
           </div>
         </>
       ) : null}
       <div className="screen-bottom-space" />
-      {immersive ? <ImmersiveDock onExit={() => setImmersive(false)} /> : null}
+      {immersive ? (
+        <div className="immersive-nav" role="toolbar" aria-label="Diff 导航">
+          <button className="nav-icon" onClick={() => step(-1)} title="上一处改动" aria-label="上一处改动">
+            <Icon name="up" size={15} />
+          </button>
+          <button className="nav-icon" onClick={() => step(1)} title="下一处改动" aria-label="下一处改动">
+            <Icon name="down" size={15} />
+          </button>
+          <button className="nav-icon" onClick={() => jump(-1)} disabled={index <= 0} title="上一个文件" aria-label="上一个文件">
+            <Icon name="left" size={15} />
+          </button>
+          <button className="nav-icon" onClick={() => jump(1)} disabled={!detail || index >= detail.files.length - 1} title="下一个文件" aria-label="下一个文件">
+            <Icon name="right" size={15} />
+          </button>
+        </div>
+      ) : null}
+      {immersive || fontPanelOpen ? (
+        <ImmersiveDock
+          onExit={() => {
+            if (immersive) setImmersive(false)
+            else setFontPanelOpen(false)
+          }}
+          exitLabel={immersive ? '退出沉浸查看' : '关闭字号调整'}
+          font={{ size: diffFontSize, min: 6, max: 20, onChange: setDiffFontSize }}
+        />
+      ) : null}
     </div>
   )
 }
@@ -882,8 +912,11 @@ export function CommitPatchScreen({ repoId, hash }: { repoId: string; hash: stri
   const [error, setError] = useState('')
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [immersive, setImmersive] = useImmersive()
+  const [diffFontSize, setDiffFontSize] = useDiffFontSize()
+  const [fontPanelOpen, setFontPanelOpen] = useState(false)
   useEffect(() => {
     setCollapsed(new Set())
+    setFontPanelOpen(false)
     setImmersive(false)
   }, [hash])
   useEffect(() => {
@@ -911,7 +944,8 @@ export function CommitPatchScreen({ repoId, hash }: { repoId: string; hash: stri
           <h1 className="file-title">{detail?.commit.subject ?? hash.slice(0, 8)}</h1>
           <code className="commit-patch-hash">{detail?.commit.short ?? hash.slice(0, 7)}</code>
         </div>
-        <button className="icon-btn" onClick={() => setImmersive(true)} aria-label="沉浸查看" title="沉浸查看">
+        <button className="icon-btn font-toggle" onClick={() => setFontPanelOpen((open) => !open)} aria-label="字号" aria-pressed={fontPanelOpen} title="字号">Aa</button>
+        <button className="icon-btn" onClick={() => { setFontPanelOpen(false); setImmersive(true) }} aria-label="沉浸查看" title="沉浸查看">
           <Icon name="expand" />
         </button>
       </header>
@@ -937,6 +971,7 @@ export function CommitPatchScreen({ repoId, hash }: { repoId: string; hash: stri
           <MultiPatchView
             key={detail.commit.hash}
             files={files}
+            fontSize={diffFontSize}
             collapsed={collapsed}
             onToggleFile={(path) =>
               setCollapsed((prev) => {
@@ -950,7 +985,16 @@ export function CommitPatchScreen({ repoId, hash }: { repoId: string; hash: stri
         </>
       ) : null}
       <div className="screen-bottom-space" />
-      {immersive ? <ImmersiveDock onExit={() => setImmersive(false)} /> : null}
+      {immersive || fontPanelOpen ? (
+        <ImmersiveDock
+          onExit={() => {
+            if (immersive) setImmersive(false)
+            else setFontPanelOpen(false)
+          }}
+          exitLabel={immersive ? '退出沉浸查看' : '关闭字号调整'}
+          font={{ size: diffFontSize, min: 6, max: 20, onChange: setDiffFontSize }}
+        />
+      ) : null}
     </div>
   )
 }

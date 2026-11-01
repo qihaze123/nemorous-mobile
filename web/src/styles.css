@@ -671,17 +671,19 @@ h1 {
   border: 1px solid var(--border-soft);
   border-radius: 12px;
   background: var(--bg-elev);
-  font: 12px/20px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--diff-font-size, 12px);
+  line-height: var(--diff-line-height, 20px);
 }
 
 .patch {
-  line-height: 20px;
+  line-height: var(--diff-line-height, 20px);
 }
 
 .diff-line {
   display: flex;
   min-width: max-content;
-  height: 20px;
+  height: var(--diff-line-height, 20px);
 }
 
 .patch.virtual {
@@ -3161,7 +3163,7 @@ h1 {
   grid-template-columns: 34px minmax(var(--split-old, 20ch), 1fr) 34px minmax(var(--split-new, 20ch), 1fr);
   width: max-content;
   min-width: 100%;
-  height: 20px;
+  height: var(--diff-line-height, 20px);
 }
 
 .diff-line.split-row .split-gutter {
@@ -3487,7 +3489,7 @@ h1 {
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: 20px;
+  height: var(--diff-line-height, 20px);
   padding: 0;
   border: 0;
   border-top: 1px solid var(--border-soft);
@@ -3610,11 +3612,15 @@ h1 {
 }
 
 .mp-viewport {
-  font: 12px/20px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--diff-font-size, 12px);
+  line-height: var(--diff-line-height, 20px);
 }
 
 .mp-inner .diff-line {
-  font: 11.5px/20px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--diff-font-size, 11.5px);
+  line-height: var(--diff-line-height, 20px);
 }
 
 .patch-viewport,
@@ -3626,8 +3632,8 @@ h1 {
 .patch .diff-line,
 .mp-inner .diff-line {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 11.5px;
-  line-height: 20px;
+  font-size: var(--diff-font-size, 11.5px);
+  line-height: var(--diff-line-height, 20px);
 }
 
 .patch .diff-line .code,
@@ -3825,4 +3831,39 @@ h1 {
 .font-toggle {
   font: 650 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
   letter-spacing: -0.04em;
+}
+
+.immersive-nav {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-elev) 82%, transparent);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 20%);
+  backdrop-filter: blur(16px);
+  opacity: 0.82;
+}
+
+.immersive-nav:hover,
+.immersive-nav:active {
+  opacity: 1;
+}
+
+.immersive-nav .nav-icon {
+  width: 32px;
+  height: 28px;
+  border: 0;
+  background: none;
+}
+
+.immersive-nav .nav-icon:hover,
+.immersive-nav .nav-icon:active {
+  background: var(--surface);
 }

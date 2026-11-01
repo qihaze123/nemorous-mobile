@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DiffResult, Workspace } from '../types'
 import { api } from '../api'
-import { back, go, replace, useImmersive } from '../hooks'
+import { back, go, replace, useDiffFontSize, useImmersive } from '../hooks'
 import { Icon, ImmersiveDock, PatchView, Spinner, StatusLetter, repoColor, type PatchViewHandle } from '../components'
 
 function DiffSidebar({
@@ -93,6 +93,8 @@ export function DiffScreen({
 }) {
   const [diff, setDiff] = useState<DiffResult | null>(null)
   const [immersive, setImmersive] = useImmersive()
+  const [diffFontSize, setDiffFontSize] = useDiffFontSize()
+  const [fontPanelOpen, setFontPanelOpen] = useState(false)
   const [error, setError] = useState('')
   const [diffStyle, setDiffStyle] = useState<'unified' | 'split'>('unified')
   const [folded, setFolded] = useState(true)
@@ -255,6 +257,7 @@ export function DiffScreen({
   const enterImmersive = () => {
     setToolsOpen(false)
     setFindOpen(false)
+    setFontPanelOpen(false)
     setImmersive(true)
   }
 
@@ -281,6 +284,7 @@ export function DiffScreen({
                 </span>
               </div>
             </div>
+            <button className="icon-btn font-toggle" onClick={() => setFontPanelOpen((open) => !open)} aria-label="字号" aria-pressed={fontPanelOpen} title="字号">Aa</button>
             <button className="icon-btn" onClick={enterImmersive} aria-label="沉浸查看" title="沉浸查看">
               <Icon name="expand" />
             </button>
@@ -367,12 +371,37 @@ export function DiffScreen({
                 </div>
               ) : null}
               <div className="commit-file-diff-page idea-diff" ref={diffRoot}>
-                <PatchView ref={patchRef} patch={diff.patch} binary={diff.binary} style={diffStyle} idea folded={folded} focusChange="first" />
+                <PatchView ref={patchRef} patch={diff.patch} binary={diff.binary} style={diffStyle} idea folded={folded} focusChange="first" fontSize={diffFontSize} />
               </div>
             </>
           ) : null}
           <div className="screen-bottom-space" />
-          {immersive ? <ImmersiveDock onExit={() => setImmersive(false)} /> : null}
+          {immersive ? (
+            <div className="immersive-nav" role="toolbar" aria-label="Diff 导航">
+              <button className="nav-icon" onClick={() => stepChange(-1)} title="上一处改动" aria-label="上一处改动">
+                <Icon name="up" size={15} />
+              </button>
+              <button className="nav-icon" onClick={() => stepChange(1)} title="下一处改动" aria-label="下一处改动">
+                <Icon name="down" size={15} />
+              </button>
+              <button className="nav-icon" onClick={() => jumpFile(-1)} disabled={navIndex <= 0} title="上一个文件" aria-label="上一个文件">
+                <Icon name="left" size={15} />
+              </button>
+              <button className="nav-icon" onClick={() => jumpFile(1)} disabled={navIndex < 0 || navIndex >= navFiles.length - 1} title="下一个文件" aria-label="下一个文件">
+                <Icon name="right" size={15} />
+              </button>
+            </div>
+          ) : null}
+          {immersive || fontPanelOpen ? (
+            <ImmersiveDock
+              onExit={() => {
+                if (immersive) setImmersive(false)
+                else setFontPanelOpen(false)
+              }}
+              exitLabel={immersive ? '退出沉浸查看' : '关闭字号调整'}
+              font={{ size: diffFontSize, min: 6, max: 20, onChange: setDiffFontSize }}
+            />
+          ) : null}
         </div>
       </div>
     </div>

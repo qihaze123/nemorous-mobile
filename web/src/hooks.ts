@@ -120,6 +120,19 @@ export function repoQuery(repoId: string, path: string, extra?: Record<string, s
   return q.toString()
 }
 
+export function useDiffFontSize() {
+  const [fontSize, setFontSizeState] = useState(() => {
+    const saved = Number(localStorage.getItem('nemorous.diffFontSize'))
+    return saved >= 6 && saved <= 20 ? saved : 12
+  })
+  const setFontSize = (next: number) => {
+    const clamped = Math.min(20, Math.max(6, next))
+    setFontSizeState(clamped)
+    localStorage.setItem('nemorous.diffFontSize', String(clamped))
+  }
+  return [fontSize, setFontSize] as const
+}
+
 export function useImmersive() {
   const [immersive, setImmersive] = useState(false)
   const requestedFullscreen = useRef(false)
