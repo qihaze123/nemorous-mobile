@@ -667,9 +667,7 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
         <>
           <div className="code-meta">
             <span>{lineCount} 行</span>
-            <span>{languageOf(path)}</span>
             <span>{(file.size / 1024).toFixed(1)} KB</span>
-            {lineParam ? <span>第 {lineParam} 行</span> : null}
             {isMarkdown ? (
               <div className="segmented md-toggle">
                 <button
