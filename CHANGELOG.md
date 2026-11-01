@@ -186,3 +186,8 @@
 - 侧栏文件树增加按文件类型区分的彩色徽标：Java、Kotlin、Go、XML、SQL、JS/TS、JSON、YAML、Markdown、Shell 等。
 - 提交文件目录同时保留 `status-letter` 和增删统计；工作区 Diff 文件列表也显示类型徽标。
 - SQL Diff 已验证输出 keyword/type/number/string/comment 五类语法 token。
+
+## 0.3.23 — 2026-11-01
+
+- 目录树右上角按钮顺序改为「收起目录」在左、「展开/收起全部文件夹」在最右，展开按钮向右靠。
+- 普通文件目录与提交文件目录统一。

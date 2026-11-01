@@ -485,6 +485,9 @@ function FileTreePanel({
       <div className="file-tree-head">
         <span>文件</span>
         <div className="file-tree-actions">
+          <button className="icon-btn" onClick={onClose} aria-label="收起目录">
+            <Icon name="left" />
+          </button>
           <button
             className="icon-btn"
             onClick={() => setExpanded(allOpen ? new Set() : new Set(allDirs))}
@@ -492,9 +495,6 @@ function FileTreePanel({
             title={allOpen ? '收起全部文件夹' : '展开全部文件夹'}
           >
             <Icon name={allOpen ? 'up' : 'down'} size={15} />
-          </button>
-          <button className="icon-btn" onClick={onClose} aria-label="收起目录">
-            <Icon name="left" />
           </button>
         </div>
       </div>
