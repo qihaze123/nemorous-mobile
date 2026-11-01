@@ -4633,3 +4633,11 @@ h1 {
 .file-actions .font-toggle {
   font-size: 10px;
 }
+
+.code-meta > .file-actions {
+  margin-left: auto;
+}
+
+.code-meta > .md-toggle + .file-actions {
+  margin-left: 4px;
+}
