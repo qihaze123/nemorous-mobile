@@ -414,7 +414,7 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
   const [fontPanelOpen, setFontPanelOpen] = useState(false)
   const [fontSize, setFontSizeState] = useState(() => {
     const saved = Number(localStorage.getItem('nemorous.codeFontSize'))
-    return saved >= 8 && saved <= 22 ? saved : 13
+    return saved >= 6 && saved <= 22 ? saved : 13
   })
   const scrollRef = useRef<HTMLDivElement>(null)
   const notify = useToast()
@@ -422,7 +422,7 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
   const lineHeight = Math.round(fontSize * 1.6)
   const codeStyle = { '--code-font-size': `${fontSize}px`, '--code-line-height': `${lineHeight}px` } as CSSProperties
   const setFontSize = (next: number) => {
-    const clamped = Math.min(22, Math.max(8, next))
+    const clamped = Math.min(22, Math.max(6, next))
     setFontSizeState(clamped)
     localStorage.setItem('nemorous.codeFontSize', String(clamped))
   }
@@ -551,7 +551,7 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
             else setFontPanelOpen(false)
           }}
           exitLabel={immersive ? '退出沉浸查看' : '关闭字号调整'}
-          font={{ size: fontSize, min: 8, max: 22, onChange: setFontSize }}
+          font={{ size: fontSize, min: 6, max: 22, onChange: setFontSize }}
         />
       ) : null}
     </div>

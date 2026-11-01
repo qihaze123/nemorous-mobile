@@ -761,7 +761,7 @@ h1 {
   background: var(--bg);
   color: var(--muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: max(9px, calc(var(--code-font-size, 12.5px) - 1.5px));
+  font-size: max(7px, calc(var(--code-font-size, 12.5px) - 1px));
   line-height: var(--code-line-height, 20px);
   text-align: right;
   user-select: none;
