@@ -4611,3 +4611,25 @@ h1 {
 .screen.immersive > .markdown-scroll .markdown-body {
   padding-top: 16px;
 }
+
+.file-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.file-actions .icon-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+
+.file-actions .icon-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.file-actions .font-toggle {
+  font-size: 10px;
+}

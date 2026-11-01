@@ -651,13 +651,15 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
           <h1 className="file-title">{path}</h1>
           {rev ? <span className="pill">{rev}</span> : null}
         </div>
-        <button className="icon-btn" onClick={() => setImmersive(true)} aria-label="沉浸查看" title="沉浸查看">
-          <Icon name="expand" />
-        </button>
-        <button className="icon-btn font-toggle" onClick={() => setFontPanelOpen((open) => !open)} aria-label="字号" aria-pressed={fontPanelOpen} title="字号">Aa</button>
-        <button className="icon-btn" onClick={() => void copy()} aria-label="复制">
-          <Icon name="copy" />
-        </button>
+        <div className="file-actions">
+          <button className="icon-btn" onClick={() => setImmersive(true)} aria-label="沉浸查看" title="沉浸查看">
+            <Icon name="expand" />
+          </button>
+          <button className="icon-btn font-toggle" onClick={() => setFontPanelOpen((open) => !open)} aria-label="字号" aria-pressed={fontPanelOpen} title="字号">Aa</button>
+          <button className="icon-btn" onClick={() => void copy()} aria-label="复制">
+            <Icon name="copy" />
+          </button>
+        </div>
       </header>
 
       {error ? <div className="error-banner"><Icon name="warning" size={15} /> {error}</div> : null}

@@ -223,3 +223,7 @@
 - Markdown 文件默认渲染预览，代码元信息栏提供「预览 / 源码」切换并记忆。
 - 预览使用 marked + DOMPurify，渲染前清洗 HTML。
 - SQL 高亮增加函数名和 `#{}` 参数颜色，保留 keyword/type/number/string/comment。
+
+## 0.3.30 — 2026-11-01
+
+- 文件页右上角沉浸、字号、复制三个按钮从 40px 缩小到 30px，图标 16px，参考 Diff 工具栏尺寸。
