@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } fr
 import hljs from 'highlight.js/lib/common'
 import type { FileContent, RepoFiles, SearchMatch, SearchResult, Workspace } from '../types'
 import { api } from '../api'
-import { back, go, useDebounced, useImmersive } from '../hooks'
+import { back, go, replace, useDebounced, useImmersive } from '../hooks'
 import { Empty, Icon, ImmersiveDock, SectionTitle, Spinner, repoColor, useToast } from '../components'
 import { languageOf } from '../syntax'
 
@@ -254,12 +254,14 @@ function TreeLevel({
   expanded,
   onToggle,
   onOpen,
+  activePath,
 }: {
   nodes: TreeNode[]
   depth: number
   expanded: Set<string>
   onToggle: (path: string) => void
   onOpen: (path: string) => void
+  activePath?: string
 }) {
   return (
     <>
@@ -282,12 +284,12 @@ function TreeLevel({
                 <span>{node.name}</span>
               </div>
               {expanded.has(node.path) ? (
-                <TreeLevel nodes={node.children} depth={depth + 1} expanded={expanded} onToggle={onToggle} onOpen={onOpen} />
+                <TreeLevel nodes={node.children} depth={depth + 1} expanded={expanded} onToggle={onToggle} onOpen={onOpen} activePath={activePath} />
               ) : null}
             </>
           ) : (
             <div
-              className="tree-row file"
+              className={`tree-row file ${activePath === node.path ? 'active' : ''}`}
               style={{ paddingLeft: 12 + depth * 16 + 18 }}
               onClick={() => onOpen(node.path)}
               role="button"
@@ -382,6 +384,73 @@ export function TreeScreen({ repoId, repoName }: { repoId: string; repoName: str
   )
 }
 
+/* ---------------- landscape file explorer ---------------- */
+
+function FileTreePanel({
+  repoId,
+  path,
+  rev,
+  onOpen,
+}: {
+  repoId: string
+  path: string
+  rev?: string
+  onOpen: (path: string) => void
+}) {
+  const [files, setFiles] = useState<string[]>([])
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    setFiles([])
+    setError('')
+    if (rev) {
+      api<{ files?: { path: string }[] }>(`/api/repos/${repoId}/commits/${encodeURIComponent(rev)}?context=full`)
+        .then((detail) => setFiles((detail.files ?? []).map((file) => file.path)))
+        .catch((err) => setError(err instanceof Error ? err.message : '读取提交文件失败'))
+    } else {
+      api<RepoFiles>(`/api/repos/${repoId}/files`)
+        .then((res) => setFiles(res.files ?? []))
+        .catch((err) => setError(err instanceof Error ? err.message : '读取文件树失败'))
+    }
+  }, [repoId, rev])
+
+  const tree = useMemo(() => buildTree(files), [files])
+
+  useEffect(() => {
+    if (!path) return
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      let prefix = ''
+      for (const part of path.split('/').slice(0, -1)) {
+        prefix = prefix ? `${prefix}/${part}` : part
+        next.add(prefix)
+      }
+      return next
+    })
+  }, [path])
+
+  const toggle = (key: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  return (
+    <div className="file-tree-body">
+      <div className="file-tree-head">文件</div>
+      {error ? <p className="hint danger-text">{error}</p> : null}
+      {files.length === 0 && !error ? <Spinner label="读取文件索引…" /> : null}
+      <div className="tree file-tree">
+        <TreeLevel nodes={tree} depth={0} expanded={expanded} onToggle={toggle} onOpen={onOpen} activePath={path} />
+      </div>
+    </div>
+  )
+}
+
 /* ---------------- file viewer ---------------- */
 
 const MAX_HIGHLIGHT_LINES = 4000
@@ -392,6 +461,7 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
   const [error, setError] = useState('')
   const [immersive, setImmersive] = useImmersive()
   const [fontPanelOpen, setFontPanelOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('nemorous.fileSidebar') !== 'closed')
   const [fontSize, setFontSizeState] = useState(() => {
     const saved = Number(localStorage.getItem('nemorous.codeFontSize'))
     return saved >= 6 && saved <= 22 ? saved : 13
@@ -453,6 +523,18 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
     return () => removeEventListener('keydown', onKey)
   }, [immersive, fontSize])
 
+  const toggleSidebar = () => {
+    setSidebarOpen((open) => {
+      localStorage.setItem('nemorous.fileSidebar', open ? 'closed' : 'open')
+      return !open
+    })
+  }
+
+  const openTreeFile = (next: string) => {
+    if (rev) replace(`#/file?repo=${repoId}&path=${encodeURIComponent(next)}&rev=${encodeURIComponent(rev)}`)
+    else replace(`#/file?repo=${repoId}&path=${encodeURIComponent(next)}`)
+  }
+
   const copy = async () => {
     if (!file) return
     try {
@@ -464,11 +546,19 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
   }
 
   return (
-    <div className={`screen file-screen fill-screen ${immersive ? 'immersive' : ''}`} style={codeStyle}>
-      <header className="topbar">
-        <button
-          className="icon-btn"
-          onClick={() => {
+    <div className={`file-page ${immersive ? 'immersive' : ''} ${sidebarOpen ? 'sidebar-open' : ''}`}>
+      <aside className={`file-tree-sidebar ${sidebarOpen ? 'open' : ''}`}>
+        <FileTreePanel repoId={repoId} path={path} rev={rev} onOpen={openTreeFile} />
+      </aside>
+      <div className="file-main">
+        <div className={`screen file-screen fill-screen ${immersive ? 'immersive' : ''}`} style={codeStyle}>
+          <header className="topbar">
+            <button className="icon-btn sidebar-toggle" onClick={toggleSidebar} aria-label="文件目录">
+              <Icon name="panel" />
+            </button>
+            <button
+              className="icon-btn"
+              onClick={() => {
             if (repoId && rev) {
               back(`#/commit-file?repo=${encodeURIComponent(repoId)}&hash=${encodeURIComponent(rev)}&path=${encodeURIComponent(path)}`)
             } else {
@@ -534,6 +624,8 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
           font={{ size: fontSize, min: 6, max: 22, onChange: setFontSize }}
         />
       ) : null}
+        </div>
+      </div>
     </div>
   )
 }
