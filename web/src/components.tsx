@@ -1243,11 +1243,13 @@ export function MultiPatchView({
   collapsed,
   onToggleFile,
   fontSize = 12,
+  disableVirtualization = false,
 }: {
   files: MultiPatchFile[]
   collapsed: Set<string>
   onToggleFile: (path: string) => void
   fontSize?: number
+  disableVirtualization?: boolean
 }) {
   const lineHeight = Math.round(fontSize * 5 / 3)
   const [expandedFolds, setExpandedFolds] = useState<Set<string>>(new Set())
@@ -1293,6 +1295,10 @@ export function MultiPatchView({
   }, [])
 
   useLayoutEffect(() => {
+    if (disableVirtualization) {
+      setRange({ start: 0, end: rows.length })
+      return
+    }
     const top = scrollTop
     let lo = 0
     let hi = rows.length
@@ -1306,7 +1312,7 @@ export function MultiPatchView({
     while (end < rows.length && rows[end].top < top + height) end++
     end = Math.min(rows.length, end + MP_OVERSCAN)
     setRange((prev) => (prev.start === start && prev.end === end ? prev : { start, end }))
-  }, [rows, scrollTop, height])
+  }, [rows, scrollTop, height, disableVirtualization])
 
   useLayoutEffect(() => {
     const pending = pendingFoldAnchor.current

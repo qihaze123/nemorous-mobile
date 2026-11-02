@@ -4746,3 +4746,22 @@ h1 {
 .commit-message-toggle:hover {
   text-decoration: underline;
 }
+
+.commit-patch-search-root {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.commit-patch-search-root > .multi-patch {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.commit-patch-search-root .mp-viewport {
+  flex: 1;
+  max-height: none;
+}

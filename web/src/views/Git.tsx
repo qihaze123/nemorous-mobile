@@ -1071,6 +1071,11 @@ export function CommitPatchScreen({ repoId, hash }: { repoId: string; hash: stri
   const [immersive, setImmersive] = useImmersive()
   const [diffFontSize, setDiffFontSize] = useDiffFontSize()
   const [fontPanelOpen, setFontPanelOpen] = useState(false)
+  const [findOpen, setFindOpen] = useState(false)
+  const [find, setFind] = useState('')
+  const [findCount, setFindCount] = useState(0)
+  const [findActive, setFindActive] = useState(0)
+  const patchRoot = useRef<HTMLDivElement>(null)
   useEffect(() => {
     setCollapsed(new Set())
     setFontPanelOpen(false)
@@ -1082,6 +1087,59 @@ export function CommitPatchScreen({ repoId, hash }: { repoId: string; hash: stri
       .then(setDetail)
       .catch((err) => setError(err instanceof Error ? err.message : '读取提交失败'))
   }, [repoId, hash])
+
+  useEffect(() => {
+    const root = patchRoot.current
+    const highlights = (CSS as unknown as { highlights?: { delete: (name: string) => void; set: (name: string, value: unknown) => void } }).highlights
+    const HighlightCtor = (window as unknown as { Highlight?: new (...ranges: Range[]) => unknown }).Highlight
+    if (!root || !highlights || !HighlightCtor) {
+      setFindCount(0)
+      return
+    }
+    highlights.delete('diff-find')
+    highlights.delete('diff-find-active')
+    const query = find.trim()
+    if (!query) {
+      setFindCount(0)
+      return
+    }
+    const ranges: Range[] = []
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+    let node = walker.nextNode()
+    while (node) {
+      const parent = node.parentElement
+      if (!parent || parent.closest('.gutter, .marker')) {
+        node = walker.nextNode()
+        continue
+      }
+      const text = node.textContent ?? ''
+      const lower = text.toLowerCase()
+      const needle = query.toLowerCase()
+      let from = 0
+      while (from < lower.length) {
+        const at = lower.indexOf(needle, from)
+        if (at < 0) break
+        const range = document.createRange()
+        range.setStart(node, at)
+        range.setEnd(node, at + query.length)
+        ranges.push(range)
+        from = at + query.length
+      }
+      node = walker.nextNode()
+    }
+    setFindCount(ranges.length)
+    if (ranges.length === 0) return
+    const active = Math.min(findActive, ranges.length - 1)
+    highlights.set('diff-find', new HighlightCtor(...ranges))
+    highlights.set('diff-find-active', new HighlightCtor(ranges[active]))
+    const scroller = root.querySelector<HTMLElement>('.mp-viewport')
+    if (scroller) {
+      const box = scroller.getBoundingClientRect()
+      const match = ranges[active].getBoundingClientRect()
+      if (match.top < box.top || match.bottom > box.bottom) scroller.scrollTop += match.top - box.top - box.height / 3
+      if (match.left < box.left || match.right > box.right) scroller.scrollLeft += match.left - box.left - 20
+    }
+  }, [find, findActive, detail, collapsed, findOpen])
 
   const chunks = useMemo(() => splitPatch(detail?.patch ?? ''), [detail])
   const added = detail?.files.reduce((n, f) => n + f.added, 0) ?? 0
@@ -1114,6 +1172,15 @@ export function CommitPatchScreen({ repoId, hash }: { repoId: string; hash: stri
             <span className="plus">+{added}</span>
             <span className="minus">−{deleted}</span>
             <span className="grow" />
+            <button
+              className="mini-btn"
+              onClick={() => { setFindOpen((open) => !open); setFindActive(0) }}
+              aria-label="在完整 Patch 中查找"
+              aria-pressed={findOpen}
+              title="在完整 Patch 中查找"
+            >
+              <Icon name="search" size={15} />
+            </button>
             <button className="mini-btn font-toggle" onClick={() => setFontPanelOpen((open) => !open)} aria-label="字号" aria-pressed={fontPanelOpen} title="字号">Aa</button>
             <button
               className="mini-btn"
@@ -1125,20 +1192,47 @@ export function CommitPatchScreen({ repoId, hash }: { repoId: string; hash: stri
               {collapsed.size >= detail.files.length ? '全部展开' : '全部收起'}
             </button>
           </div>
-          <MultiPatchView
-            key={detail.commit.hash}
-            files={files}
-            fontSize={diffFontSize}
-            collapsed={collapsed}
-            onToggleFile={(path) =>
-              setCollapsed((prev) => {
-                const next = new Set(prev)
-                if (next.has(path)) next.delete(path)
-                else next.add(path)
-                return next
-              })
-            }
-          />
+          {findOpen ? (
+            <div className="diff-find-bar">
+              <Icon name="search" size={15} />
+              <input
+                value={find}
+                onChange={(event) => { setFind(event.target.value); setFindActive(0) }}
+                placeholder="在完整 Patch 中查找…"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                autoFocus
+              />
+              <span className="diff-find-count">{findCount ? `${Math.min(findActive + 1, findCount)}/${findCount}` : '0/0'}</span>
+              <button className="icon-btn tiny" disabled={findCount === 0} onClick={() => setFindActive((value) => (value - 1 + findCount) % findCount)} aria-label="上一个匹配">
+                <Icon name="up" size={14} />
+              </button>
+              <button className="icon-btn tiny" disabled={findCount === 0} onClick={() => setFindActive((value) => (value + 1) % findCount)} aria-label="下一个匹配">
+                <Icon name="down" size={14} />
+              </button>
+              <button className="icon-btn tiny" onClick={() => { setFindOpen(false); setFind(''); setFindActive(0) }} aria-label="关闭查找">
+                <Icon name="close" size={14} />
+              </button>
+            </div>
+          ) : null}
+          <div className="commit-patch-search-root" ref={patchRoot}>
+            <MultiPatchView
+              key={detail.commit.hash}
+              files={files}
+              fontSize={diffFontSize}
+              collapsed={collapsed}
+              disableVirtualization={findOpen}
+              onToggleFile={(path) =>
+                setCollapsed((prev) => {
+                  const next = new Set(prev)
+                  if (next.has(path)) next.delete(path)
+                  else next.add(path)
+                  return next
+                })
+              }
+            />
+          </div>
         </>
       ) : null}
       <div className="screen-bottom-space" />
