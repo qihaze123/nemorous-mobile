@@ -154,7 +154,7 @@ go build -o nemorous-mobile .
 终端会打印：
 
 ```text
-Nemorous Mobile 0.4.1
+Nemorous Mobile 0.4.2
 工作区: /Users/you/code（6 个仓库）
 配对码: 123456（19:42 前有效）
 安全: 默认只接受 HTTPS；本机回环除外。手机请通过 Tailscale Serve 或反向代理访问。
@@ -182,6 +182,14 @@ tailscale serve --bg 8787
 
 HTTPS 下 Service Worker 会自动注册，用于离线壳与后续推送能力。
 
+### 自动更新
+
+发布构建会注入更新仓库并启用自动检查；启动 60 秒后检查，之后每 6 小时检查一次。更新包必须通过内置 Ed25519 公钥验证的 `release-manifest.json`，且二进制 SHA-256 与大小都要匹配。安装时原子替换当前二进制并原地重启，不需要手动下载。
+
+本地构建默认没有 `-update-repo`，因此不会自动替换；需要时显式传 `-update-repo owner/repo`，或使用 `scripts/release.sh` 构建签名发布包。关闭自动更新：`-auto-update=false`。
+
+> 当前发布签名为 Ed25519 清单签名，用于更新完整性与来源校验；Apple Developer ID / 公证尚未配置。签名私钥在 `~/Library/Application Support/nemorous-mobile/release.key`（Linux 为 `~/.config/nemorous-mobile/release.key`），权限 `0600`，必须离线备份，丢失后旧客户端无法验证新版本。
+
 ### 参数
 
 | 参数 | 默认值 | 说明 |
@@ -189,6 +197,8 @@ HTTPS 下 Service Worker 会自动注册，用于离线壳与后续推送能力�
 | `-workspace` | 当前目录 / `$NEMOROUS_WORKSPACE` | 工作区根目录；根本身是仓库时只服务该仓库，否则扫描直接子目录 |
 | `-addr` | `:8787` | 监听地址 |
 | `-require-https` | `true` | 只接受 HTTPS（本机回环除外）；设为 false 才允许局域网 HTTP |
+| `-auto-update` | `true` | 自动检查并安装签名更新；`-update-repo` 为空时禁用 |
+| `-update-repo` | 发布构建注入 | 更新仓库 `owner/repo`；本地构建可显式指定 |
 | `-token` | 空 | 可选的 API Bearer 令牌（脚本 / curl）；也可用 `$NEMOROUS_TOKEN`；手机端不使用 |
 | `-state` | `os.UserConfigDir()/nemorous-mobile` | 配对设备状态目录（`devices.json`） |
 | `-web` | 空（使用内嵌资源） | 开发时从指定目录提供前端 |
@@ -297,7 +307,7 @@ npm run build                       # 生成类型 + 类型检查 + 生产构建
 - 会话 Cookie 只支持同源；反向代理时需要 HTTPS + 同源部署。
 - 默认只接受 HTTPS；局域网 HTTP 需 `-require-https=false`，且浏览器不提供 PWA 安装入口。
 - 文件查看上限 1 MiB、文件树 20000 条、高亮 4000 行；文件查看器只读，不支持手机端编辑保存。
-- 客户端检测到服务端版本变化后会提示刷新，但不会自行下载、替换或重启电脑端二进制；自动升级仍需部署层实现。
+- 服务端自动更新依赖 GitHub Release 与 Ed25519 签名清单；当前没有 Apple Developer ID 公证，macOS 首次运行仍建议本地构建或手动信任。
 - 设备会话 30 天滚动过期；撤销设备会立即失效，但当前没有应用锁。
 - 添加工作区会让所有已配对设备访问该路径下的 Git 仓库；只添加可信目录，不要把包含敏感仓库的父目录整体加入。
 - Diff 默认单栏 Unified；并排视图已提供，但手机竖屏通常需要横向滚动，横屏 / 平板体验更好。

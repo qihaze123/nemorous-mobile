@@ -345,3 +345,9 @@
 - CORS 从通配 `*` 收紧为同源；跨域预检直接拒绝。
 - 页面与 API 增加 CSP、`Referrer-Policy: no-referrer`、`X-Frame-Options: DENY`。
 - API 响应增加 `Cache-Control: no-store`，SSE 同时禁用缓存。
+
+## 0.4.2 — 2026-11-02
+
+- 发布包增加 Ed25519 签名清单与 SHA-256 校验；新增 `scripts/release.sh` 和 `cmd/signrelease`。
+- 服务端新增自动更新：启动 60 秒后检查，之后每 6 小时检查；签名验证通过后原子替换并原地重启。
+- 本地构建未注入更新仓库时自动更新禁用，避免误替换开发二进制。

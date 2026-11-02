@@ -15,21 +15,30 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
 
 	"nemorous-mobile/internal/app"
+	"nemorous-mobile/internal/updater"
 )
 
 //go:embed all:web/dist
 var embeddedWeb embed.FS
+
+// updateRepo is injected at release time with:
+//
+//	-ldflags "-X main.updateRepo=owner/repo"
+var updateRepo = ""
 
 func main() {
 	workspace := flag.String("workspace", defaultWorkspace(), "多仓工作区目录")
 	addr := flag.String("addr", ":8787", "监听地址，例如 :8787")
 	token := flag.String("token", envOr("NEMOROUS_TOKEN", ""), "可选的 API Bearer 令牌（脚本使用）；手机通过配对码连接")
 	requireHTTPS := flag.Bool("require-https", true, "只接受 HTTPS（本机回环除外）；设为 false 允许局域网 HTTP")
+	autoUpdate := flag.Bool("auto-update", true, "自动检查并安装签名更新；更新仓库为空时禁用")
+	repo := flag.String("update-repo", updateRepo, "更新仓库 owner/repo；发布构建会自动注入")
 	stateDir := flag.String("state", "", "状态目录（配对设备），默认 os.UserConfigDir()/nemorous-mobile")
 	webDir := flag.String("web", "", "开发模式：从该目录提供前端静态文件")
 	flag.Parse()
@@ -54,6 +63,13 @@ func main() {
 		ReadTimeout:       30 * time.Second,
 		IdleTimeout:       120 * time.Second,
 		MaxHeaderBytes:    1 << 20,
+	}
+	exe, _ := os.Executable()
+	updater.CleanupOld(exe)
+	if *autoUpdate && strings.TrimSpace(*repo) != "" {
+		go updateLoop(*repo, exe)
+	} else if *autoUpdate {
+		log.Printf("自动更新未启用：未配置 -update-repo")
 	}
 
 	code, expires := core.PairCode()
@@ -191,6 +207,34 @@ func logRequests(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func updateLoop(repo, exe string) {
+	const (
+		initialDelay = 60 * time.Second
+		interval     = 6 * time.Hour
+	)
+	timer := time.NewTimer(initialDelay)
+	defer timer.Stop()
+	manager := &updater.Manager{Repo: repo, PublicKey: updater.PublicKey}
+	for {
+		select {
+		case <-timer.C:
+		}
+		rel, err := manager.Check(context.Background(), app.Version)
+		if err != nil {
+			log.Printf("检查更新失败: %v", err)
+		} else if rel != nil {
+			log.Printf("发现新版本 %s，开始下载", rel.Version)
+			newPath, err := manager.Download(context.Background(), rel, filepath.Dir(exe))
+			if err != nil {
+				log.Printf("下载更新失败: %v", err)
+			} else if err := updater.ApplyAndRestart(exe, newPath); err != nil {
+				log.Printf("安装更新失败: %v", err)
+			}
+		}
+		timer.Reset(interval)
+	}
 }
 
 func envOr(key, fallback string) string {
