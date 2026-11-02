@@ -249,13 +249,8 @@ export function DiffScreen({
     const active = Math.min(findActive, ranges.length - 1)
     highlights.set('diff-find', new HighlightCtor(...ranges))
     highlights.set('diff-find-active', new HighlightCtor(ranges[active]))
-    const scroller = root.querySelector<HTMLElement>('.patch-viewport')
-    if (scroller) {
-      const box = scroller.getBoundingClientRect()
-      const match = ranges[active].getBoundingClientRect()
-      if (match.top < box.top || match.bottom > box.bottom) scroller.scrollTop += match.top - box.top - box.height / 3
-      if (match.left < box.left || match.right > box.right) scroller.scrollLeft += match.left - box.left - 20
-    }
+    const line = ranges[active].startContainer.parentElement?.closest<HTMLElement>('.diff-line, .mp-file-row')
+    line?.scrollIntoView({ block: 'center', inline: 'nearest' })
   }, [find, findActive, diff, folded, diffStyle])
 
   const copyPath = async () => {
