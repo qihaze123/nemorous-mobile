@@ -10,7 +10,7 @@ import (
 )
 
 // Version is stamped into the health response and the UI footer.
-const Version = "0.4.3"
+const Version = "0.4.4"
 
 // APIHandler returns the routed, authenticated JSON API.
 func (a *App) APIHandler() http.Handler {

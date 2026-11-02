@@ -38,6 +38,7 @@ func main() {
 	token := flag.String("token", envOr("NEMOROUS_TOKEN", ""), "可选的 API Bearer 令牌（脚本使用）；手机通过配对码连接")
 	requireHTTPS := flag.Bool("require-https", true, "只接受 HTTPS（本机回环除外）；设为 false 允许局域网 HTTP")
 	autoUpdate := flag.Bool("auto-update", true, "自动检查并安装签名更新；更新仓库为空时禁用")
+	updateInterval := flag.Duration("update-interval", time.Hour, "自动检查间隔（最小 5m，最大 24h）")
 	repo := flag.String("update-repo", updateRepo, "更新仓库 owner/repo；发布构建会自动注入")
 	stateDir := flag.String("state", "", "状态目录（配对设备），默认 os.UserConfigDir()/nemorous-mobile")
 	webDir := flag.String("web", "", "开发模式：从该目录提供前端静态文件")
@@ -67,7 +68,7 @@ func main() {
 	exe, _ := os.Executable()
 	updater.CleanupOld(exe)
 	if *autoUpdate && strings.TrimSpace(*repo) != "" {
-		go updateLoop(*repo, exe)
+		go updateLoop(*repo, exe, *updateInterval)
 	} else if *autoUpdate {
 		log.Printf("自动更新未启用：未配置 -update-repo")
 	}
@@ -209,11 +210,13 @@ func logRequests(next http.Handler) http.Handler {
 	})
 }
 
-func updateLoop(repo, exe string) {
-	const (
-		initialDelay = 60 * time.Second
-		interval     = 6 * time.Hour
-	)
+func updateLoop(repo, exe string, interval time.Duration) {
+	const initialDelay = 60 * time.Second
+	if interval < 5*time.Minute {
+		interval = 5 * time.Minute
+	} else if interval > 24*time.Hour {
+		interval = 24 * time.Hour
+	}
 	timer := time.NewTimer(initialDelay)
 	defer timer.Stop()
 	manager := &updater.Manager{Repo: repo, PublicKey: updater.PublicKey}

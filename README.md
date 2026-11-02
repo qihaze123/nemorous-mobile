@@ -154,7 +154,7 @@ go build -o nemorous-mobile .
 终端会打印：
 
 ```text
-Nemorous Mobile 0.4.3
+Nemorous Mobile 0.4.4
 工作区: /Users/you/code（6 个仓库）
 配对码: 123456（19:42 前有效）
 安全: 默认只接受 HTTPS；本机回环除外。手机请通过 Tailscale Serve 或反向代理访问。
@@ -184,7 +184,7 @@ HTTPS 下 Service Worker 会自动注册，用于离线壳与后续推送能力�
 
 ### 自动更新
 
-发布构建会注入更新仓库并启用自动检查；启动 60 秒后检查，之后每 6 小时检查一次。更新包必须通过内置 Ed25519 公钥验证的 `release-manifest.json`，且二进制 SHA-256 与大小都要匹配。安装时原子替换当前二进制并原地重启，不需要手动下载。
+发布构建会注入更新仓库并启用自动检查；启动 60 秒后检查，之后默认每小时检查一次，可用 `-update-interval` 调整（5 分钟到 24 小时）。更新包必须通过内置 Ed25519 公钥验证的 `release-manifest.json`，且二进制 SHA-256 与大小都要匹配。安装时原子替换当前二进制并原地重启，不需要手动下载。
 
 本地构建默认没有 `-update-repo`，因此不会自动替换；需要时显式传 `-update-repo owner/repo`，或使用 `scripts/release.sh` 构建签名发布包。关闭自动更新：`-auto-update=false`。
 
@@ -198,6 +198,7 @@ HTTPS 下 Service Worker 会自动注册，用于离线壳与后续推送能力�
 | `-addr` | `:8787` | 监听地址 |
 | `-require-https` | `true` | 只接受 HTTPS（本机回环除外）；设为 false 才允许局域网 HTTP |
 | `-auto-update` | `true` | 自动检查并安装签名更新；`-update-repo` 为空时禁用 |
+| `-update-interval` | `1h` | 自动检查间隔；最小 5m，最大 24h |
 | `-update-repo` | 发布构建注入 | 更新仓库 `owner/repo`；本地构建可显式指定 |
 | `-token` | 空 | 可选的 API Bearer 令牌（脚本 / curl）；也可用 `$NEMOROUS_TOKEN`；手机端不使用 |
 | `-state` | `os.UserConfigDir()/nemorous-mobile` | 配对设备状态目录（`devices.json`） |
