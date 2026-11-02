@@ -1066,6 +1066,7 @@ export function CommitPatchScreen({ repoId, hash }: { repoId: string; hash: stri
   const [immersive, setImmersive] = useImmersive()
   const [diffFontSize, setDiffFontSize] = useDiffFontSize()
   const [fontPanelOpen, setFontPanelOpen] = useState(false)
+  const [wrapPaths, setWrapPaths] = useState(() => localStorage.getItem('nemorous.patchWrapPaths') !== 'off')
   const [findOpen, setFindOpen] = useState(false)
   const [find, setFind] = useState('')
   const [findCount, setFindCount] = useState(0)
@@ -1164,6 +1165,20 @@ export function CommitPatchScreen({ repoId, hash }: { repoId: string; hash: stri
             <span className="grow" />
             <button
               className="mini-btn"
+              onClick={() => {
+                setWrapPaths((value) => {
+                  localStorage.setItem('nemorous.patchWrapPaths', value ? 'off' : 'on')
+                  return !value
+                })
+              }}
+              aria-label="自动换行文件路径"
+              aria-pressed={wrapPaths}
+              title="自动换行文件路径"
+            >
+              <Icon name="wrap" size={15} />
+            </button>
+            <button
+              className="mini-btn"
               onClick={() => { setFindOpen((open) => !open); setFindActive(0) }}
               aria-label="在完整 Patch 中查找"
               aria-pressed={findOpen}
@@ -1213,6 +1228,7 @@ export function CommitPatchScreen({ repoId, hash }: { repoId: string; hash: stri
               fontSize={diffFontSize}
               collapsed={collapsed}
               disableVirtualization={findOpen}
+              wrapPaths={wrapPaths}
               onToggleFile={(path) =>
                 setCollapsed((prev) => {
                   const next = new Set(prev)

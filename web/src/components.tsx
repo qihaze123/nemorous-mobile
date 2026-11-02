@@ -1245,12 +1245,14 @@ export function MultiPatchView({
   onToggleFile,
   fontSize = 12,
   disableVirtualization = false,
+  wrapPaths = false,
 }: {
   files: MultiPatchFile[]
   collapsed: Set<string>
   onToggleFile: (path: string) => void
   fontSize?: number
   disableVirtualization?: boolean
+  wrapPaths?: boolean
 }) {
   const lineHeight = Math.round(fontSize * 5 / 3)
   const [expandedFolds, setExpandedFolds] = useState<Set<string>>(new Set())
@@ -1265,8 +1267,11 @@ export function MultiPatchView({
     const out: MultiRow[] = []
     let top = 0
     for (const file of files) {
-      out.push({ kind: 'file', file, top, height: MP_FILE_HEIGHT })
-      top += MP_FILE_HEIGHT
+      const fileHeight = wrapPaths
+        ? Math.min(84, Math.max(MP_FILE_HEIGHT, 24 + Math.ceil((file.path.length + 24) / 46) * 15))
+        : MP_FILE_HEIGHT
+      out.push({ kind: 'file', file, top, height: fileHeight })
+      top += fileHeight
       if (collapsed.has(file.path)) continue
       const rawLines = parsePatch(file.patch)
       const lines = foldContextRows(rawLines, expandedFolds, 3, `${file.path}:`)
@@ -1280,7 +1285,7 @@ export function MultiPatchView({
       }
     }
     return out
-  }, [files, collapsed, expandedFolds, lineHeight])
+  }, [files, collapsed, expandedFolds, lineHeight, wrapPaths])
   const total = rows.length ? rows[rows.length - 1].top + rows[rows.length - 1].height : 0
 
   useEffect(() => {
@@ -1368,7 +1373,7 @@ export function MultiPatchView({
             row.kind === 'file' ? (
               <button
                 key={`f:${row.file.path}`}
-                className="mp-file-row"
+                className={`mp-file-row ${wrapPaths ? 'wrap-paths' : ''}`}
                 style={{ top: row.top, height: row.height }}
                 onClick={() => onToggleFile(row.file.path)}
                 aria-expanded={!collapsed.has(row.file.path)}

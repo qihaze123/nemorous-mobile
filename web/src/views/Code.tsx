@@ -6,7 +6,7 @@ import type { FileContent, RepoFiles, SearchMatch, SearchResult, Workspace } fro
 import { api } from '../api'
 import { back, go, replace, useDebounced, useImmersive, usePinchZoom, useSidebarWidth, useSidebarZoom } from '../hooks'
 import { Empty, FileTypeIcon, Icon, ImmersiveDock, SectionTitle, SidebarResizer, Spinner, repoColor, useToast } from '../components'
-import { languageOf, syntaxSegments } from '../syntax'
+import { languageOf } from '../syntax'
 
 function fileName(path: string) {
   const i = path.lastIndexOf('/')
@@ -520,7 +520,6 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
   const [immersive, setImmersive] = useImmersive()
   const [fontPanelOpen, setFontPanelOpen] = useState(false)
   const [markdownPreview, setMarkdownPreview] = useState(() => localStorage.getItem('nemorous.markdownPreview') !== 'source')
-  const [wrapCode, setWrapCode] = useState(() => localStorage.getItem('nemorous.codeWrap') !== 'off')
   const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('nemorous.fileSidebar') !== 'closed')
   const [sidebarWidth, setSidebarWidth] = useSidebarWidth('nemorous.fileSidebarWidth')
   const [sidebarZoom, setSidebarZoom] = useSidebarZoom()
@@ -582,12 +581,8 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
 
   useEffect(() => {
     if (!file || !lineParam || !scrollRef.current || (isMarkdown && markdownPreview)) return
-    if (wrapCode) {
-      scrollRef.current.querySelector<HTMLElement>(`[data-line="${lineParam}"]`)?.scrollIntoView({ block: 'center' })
-    } else {
-      scrollRef.current.scrollTop = Math.max(0, (lineParam - 1) * lineHeight - 120)
-    }
-  }, [file, lineParam, lineHeight, isMarkdown, markdownPreview, wrapCode])
+    scrollRef.current.scrollTop = Math.max(0, (lineParam - 1) * lineHeight - 120)
+  }, [file, lineParam, lineHeight, isMarkdown, markdownPreview])
 
   useEffect(() => {
     if (!immersive) return
@@ -686,20 +681,6 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
               <button className="icon-btn" onClick={() => setImmersive(true)} aria-label="沉浸查看" title="沉浸查看">
                 <Icon name="expand" />
               </button>
-              <button
-                className="icon-btn"
-                onClick={() => {
-                  setWrapCode((value) => {
-                    localStorage.setItem('nemorous.codeWrap', value ? 'off' : 'on')
-                    return !value
-                  })
-                }}
-                aria-label="自动换行"
-                aria-pressed={wrapCode}
-                title="自动换行"
-              >
-                <Icon name="wrap" />
-              </button>
               <button className="icon-btn font-toggle" onClick={() => setFontPanelOpen((open) => !open)} aria-label="字号" aria-pressed={fontPanelOpen} title="字号">Aa</button>
               <button className="icon-btn" onClick={() => void copy()} aria-label="复制">
                 <Icon name="copy" />
@@ -709,23 +690,6 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
           {isMarkdown && markdownPreview ? (
             <div className="markdown-scroll" ref={scrollRef}>
               <div className="markdown-body" dangerouslySetInnerHTML={{ __html: markdownHtml }} />
-            </div>
-          ) : wrapCode ? (
-            <div className="code-scroll wrapped" ref={scrollRef}>
-              <div className="wrapped-code">
-                {lines.slice(0, lineCount).map((line, index) => (
-                  <div className={`wrapped-row ${lineParam === index + 1 ? 'hit' : ''}`} data-line={index + 1} key={index}>
-                    <span className="wrapped-gutter">{index + 1}</span>
-                    <code className="wrapped-code-text">
-                      {canHighlight
-                        ? syntaxSegments(line, languageOf(path)).map((segment, segmentIndex) =>
-                            segment.className ? <span key={segmentIndex} className={segment.className}>{segment.text}</span> : <Fragment key={segmentIndex}>{segment.text}</Fragment>,
-                          )
-                        : line || ' '}
-                    </code>
-                  </div>
-                ))}
-              </div>
             </div>
           ) : (
             <div className="code-scroll" ref={scrollRef}>
