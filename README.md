@@ -112,6 +112,7 @@ Go 伴生服务 · React + Vite PWA · 单二进制内嵌前端 · 零运行时�
 - 会话 30 天滚动过期：每次使用自动续期；30 天未活跃自动失效。
 - 设备列表展示名称、最近活跃、加入时间；可逐台撤销或一键撤销全部其他设备。
 - 默认只接受 HTTPS（本机回环除外）；`-require-https=false` 可显式允许局域网 HTTP。
+- 同源 CORS；CSP、`Referrer-Policy: no-referrer`、`X-Frame-Options: DENY` 与 API `Cache-Control: no-store`。
 - API 按会话 / IP 限流 600 次/分钟，突发 120 次；正常浏览与 Git 操作不受影响。
 - 同源写保护：Cookie 鉴权的写请求校验 `Origin` / `Sec-Fetch-Site`。
 - 可选 `-token` 仅供脚本使用 `Authorization: Bearer`；手机端不使用长令牌。
@@ -153,7 +154,7 @@ go build -o nemorous-mobile .
 终端会打印：
 
 ```text
-Nemorous Mobile 0.4.0
+Nemorous Mobile 0.4.1
 工作区: /Users/you/code（6 个仓库）
 配对码: 123456（19:42 前有效）
 安全: 默认只接受 HTTPS；本机回环除外。手机请通过 Tailscale Serve 或反向代理访问。

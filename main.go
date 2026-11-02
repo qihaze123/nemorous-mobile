@@ -145,6 +145,7 @@ func lanURLs(port, code string) []string {
 // staticHandler serves the embedded client with an SPA fallback.
 func staticHandler(fsys fs.FS) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		app.SetSecurityHeaders(w)
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return

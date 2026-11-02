@@ -339,3 +339,9 @@
 - 默认只接受 HTTPS（本机回环与 Tailscale Serve / 同机反向代理除外）；新增 `-require-https=false` 显式允许局域网 HTTP。
 - API 增加按会话 / IP 的令牌桶限流（600 次/分钟，突发 120 次）。
 - 服务端补充 ReadTimeout、IdleTimeout 与 1 MiB Header 上限。
+
+## 0.4.1 — 2026-11-02
+
+- CORS 从通配 `*` 收紧为同源；跨域预检直接拒绝。
+- 页面与 API 增加 CSP、`Referrer-Policy: no-referrer`、`X-Frame-Options: DENY`。
+- API 响应增加 `Cache-Control: no-store`，SSE 同时禁用缓存。

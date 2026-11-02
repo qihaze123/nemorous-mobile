@@ -6,10 +6,11 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 // Version is stamped into the health response and the UI footer.
-const Version = "0.4.0"
+const Version = "0.4.1"
 
 // APIHandler returns the routed, authenticated JSON API.
 func (a *App) APIHandler() http.Handler {
@@ -82,12 +83,33 @@ func (a *App) authed(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+const contentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self'; media-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+
+// SetSecurityHeaders applies response hardening shared by the API and static UI.
+func SetSecurityHeaders(w http.ResponseWriter) {
+	w.Header().Set("Content-Security-Policy", contentSecurityPolicy)
+	w.Header().Set("Referrer-Policy", "no-referrer")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "DENY")
+}
+
 func withCommon(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
-		w.Header().Set("X-Content-Type-Options", "nosniff")
+		SetSecurityHeaders(w)
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			w.Header().Set("Cache-Control", "no-store")
+		}
+		if origin := r.Header.Get("Origin"); origin != "" {
+			w.Header().Add("Vary", "Origin")
+			if sameOrigin(r) {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+			} else if r.Method == http.MethodOptions {
+				http.Error(w, "跨域请求被拒绝", http.StatusForbidden)
+				return
+			}
+		}
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return

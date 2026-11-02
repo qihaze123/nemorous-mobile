@@ -1154,3 +1154,42 @@ func TestRateLimiterBurst(t *testing.T) {
 		t.Fatal("token should refill after one second")
 	}
 }
+
+func TestSecurityHeadersAndSameOriginCORS(t *testing.T) {
+	app, _ := newTestApp(t)
+	srv := httptest.NewServer(app.APIHandler())
+	defer srv.Close()
+
+	req, _ := http.NewRequest(http.MethodGet, srv.URL+"/api/health", nil)
+	req.Header.Set("Origin", srv.URL)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if got := res.Header.Get("Access-Control-Allow-Origin"); got != srv.URL {
+		t.Fatalf("same-origin ACAO = %q", got)
+	}
+	for _, key := range []string{"Content-Security-Policy", "Referrer-Policy", "X-Content-Type-Options", "X-Frame-Options"} {
+		if res.Header.Get(key) == "" {
+			t.Fatalf("missing %s header", key)
+		}
+	}
+	if got := res.Header.Get("Cache-Control"); !strings.Contains(got, "no-store") {
+		t.Fatalf("API cache-control = %q", got)
+	}
+
+	req, _ = http.NewRequest(http.MethodOptions, srv.URL+"/api/health", nil)
+	req.Header.Set("Origin", "https://evil.example")
+	res, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusForbidden {
+		t.Fatalf("cross-origin preflight status = %d", res.StatusCode)
+	}
+	if got := res.Header.Get("Access-Control-Allow-Origin"); got != "" {
+		t.Fatalf("cross-origin ACAO = %q", got)
+	}
+}
