@@ -4765,3 +4765,42 @@ h1 {
   flex: 1;
   max-height: none;
 }
+
+.code-scroll.wrapped {
+  padding: 0;
+}
+
+.wrapped-code {
+  min-width: 0;
+}
+
+.wrapped-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  min-height: calc(var(--code-line-height, 20px));
+  font: var(--code-font-size, 12.5px)/var(--code-line-height, 20px) ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.wrapped-row.hit {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.wrapped-gutter {
+  flex: none;
+  width: 38px;
+  padding-right: 8px;
+  color: var(--muted);
+  text-align: right;
+  user-select: none;
+  border-right: 1px solid var(--border-soft);
+  background: var(--bg);
+}
+
+.wrapped-code-text {
+  flex: 1;
+  min-width: 0;
+  padding: 0 14px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
