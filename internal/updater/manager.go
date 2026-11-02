@@ -5,7 +5,6 @@ import (
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -35,63 +34,37 @@ type Release struct {
 type Manager struct {
 	Repo      string
 	PublicKey ed25519.PublicKey
-	APIBase   string
-	Client    *http.Client
+	// ReleaseBase overrides the download base for tests. Production uses the
+	// /releases/latest/download/ path, avoiding unauthenticated API rate limits.
+	ReleaseBase string
+	Client      *http.Client
 }
 
-type githubRelease struct {
-	TagName string `json:"tag_name"`
-	Assets  []struct {
-		Name               string `json:"name"`
-		BrowserDownloadURL string `json:"browser_download_url"`
-		Size               int64  `json:"size"`
-	} `json:"assets"`
-}
-
-// Check returns the latest signed build for this OS/architecture. It returns
-// nil when the latest release is not newer than current.
+// Check downloads the latest signed manifest and returns a newer build for
+// this OS/architecture. It returns nil when the latest release is not newer.
 func (m *Manager) Check(ctx context.Context, current string) (*Release, error) {
 	if strings.TrimSpace(m.Repo) == "" {
 		return nil, errors.New("未配置更新仓库")
 	}
-	base := strings.TrimRight(m.APIBase, "/")
+	base := strings.TrimRight(m.ReleaseBase, "/")
 	if base == "" {
-		base = "https://api.github.com"
+		base = "https://github.com/" + strings.Trim(m.Repo, "/") + "/releases/latest/download"
 	}
 	client := m.Client
 	if client == nil {
 		client = &http.Client{Timeout: updateAPITimeout}
 	}
-	var latest githubRelease
-	if err := getJSON(ctx, client, base+"/repos/"+m.Repo+"/releases/latest", &latest); err != nil {
-		return nil, err
-	}
-	byName := map[string]string{}
-	for _, a := range latest.Assets {
-		byName[a.Name] = a.BrowserDownloadURL
-	}
-	manifestURL, ok := byName[ManifestName]
-	if !ok {
-		return nil, errors.New("最新版本没有签名清单")
-	}
-	sigURL, ok := byName[SignatureName]
-	if !ok {
-		return nil, errors.New("最新版本没有清单签名")
-	}
-	raw, err := getBytes(ctx, client, manifestURL, maxManifestSize)
+	raw, err := getBytes(ctx, client, base+"/"+ManifestName, maxManifestSize)
 	if err != nil {
 		return nil, err
 	}
-	sig, err := getBytes(ctx, client, sigURL, maxManifestSize)
+	sig, err := getBytes(ctx, client, base+"/"+SignatureName, maxManifestSize)
 	if err != nil {
 		return nil, err
 	}
 	manifest, err := Verify(raw, sig, m.PublicKey)
 	if err != nil {
 		return nil, err
-	}
-	if !SameVersion(manifest.Version, latest.TagName) {
-		return nil, errors.New("更新清单版本与 Release 标签不一致")
 	}
 	if !VersionLess(current, manifest.Version) {
 		return nil, nil
@@ -101,11 +74,12 @@ func (m *Manager) Check(ctx context.Context, current string) (*Release, error) {
 	if !ok {
 		return nil, fmt.Errorf("该版本没有 %s 构建", key)
 	}
-	url, ok := byName[a.Name]
-	if !ok {
-		return nil, fmt.Errorf("Release 缺少文件 %s", a.Name)
-	}
-	return &Release{Version: manifest.Version, Manifest: manifest, Asset: a, URL: url}, nil
+	return &Release{
+		Version:  manifest.Version,
+		Manifest: manifest,
+		Asset:    a,
+		URL:      base + "/" + a.Name,
+	}, nil
 }
 
 // Download writes the verified binary into dir. The directory must be on the
@@ -194,17 +168,6 @@ func getBytes(ctx context.Context, client *http.Client, url string, limit int64)
 		return nil, errors.New("更新响应过大")
 	}
 	return data, nil
-}
-
-func getJSON(ctx context.Context, client *http.Client, url string, v any) error {
-	data, err := getBytes(ctx, client, url, 1<<20)
-	if err != nil {
-		return err
-	}
-	if err := json.Unmarshal(data, v); err != nil {
-		return fmt.Errorf("解析更新信息: %w", err)
-	}
-	return nil
 }
 
 // CleanupOld removes the .old binary left by a successful self-update.

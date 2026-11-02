@@ -154,7 +154,7 @@ go build -o nemorous-mobile .
 终端会打印：
 
 ```text
-Nemorous Mobile 0.4.2
+Nemorous Mobile 0.4.3
 工作区: /Users/you/code（6 个仓库）
 配对码: 123456（19:42 前有效）
 安全: 默认只接受 HTTPS；本机回环除外。手机请通过 Tailscale Serve 或反向代理访问。

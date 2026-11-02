@@ -25,4 +25,4 @@ go run ./cmd/signrelease -verify "$out"
 
 echo "release assets: $out"
 echo "update repo: $repo"
-echo "upload with: gh release create v${version} --title \"v${version}\" --notes-file <notes> ${out}/*.zip ${out}/release-manifest.json ${out}/release-manifest.json.sig"
+echo "upload with: gh release create v${version} --title \"v${version}\" --notes-file <notes> ${out}/*"

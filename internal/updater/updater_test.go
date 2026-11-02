@@ -72,25 +72,14 @@ func TestCheckAndDownloadSignedRelease(t *testing.T) {
 	}
 	sig := base64.StdEncoding.EncodeToString(ed25519.Sign(priv, raw))
 
-	var srv *httptest.Server
 	mux := http.NewServeMux()
-	mux.HandleFunc("/repos/o/r/releases/latest", func(w http.ResponseWriter, _ *http.Request) {
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"tag_name": "v0.4.2",
-			"assets": []map[string]any{
-				{"name": ManifestName, "browser_download_url": srv.URL + "/manifest"},
-				{"name": SignatureName, "browser_download_url": srv.URL + "/sig"},
-				{"name": "nemorous-mobile-test", "browser_download_url": srv.URL + "/bin"},
-			},
-		})
-	})
-	mux.HandleFunc("/manifest", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(raw) })
-	mux.HandleFunc("/sig", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(sig)) })
-	mux.HandleFunc("/bin", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(binary) })
-	srv = httptest.NewServer(mux)
+	mux.HandleFunc("/latest/"+ManifestName, func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(raw) })
+	mux.HandleFunc("/latest/"+SignatureName, func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(sig)) })
+	mux.HandleFunc("/latest/nemorous-mobile-test", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(binary) })
+	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
-	manager := &Manager{Repo: "o/r", PublicKey: pub, APIBase: srv.URL, Client: srv.Client()}
+	manager := &Manager{Repo: "o/r", PublicKey: pub, ReleaseBase: srv.URL + "/latest", Client: srv.Client()}
 	release, err := manager.Check(context.Background(), "0.4.1")
 	if err != nil {
 		t.Fatal(err)
@@ -121,23 +110,13 @@ func TestCheckRejectsTamperedManifest(t *testing.T) {
 		t.Fatal(err)
 	}
 	raw := []byte(`{"version":"0.4.2","assets":{"` + AssetKey(runtime.GOOS, runtime.GOARCH) + `":{"name":"x","sha256":"` + repeatHex(64) + `","size":1}}}`)
-	var srv *httptest.Server
 	mux := http.NewServeMux()
-	mux.HandleFunc("/repos/o/r/releases/latest", func(w http.ResponseWriter, _ *http.Request) {
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"tag_name": "v0.4.2",
-			"assets": []map[string]any{
-				{"name": ManifestName, "browser_download_url": srv.URL + "/manifest"},
-				{"name": SignatureName, "browser_download_url": srv.URL + "/sig"},
-			},
-		})
-	})
-	mux.HandleFunc("/manifest", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(raw) })
-	mux.HandleFunc("/sig", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("not-a-signature")) })
-	srv = httptest.NewServer(mux)
+	mux.HandleFunc("/latest/"+ManifestName, func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(raw) })
+	mux.HandleFunc("/latest/"+SignatureName, func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("not-a-signature")) })
+	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
-	manager := &Manager{Repo: "o/r", PublicKey: pub, APIBase: srv.URL, Client: srv.Client()}
+	manager := &Manager{Repo: "o/r", PublicKey: pub, ReleaseBase: srv.URL + "/latest", Client: srv.Client()}
 	if _, err := manager.Check(context.Background(), "0.4.1"); err == nil {
 		t.Fatal("tampered release was accepted")
 	}
