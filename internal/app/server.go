@@ -9,7 +9,7 @@ import (
 )
 
 // Version is stamped into the health response and the UI footer.
-const Version = "0.3.51"
+const Version = "0.4.0"
 
 // APIHandler returns the routed, authenticated JSON API.
 func (a *App) APIHandler() http.Handler {
@@ -51,9 +51,10 @@ func (a *App) APIHandler() http.Handler {
 	mux.HandleFunc("POST /api/batch/stash/pop", a.authed(a.handleBatchStashPop))
 	mux.HandleFunc("GET /api/pair/code", a.authed(a.handlePairCode))
 	mux.HandleFunc("GET /api/devices", a.authed(a.handleDevices))
+	mux.HandleFunc("DELETE /api/devices", a.authed(a.handleRevokeAllDevices))
 	mux.HandleFunc("DELETE /api/devices/{id}", a.authed(a.handleRevokeDevice))
 	mux.HandleFunc("GET /api/events", a.authed(a.handleEvents))
-	return withCommon(mux)
+	return withCommon(newRateLimiter(apiRatePerMinute, apiBurst).middleware(mux))
 }
 
 // authed accepts a paired-device cookie or the optional API bearer token.
@@ -63,6 +64,13 @@ func (a *App) authed(next http.HandlerFunc) http.HandlerFunc {
 		if !ok {
 			writeError(w, http.StatusUnauthorized, "设备未配对或会话已失效，请用配对码连接")
 			return
+		}
+		if info.Cookie {
+			if c, err := r.Cookie(sessionCookie); err == nil {
+				// Sliding expiration: every authenticated request renews both
+				// the server-side idle clock and the browser cookie.
+				setSessionCookie(w, r, c.Value)
+			}
 		}
 		// A cookie is ambient authority; require same-origin writes so a
 		// malicious site cannot drive the console with the user's session.

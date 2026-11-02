@@ -1027,3 +1027,130 @@ func TestInspectSkipsUntrackedNestedRepository(t *testing.T) {
 		t.Fatalf("untracked = %d, want 1", st.UntrackedCount)
 	}
 }
+
+func TestRevokeAllDevicesKeepsCurrent(t *testing.T) {
+	app, _ := newTestApp(t)
+	srv := httptest.NewServer(app.APIHandler())
+	defer srv.Close()
+
+	first := newCookieClient(t)
+	res, body := postJSON(t, first, srv.URL+"/api/pair", map[string]string{"code": "123456", "name": "iPhone"}, nil)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("first pair: %d %s", res.StatusCode, body)
+	}
+	second := newCookieClient(t)
+	res, body = postJSON(t, second, srv.URL+"/api/pair", map[string]string{"code": "123456", "name": "Pixel"}, nil)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("second pair: %d %s", res.StatusCode, body)
+	}
+
+	req, _ := http.NewRequest(http.MethodDelete, srv.URL+"/api/devices", nil)
+	res, err := first.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out struct {
+		Revoked int `json:"revoked"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusOK || out.Revoked != 1 {
+		t.Fatalf("revoke all = %d %+v", res.StatusCode, out)
+	}
+	res, err = second.Get(srv.URL + "/api/workspace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("revoked peer still works: %d", res.StatusCode)
+	}
+	res, err = first.Get(srv.URL + "/api/workspace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("current device lost session: %d", res.StatusCode)
+	}
+}
+
+func TestIdleSessionExpires(t *testing.T) {
+	app, _ := newTestApp(t)
+	srv := httptest.NewServer(app.APIHandler())
+	defer srv.Close()
+	client := newCookieClient(t)
+	res, body := postJSON(t, client, srv.URL+"/api/pair", map[string]string{"code": "123456", "name": "iPhone"}, nil)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("pair: %d %s", res.StatusCode, body)
+	}
+
+	app.devices.mu.Lock()
+	for _, rec := range app.devices.byID {
+		rec.LastSeenAt = time.Now().Add(-sessionIdle - time.Hour).Unix()
+	}
+	_ = app.devices.saveLocked()
+	app.devices.mu.Unlock()
+
+	res, err := client.Get(srv.URL + "/api/workspace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expired session status = %d", res.StatusCode)
+	}
+}
+
+func TestHTTPSOnly(t *testing.T) {
+	ok := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+	remote := func(addr string) *http.Request {
+		r := httptest.NewRequest(http.MethodGet, "http://example.test/api/health", nil)
+		r.RemoteAddr = addr
+		return r
+	}
+	for _, tc := range []struct {
+		name    string
+		enabled bool
+		addr    string
+		xfp     string
+		want    int
+	}{
+		{"remote http rejected", true, "203.0.113.5:1234", "", http.StatusUpgradeRequired},
+		{"remote spoofed xfp rejected", true, "203.0.113.5:1234", "https", http.StatusUpgradeRequired},
+		{"loopback allowed", true, "127.0.0.1:5555", "", http.StatusOK},
+		{"ipv6 loopback allowed", true, "[::1]:5555", "", http.StatusOK},
+		{"disabled allows remote", false, "203.0.113.5:1234", "", http.StatusOK},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := remote(tc.addr)
+			if tc.xfp != "" {
+				r.Header.Set("X-Forwarded-Proto", tc.xfp)
+			}
+			w := httptest.NewRecorder()
+			HTTPSOnly(tc.enabled, ok).ServeHTTP(w, r)
+			if w.Code != tc.want {
+				t.Fatalf("status = %d, want %d", w.Code, tc.want)
+			}
+		})
+	}
+}
+
+func TestRateLimiterBurst(t *testing.T) {
+	limiter := newRateLimiter(60, 2)
+	now := time.Now()
+	if !limiter.allow("session:a", now) || !limiter.allow("session:a", now) {
+		t.Fatal("burst requests should pass")
+	}
+	if limiter.allow("session:a", now) {
+		t.Fatal("third immediate request should be limited")
+	}
+	if !limiter.allow("session:b", now) {
+		t.Fatal("budgets must be independent per session")
+	}
+	if !limiter.allow("session:a", now.Add(time.Second)) {
+		t.Fatal("token should refill after one second")
+	}
+}

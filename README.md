@@ -109,7 +109,10 @@ Go 伴生服务 · React + Vite PWA · 单二进制内嵌前端 · 零运行时�
 
 - 6 位配对码，10 分钟有效；过期自动轮换并打印到终端。
 - 配对成功写入 `HttpOnly + SameSite=Lax` 会话 Cookie，页面脚本读不到凭证。
-- 设备列表展示名称、最近活跃、加入时间；可逐台撤销，撤销立即失效。
+- 会话 30 天滚动过期：每次使用自动续期；30 天未活跃自动失效。
+- 设备列表展示名称、最近活跃、加入时间；可逐台撤销或一键撤销全部其他设备。
+- 默认只接受 HTTPS（本机回环除外）；`-require-https=false` 可显式允许局域网 HTTP。
+- API 按会话 / IP 限流 600 次/分钟，突发 120 次；正常浏览与 Git 操作不受影响。
 - 同源写保护：Cookie 鉴权的写请求校验 `Origin` / `Sec-Fetch-Site`。
 - 可选 `-token` 仅供脚本使用 `Authorization: Bearer`；手机端不使用长令牌。
 
@@ -124,7 +127,8 @@ Go 伴生服务 · React + Vite PWA · 单二进制内嵌前端 · 零运行时�
 - **改写有边界**：`--amend` 与软撤销只允许未推送、未打标签的提交；合并提交不能撤销。
 - **路径隔离**：仓库相对路径做规范化与 symlink 逃逸检查，禁止访问 `.git`。
 - **命令可控**：`GIT_TERMINAL_PROMPT=0`，读操作 15s、写操作 120s 超时。
-- **会话安全**：会话令牌只存 SHA-256；配对码按 IP 限制失败次数；请求体上限 1 MiB。
+- **会话安全**：会话令牌只存 SHA-256；30 天滚动过期；配对码按 IP 限制失败次数；请求体上限 1 MiB。
+- **传输安全**：默认拒绝非 HTTPS 远程请求；本机回环和 Tailscale Serve / 同机反向代理通过 127.0.0.1 访问。
 
 > 一台已配对设备等同于工作区写权限。只在可信网络（家庭 / 公司内网 / Tailscale）中启动服务，不要把端口直接暴露到公网；手机丢失时在设置页立即撤销。
 
@@ -149,17 +153,18 @@ go build -o nemorous-mobile .
 终端会打印：
 
 ```text
-Nemorous Mobile 0.3.51
+Nemorous Mobile 0.4.0
 工作区: /Users/you/code（6 个仓库）
 配对码: 123456（19:42 前有效）
-手机打开: http://192.168.1.5:8787/?pair=123456
+安全: 默认只接受 HTTPS；本机回环除外。手机请通过 Tailscale Serve 或反向代理访问。
+本机调试: http://localhost:8787/?pair=123456
 ```
 
-手机与电脑处于同一网络后打开该链接即可自动配对；也可以在任意页面手动输入配对码。需要用二维码时，把终端里的链接交给任意二维码工具生成后再用手机扫描。配对成功后 Cookie 自动保存，地址栏里的配对码会被移除。
+手机端默认必须走 HTTPS（Tailscale Serve 或反向代理），局域网 `http://<IP>:8787` 会被拒绝；只有显式加 `-require-https=false` 才允许 HTTP。本机 `localhost` 不受限制。配对成功后 Cookie 自动保存，地址栏里的配对码会被移除。
 
 ### 安装到手机（全屏运行）
 
-Chrome 只会在 **HTTPS 安全上下文**提供安装入口。局域网 `http://<IP>:8787` 可以正常浏览，但无法安装，也不会隐藏浏览器地址栏。
+Chrome 只会在 **HTTPS 安全上下文**提供安装入口。默认配置下局域网 HTTP 会被直接拒绝；即使加 `-require-https=false` 允许浏览，也无法安装或隐藏浏览器地址栏。
 
 推荐用 Tailscale Serve 把本机服务放到 HTTPS：
 
@@ -182,6 +187,7 @@ HTTPS 下 Service Worker 会自动注册，用于离线壳与后续推送能力�
 | --- | --- | --- |
 | `-workspace` | 当前目录 / `$NEMOROUS_WORKSPACE` | 工作区根目录；根本身是仓库时只服务该仓库，否则扫描直接子目录 |
 | `-addr` | `:8787` | 监听地址 |
+| `-require-https` | `true` | 只接受 HTTPS（本机回环除外）；设为 false 才允许局域网 HTTP |
 | `-token` | 空 | 可选的 API Bearer 令牌（脚本 / curl）；也可用 `$NEMOROUS_TOKEN`；手机端不使用 |
 | `-state` | `os.UserConfigDir()/nemorous-mobile` | 配对设备状态目录（`devices.json`） |
 | `-web` | 空（使用内嵌资源） | 开发时从指定目录提供前端 |
@@ -212,6 +218,7 @@ npm run build                       # 生成类型 + 类型检查 + 生产构建
 | POST | `/api/pair` | 用 6 位配对码换取会话 Cookie |
 | GET | `/api/pair/code` | 当前配对码与过期时间（已配对设备） |
 | GET | `/api/devices` | 已配对设备列表 |
+| DELETE | `/api/devices` | 撤销全部其他设备，保留当前设备 |
 | DELETE | `/api/devices/{id}` | 撤销设备；撤销当前设备会清除 Cookie |
 | GET | `/api/events` | SSE：`invalidate` 事件，客户端据此重新拉取 |
 | GET | `/api/workspace` | 全部仓库状态与改动文件 |
@@ -287,10 +294,10 @@ npm run build                       # 生成类型 + 类型检查 + 生产构建
 - Web Push 未实现：需要 HTTPS + 已安装 PWA + VAPID；当前仅提供 SSE 实时刷新。
 - Capacitor 原生壳未打包：同一套 `web/dist` 可包成 iOS / Android 应用，但需要 Xcode 签名、Android SDK 与商店配置。
 - 会话 Cookie 只支持同源；反向代理时需要 HTTPS + 同源部署。
-- 局域网 HTTP 下浏览器不提供 PWA 安装入口；安装与锁屏通知都需要 HTTPS。
+- 默认只接受 HTTPS；局域网 HTTP 需 `-require-https=false`，且浏览器不提供 PWA 安装入口。
 - 文件查看上限 1 MiB、文件树 20000 条、高亮 4000 行；文件查看器只读，不支持手机端编辑保存。
 - 客户端检测到服务端版本变化后会提示刷新，但不会自行下载、替换或重启电脑端二进制；自动升级仍需部署层实现。
-- 设备会话默认 365 天有效；撤销设备会立即失效，但当前没有应用锁或更短的自动过期策略。
+- 设备会话 30 天滚动过期；撤销设备会立即失效，但当前没有应用锁。
 - 添加工作区会让所有已配对设备访问该路径下的 Git 仓库；只添加可信目录，不要把包含敏感仓库的父目录整体加入。
 - Diff 默认单栏 Unified；并排视图已提供，但手机竖屏通常需要横向滚动，横屏 / 平板体验更好。
 - iOS 不允许后台常驻服务：手机是客户端，电脑端必须在线。

@@ -81,6 +81,20 @@ export function SettingsScreen({ ws }: { ws: Workspace }) {
     }
   }
 
+  const revokeAll = async () => {
+    if (!confirm('撤销全部其他设备？这些设备需要重新输入配对码。')) return
+    setBusy('all')
+    try {
+      const res = await api<{ revoked: number }>('/api/devices', { method: 'DELETE' })
+      await load()
+      notify(`已撤销 ${res.revoked} 台设备`, 'ok')
+    } catch (err) {
+      notify(err instanceof Error ? err.message : '撤销失败', 'error')
+    } finally {
+      setBusy('')
+    }
+  }
+
   const savePreset = async () => {
     const branches = Object.fromEntries(ws.repos.filter((r) => r.branch).map((r) => [r.id, r.branch]))
     if (!presetName.trim() || Object.keys(branches).length === 0) return
@@ -383,6 +397,11 @@ export function SettingsScreen({ ws }: { ws: Workspace }) {
             </button>
           </div>
         ))}
+        {(devices?.devices.filter((device) => !device.current).length ?? 0) > 0 ? (
+          <button className="btn ghost block" disabled={busy === 'all'} onClick={() => void revokeAll()}>
+            撤销全部其他设备
+          </button>
+        ) : null}
       </div>
 
       <SectionTitle>分支预设</SectionTitle>

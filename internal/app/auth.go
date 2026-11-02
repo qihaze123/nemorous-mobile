@@ -24,7 +24,8 @@ import (
 
 const (
 	sessionCookie = "nemorous_session"
-	sessionMaxAge = 365 * 24 * 60 * 60
+	sessionMaxAge = 30 * 24 * 60 * 60
+	sessionIdle   = 30 * 24 * time.Hour
 	maxPairFails  = 8
 )
 
@@ -132,9 +133,19 @@ func (s *deviceStore) lookup(token string) (Device, bool) {
 	if !ok {
 		return Device{}, false
 	}
-	now := time.Now().Unix()
-	if now-rec.LastSeenAt > 60 {
-		rec.LastSeenAt = now
+	now := time.Now()
+	last := rec.LastSeenAt
+	if last == 0 {
+		last = rec.CreatedAt
+	}
+	if last == 0 || now.Sub(time.Unix(last, 0)) > sessionIdle {
+		delete(s.byID, rec.ID)
+		delete(s.byHash, rec.Hash)
+		_ = s.saveLocked()
+		return Device{}, false
+	}
+	if now.Unix()-last > 60 {
+		rec.LastSeenAt = now.Unix()
 		_ = s.saveLocked()
 	}
 	return rec.Device, true
@@ -162,6 +173,25 @@ func (s *deviceStore) revoke(id string) bool {
 	delete(s.byHash, rec.Hash)
 	_ = s.saveLocked()
 	return true
+}
+
+// revokeAll keeps the current device and removes every other session.
+func (s *deviceStore) revokeAll(except string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n := 0
+	for id, rec := range s.byID {
+		if id == except {
+			continue
+		}
+		delete(s.byID, id)
+		delete(s.byHash, rec.Hash)
+		n++
+	}
+	if n > 0 {
+		_ = s.saveLocked()
+	}
+	return n
 }
 
 // pairStore holds the short-lived pairing code and a per-IP failure budget.
@@ -390,4 +420,11 @@ func (a *App) handleRevokeDevice(w http.ResponseWriter, r *http.Request) {
 	}
 	a.hub.notify()
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// handleRevokeAllDevices signs out every other device but keeps the caller.
+func (a *App) handleRevokeAllDevices(w http.ResponseWriter, r *http.Request) {
+	n := a.devices.revokeAll(a.currentDeviceID(r))
+	a.hub.notify()
+	writeJSON(w, http.StatusOK, map[string]int{"revoked": n})
 }

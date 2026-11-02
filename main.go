@@ -29,6 +29,7 @@ func main() {
 	workspace := flag.String("workspace", defaultWorkspace(), "多仓工作区目录")
 	addr := flag.String("addr", ":8787", "监听地址，例如 :8787")
 	token := flag.String("token", envOr("NEMOROUS_TOKEN", ""), "可选的 API Bearer 令牌（脚本使用）；手机通过配对码连接")
+	requireHTTPS := flag.Bool("require-https", true, "只接受 HTTPS（本机回环除外）；设为 false 允许局域网 HTTP")
 	stateDir := flag.String("state", "", "状态目录（配对设备），默认 os.UserConfigDir()/nemorous-mobile")
 	webDir := flag.String("web", "", "开发模式：从该目录提供前端静态文件")
 	flag.Parse()
@@ -48,16 +49,29 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              *addr,
-		Handler:           logRequests(mux),
+		Handler:           logRequests(app.HTTPSOnly(*requireHTTPS, mux)),
 		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    1 << 20,
 	}
 
 	code, expires := core.PairCode()
 	fmt.Printf("Nemorous Mobile %s\n", app.Version)
 	fmt.Printf("工作区: %s（%d 个仓库）\n", core.Root, len(core.Repos()))
 	fmt.Printf("配对码: %s（%s 前有效）\n", code, expires.Format("15:04"))
-	for _, u := range urls(*addr, code) {
-		fmt.Printf("手机打开: %s\n", u)
+	if *requireHTTPS {
+		port := *addr
+		if _, p, err := net.SplitHostPort(*addr); err == nil {
+			port = p
+		}
+		fmt.Println("安全: 默认只接受 HTTPS；本机回环除外。手机请通过 Tailscale Serve 或反向代理访问。")
+		fmt.Printf("本机调试: http://localhost:%s/?pair=%s\n", port, code)
+	} else {
+		fmt.Println("注意: 已关闭 HTTPS 强制，局域网 HTTP 可用；不要暴露到公网。")
+		for _, u := range urls(*addr, code) {
+			fmt.Printf("手机打开: %s\n", u)
+		}
 	}
 
 	go func() {
