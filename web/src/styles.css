@@ -2198,11 +2198,17 @@ h1 {
 .mp-path {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-x: auto;
+  overflow-y: hidden;
+  text-overflow: clip;
   white-space: nowrap;
+  scrollbar-width: none;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11.5px;
+}
+
+.mp-path::-webkit-scrollbar {
+  display: none;
 }
 
 .mp-dir {
@@ -4764,18 +4770,4 @@ h1 {
 .commit-patch-search-root .mp-viewport {
   flex: 1;
   max-height: none;
-}
-
-.mp-file-row.wrap-paths {
-  align-items: flex-start;
-  padding-top: 5px;
-  padding-bottom: 5px;
-}
-
-.mp-file-row.wrap-paths .mp-path {
-  overflow: visible;
-  text-overflow: clip;
-  white-space: normal;
-  line-height: 1.3;
-  overflow-wrap: anywhere;
 }
