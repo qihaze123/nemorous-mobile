@@ -4804,3 +4804,9 @@ h1 {
   overflow-wrap: anywhere;
   padding-bottom: 2px;
 }
+
+.commit-patch-meta .wrap-toggle[aria-pressed="true"] {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}

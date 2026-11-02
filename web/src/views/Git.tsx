@@ -1164,7 +1164,7 @@ export function CommitPatchScreen({ repoId, hash }: { repoId: string; hash: stri
             <span className="minus">−{deleted}</span>
             <span className="grow" />
             <button
-              className="mini-btn"
+              className="mini-btn wrap-toggle"
               onClick={() => {
                 setWrapLines((value) => {
                   localStorage.setItem('nemorous.patchWrap', value ? 'off' : 'on')
