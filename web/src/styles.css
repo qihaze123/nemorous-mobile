@@ -4766,3 +4766,41 @@ h1 {
   flex: 1;
   max-height: none;
 }
+
+.mp-inner.wrap-lines > .mp-file-row,
+.mp-inner.wrap-lines > .diff-line {
+  position: relative;
+  left: auto;
+  top: auto;
+  width: 100%;
+  min-width: 0;
+  height: auto;
+}
+
+.mp-inner.wrap-lines > .mp-file-row {
+  align-items: flex-start;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+.mp-inner.wrap-lines .mp-path {
+  flex: 1;
+  min-width: 0;
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+.mp-inner.wrap-lines > .diff-line {
+  align-items: flex-start;
+  min-height: var(--diff-line-height, 20px);
+}
+
+.mp-inner.wrap-lines > .diff-line .code {
+  flex: 1;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding-bottom: 2px;
+}

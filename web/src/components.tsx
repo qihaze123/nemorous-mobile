@@ -1245,12 +1245,14 @@ export function MultiPatchView({
   onToggleFile,
   fontSize = 12,
   disableVirtualization = false,
+  wrapLines = false,
 }: {
   files: MultiPatchFile[]
   collapsed: Set<string>
   onToggleFile: (path: string) => void
   fontSize?: number
   disableVirtualization?: boolean
+  wrapLines?: boolean
 }) {
   const lineHeight = Math.round(fontSize * 5 / 3)
   const [expandedFolds, setExpandedFolds] = useState<Set<string>>(new Set())
@@ -1296,7 +1298,7 @@ export function MultiPatchView({
   }, [])
 
   useLayoutEffect(() => {
-    if (disableVirtualization) {
+    if (disableVirtualization || wrapLines) {
       setRange({ start: 0, end: rows.length })
       return
     }
@@ -1313,7 +1315,7 @@ export function MultiPatchView({
     while (end < rows.length && rows[end].top < top + height) end++
     end = Math.min(rows.length, end + MP_OVERSCAN)
     setRange((prev) => (prev.start === start && prev.end === end ? prev : { start, end }))
-  }, [rows, scrollTop, height, disableVirtualization])
+  }, [rows, scrollTop, height, disableVirtualization, wrapLines])
 
   useLayoutEffect(() => {
     const pending = pendingFoldAnchor.current
@@ -1363,13 +1365,13 @@ export function MultiPatchView({
           }, 100)
         }}
       >
-        <div className={`mp-inner ${expandedFolds.size ? 'has-expanded' : ''}`} style={{ height: total }}>
+        <div className={`mp-inner ${expandedFolds.size ? 'has-expanded' : ''} ${wrapLines ? 'wrap-lines' : ''}`} style={{ height: wrapLines ? undefined : total }}>
           {rows.slice(range.start, range.end).map((row) =>
             row.kind === 'file' ? (
               <button
                 key={`f:${row.file.path}`}
                 className="mp-file-row"
-                style={{ top: row.top, height: row.height }}
+                style={wrapLines ? undefined : { top: row.top, height: row.height }}
                 onClick={() => onToggleFile(row.file.path)}
                 aria-expanded={!collapsed.has(row.file.path)}
               >
@@ -1390,7 +1392,7 @@ export function MultiPatchView({
               <button
                 key={`l:${row.file.path}:${row.top}`}
                 className="diff-line fold-row"
-                style={{ top: row.top, height: row.height, left: 0, minWidth: '100%', width: 'max-content' }}
+                style={wrapLines ? undefined : { top: row.top, height: row.height, left: 0, minWidth: '100%', width: 'max-content' }}
                 aria-label={`展开 ${row.line.foldCount ?? 0} 行未修改内容`}
                 onClick={(event) => row.line.foldId && toggleFold(row.line.foldId, row.line.foldSide, row.line.foldHidden, event.currentTarget)}
               >
@@ -1400,7 +1402,7 @@ export function MultiPatchView({
               <div
                 key={`l:${row.file.path}:${row.top}`}
                 className={`diff-line ${row.line.kind}`}
-                style={{ top: row.top, height: row.height, left: 0, minWidth: '100%', width: 'max-content' }}
+                style={wrapLines ? undefined : { top: row.top, height: row.height, left: 0, minWidth: '100%', width: 'max-content' }}
                 data-change-key={row.line.kind === 'add' ? `${row.file.path}:a:${row.line.new ?? ''}:${row.line.text}` : row.line.kind === 'del' ? `${row.file.path}:d:${row.line.old ?? ''}:${row.line.text}` : undefined}
                 data-line-key={row.line.kind === 'hunk' || row.line.kind === 'meta' ? undefined : `${row.file.path}:l:${row.line.old ?? ''}:${row.line.new ?? ''}:${row.line.text}`}
               >
