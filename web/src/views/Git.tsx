@@ -26,6 +26,26 @@ const EMPTY_FILTERS: CommitFilters = {
   caseSensitive: false,
 }
 
+const COMMIT_FILTERS_KEY = 'nemorous.commitFilters'
+
+function loadStoredFilters(): CommitFilters {
+  try {
+    const raw = JSON.parse(localStorage.getItem(COMMIT_FILTERS_KEY) ?? 'null') as Partial<CommitFilters> | null
+    if (!raw || typeof raw !== 'object') return EMPTY_FILTERS
+    return {
+      repoId: typeof raw.repoId === 'string' ? raw.repoId : '',
+      branch: typeof raw.branch === 'string' ? raw.branch : '',
+      mine: raw.mine === true,
+      path: typeof raw.path === 'string' ? raw.path : '',
+      days: typeof raw.days === 'number' && Number.isFinite(raw.days) ? raw.days : 0,
+      regex: raw.regex === true,
+      caseSensitive: raw.caseSensitive === true,
+    }
+  } catch {
+    return EMPTY_FILTERS
+  }
+}
+
 function filterCount(f: CommitFilters): number {
   return [f.repoId, f.branch, f.mine, f.path, f.days, f.regex, f.caseSensitive].filter(Boolean).length
 }
@@ -36,12 +56,16 @@ export function GitScreen({ ws }: { ws: Workspace }) {
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
   const debouncedQuery = useDebounced(query, 250)
-  const [filters, setFilters] = useState<CommitFilters>(EMPTY_FILTERS)
+  const [filters, setFilters] = useState<CommitFilters>(loadStoredFilters)
   const [draft, setDraft] = useState<CommitFilters>(EMPTY_FILTERS)
   const [filterOpen, setFilterOpen] = useState(false)
   const [branches, setBranches] = useState<BranchesResponse | null>(null)
   const [repoSheet, setRepoSheet] = useState<string | null>(null)
   const notify = useToast()
+
+  useEffect(() => {
+    localStorage.setItem(COMMIT_FILTERS_KEY, JSON.stringify(filters))
+  }, [filters])
 
   useEffect(() => {
     let cancelled = false
@@ -122,9 +146,12 @@ export function GitScreen({ ws }: { ws: Workspace }) {
             <Icon name="close" size={16} />
           </button>
         ) : null}
-        <button className={`icon-btn tiny filter-toggle ${active ? 'on' : ''}`} onClick={openFilters} aria-label="筛选提交">
+        <button
+          className={`icon-btn tiny filter-toggle ${active ? 'on' : ''}`}
+          onClick={openFilters}
+          aria-label={active ? `筛选提交，已启用 ${active} 项` : '筛选提交'}
+        >
           <Icon name="filter" size={17} />
-          {active ? <em>{active}</em> : null}
         </button>
       </div>
 

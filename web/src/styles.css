@@ -1842,23 +1842,6 @@ h1 {
   color: var(--accent);
 }
 
-.filter-toggle em {
-  position: absolute;
-  top: 2px;
-  right: 0;
-  min-width: 14px;
-  height: 20px;
-  padding: 0 3px;
-  border-radius: 7px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-size: 9px;
-  font-style: normal;
-  font-weight: 700;
-  line-height: 20px;
-  text-align: center;
-}
-
 .active-filters {
   display: flex;
   flex-wrap: wrap;
