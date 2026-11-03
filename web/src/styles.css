@@ -4788,7 +4788,8 @@ h1 {
   min-width: 0;
   overflow: visible;
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  word-break: normal;
   line-height: 1.35;
 }
 
@@ -4797,11 +4798,19 @@ h1 {
   min-height: var(--diff-line-height, 20px);
 }
 
+/* Hanging indent: the first line keeps its leading spaces, while wrapped
+   continuations start at the first non-space column. break-word is only a
+   fallback for a single token wider than the viewport. */
 .mp-inner.wrap-lines > .diff-line .code {
   flex: 1;
   min-width: 0;
   white-space: pre-wrap;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: none;
+  tab-size: 8;
+  padding-left: calc(10px + var(--code-indent, 0) * 1ch);
+  text-indent: calc(var(--code-indent, 0) * -1ch);
   padding-bottom: 2px;
 }
 

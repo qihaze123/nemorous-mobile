@@ -1,4 +1,4 @@
-import { Fragment, createContext, forwardRef, useCallback, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { Fragment, createContext, forwardRef, useCallback, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 import type { FileChange, RepoHealth } from './types'
 import { languageOf, syntaxSegments } from './syntax'
@@ -1239,6 +1239,18 @@ type MultiRow =
 const MP_FILE_HEIGHT = 32
 const MP_OVERSCAN = 10
 
+// leadingColumns counts indentation for the hanging indent used while wrapping.
+// Tabs use the same 8-column stops as the CSS tab-size.
+function leadingColumns(text: string): number {
+  let columns = 0
+  for (const ch of text) {
+    if (ch === ' ') columns += 1
+    else if (ch === '\t') columns += 8 - (columns % 8)
+    else break
+  }
+  return columns
+}
+
 export function MultiPatchView({
   files,
   collapsed,
@@ -1413,7 +1425,7 @@ export function MultiPatchView({
                 ) : (
                   <span className={`marker ${row.line.kind}`}>{row.line.kind === 'add' ? '+' : row.line.kind === 'del' ? '−' : ''}</span>
                 )}
-                <span className="code">
+                <span className="code" style={wrapLines ? ({ '--code-indent': leadingColumns(row.line.text) } as CSSProperties) : undefined}>
                   <SyntaxCode
                     text={row.line.text}
                     language={row.line.kind === 'hunk' || row.line.kind === 'meta' ? '' : languageOf(row.file.path)}
