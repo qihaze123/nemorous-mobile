@@ -695,6 +695,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
   const [toolsOpen, setToolsOpen] = useState(false)
   const [immersive, setImmersive] = useImmersive()
   const [diffFontSize, setDiffFontSize] = useDiffFontSize()
+  const [wrapLines, setWrapLines] = useState(() => localStorage.getItem('nemorous.diffWrap') === 'on')
   const [fontPanelOpen, setFontPanelOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('nemorous.commitFileSidebar') !== 'closed')
   const [sidebarWidth, setSidebarWidth] = useSidebarWidth('nemorous.commitFileSidebarWidth')
@@ -972,6 +973,21 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
                     </button>
                   </div>
                   <button
+                    className="nav-icon nav-tool wrap-toggle"
+                    title={diffStyle === 'split' ? '并排模式不支持换行' : '自动换行'}
+                    aria-label="自动换行"
+                    aria-pressed={wrapLines}
+                    disabled={diffStyle === 'split'}
+                    onClick={() => {
+                      setWrapLines((value) => {
+                        localStorage.setItem('nemorous.diffWrap', value ? 'off' : 'on')
+                        return !value
+                      })
+                    }}
+                  >
+                    <Icon name="wrap" size={15} />
+                  </button>
+                  <button
                     className="nav-icon nav-tool"
                     title="打开完整文件"
                     aria-label="打开完整文件"
@@ -1023,7 +1039,7 @@ export function CommitFileScreen({ repoId, hash, path }: { repoId: string; hash:
             </div>
           ) : null}
           <div className="commit-file-diff-page idea-diff" ref={diffRoot}>
-            <PatchView ref={patchRef} patch={chunks.get(path) ?? ''} style={diffStyle} idea folded={folded} focusChange={atLast ? 'last' : 'first'} fontSize={diffFontSize} language={languageOf(path)} />
+            <PatchView ref={patchRef} patch={chunks.get(path) ?? ''} style={diffStyle} idea folded={folded} focusChange={atLast ? 'last' : 'first'} fontSize={diffFontSize} language={languageOf(path)} wrapLines={wrapLines} />
           </div>
         </>
       ) : null}

@@ -117,6 +117,7 @@ export function DiffScreen({
   const [fontPanelOpen, setFontPanelOpen] = useState(false)
   const [error, setError] = useState('')
   const [diffStyle, setDiffStyle] = useState<'unified' | 'split'>('unified')
+  const [wrapLines, setWrapLines] = useState(() => localStorage.getItem('nemorous.diffWrap') === 'on')
   const [folded, setFolded] = useState(true)
   const [toolsOpen, setToolsOpen] = useState(false)
   const [findOpen, setFindOpen] = useState(false)
@@ -342,6 +343,21 @@ export function DiffScreen({
                         </button>
                       </div>
                       <button
+                        className="nav-icon nav-tool wrap-toggle"
+                        title={diffStyle === 'split' ? '并排模式不支持换行' : '自动换行'}
+                        aria-label="自动换行"
+                        aria-pressed={wrapLines}
+                        disabled={diffStyle === 'split'}
+                        onClick={() => {
+                          setWrapLines((value) => {
+                            localStorage.setItem('nemorous.diffWrap', value ? 'off' : 'on')
+                            return !value
+                          })
+                        }}
+                      >
+                        <Icon name="wrap" size={15} />
+                      </button>
+                      <button
                         className="nav-icon nav-tool"
                         title="打开完整文件"
                         aria-label="打开完整文件"
@@ -393,7 +409,7 @@ export function DiffScreen({
                 </div>
               ) : null}
               <div className="commit-file-diff-page idea-diff" ref={diffRoot}>
-                <PatchView ref={patchRef} patch={diff.patch} binary={diff.binary} style={diffStyle} idea folded={folded} focusChange="first" fontSize={diffFontSize} language={languageOf(path)} />
+                <PatchView ref={patchRef} patch={diff.patch} binary={diff.binary} style={diffStyle} idea folded={folded} focusChange="first" fontSize={diffFontSize} language={languageOf(path)} wrapLines={wrapLines} />
               </div>
             </>
           ) : null}

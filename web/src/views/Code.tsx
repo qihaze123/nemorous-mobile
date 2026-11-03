@@ -5,7 +5,7 @@ import DOMPurify from 'dompurify'
 import type { FileContent, RepoFiles, SearchMatch, SearchResult, Workspace } from '../types'
 import { api } from '../api'
 import { back, go, replace, useDebounced, useImmersive, usePinchZoom, useSidebarWidth, useSidebarZoom } from '../hooks'
-import { Empty, FileTypeIcon, Icon, ImmersiveDock, SectionTitle, SidebarResizer, Spinner, repoColor, useToast } from '../components'
+import { Empty, FileTypeIcon, Icon, ImmersiveDock, SectionTitle, SidebarResizer, Spinner, leadingColumns, repoColor, useToast } from '../components'
 import { languageOf } from '../syntax'
 
 function fileName(path: string) {
@@ -520,6 +520,7 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
   const [immersive, setImmersive] = useImmersive()
   const [fontPanelOpen, setFontPanelOpen] = useState(false)
   const [markdownPreview, setMarkdownPreview] = useState(() => localStorage.getItem('nemorous.markdownPreview') !== 'source')
+  const [wrapCode, setWrapCode] = useState(() => localStorage.getItem('nemorous.codeWrap') === 'on')
   const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('nemorous.fileSidebar') !== 'closed')
   const [sidebarWidth, setSidebarWidth] = useSidebarWidth('nemorous.fileSidebarWidth')
   const [sidebarZoom, setSidebarZoom] = useSidebarZoom()
@@ -560,13 +561,24 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
 
   const canHighlight = lineCount > 0 && lineCount <= MAX_HIGHLIGHT_LINES && (file?.size ?? 0) <= MAX_HIGHLIGHT_BYTES
   const html = useMemo(() => {
-    if (!file || file.binary || !canHighlight) return ''
+    if (!file || file.binary || !canHighlight || wrapCode) return ''
     try {
       return hljs.highlight(file.content, { language: languageOf(path) }).value
     } catch {
       return escapeHtml(file.content)
     }
-  }, [file, canHighlight, path])
+  }, [file, canHighlight, path, wrapCode])
+  const highlightedLines = useMemo(() => {
+    if (!file || file.binary || !canHighlight || !wrapCode) return null
+    const language = languageOf(path)
+    return lines.slice(0, lineCount).map((text) => {
+      try {
+        return hljs.highlight(text, { language }).value
+      } catch {
+        return escapeHtml(text)
+      }
+    })
+  }, [file, canHighlight, wrapCode, lines, lineCount, path])
 
   const isMarkdown = /\.(md|markdown)$/i.test(path)
   const markdownHtml = useMemo(() => {
@@ -580,9 +592,18 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
   }, [file, isMarkdown])
 
   useEffect(() => {
-    if (!file || !lineParam || !scrollRef.current || (isMarkdown && markdownPreview)) return
-    scrollRef.current.scrollTop = Math.max(0, (lineParam - 1) * lineHeight - 120)
-  }, [file, lineParam, lineHeight, isMarkdown, markdownPreview])
+    const scroll = scrollRef.current
+    if (!file || !lineParam || !scroll || (isMarkdown && markdownPreview)) return
+    if (wrapCode) {
+      const row = scroll.querySelector<HTMLElement>(`[data-line="${lineParam}"]`)
+      if (row) {
+        const top = row.getBoundingClientRect().top - scroll.getBoundingClientRect().top + scroll.scrollTop
+        scroll.scrollTop = Math.max(0, top - 120)
+      }
+      return
+    }
+    scroll.scrollTop = Math.max(0, (lineParam - 1) * lineHeight - 120)
+  }, [file, lineParam, lineHeight, isMarkdown, markdownPreview, wrapCode])
 
   useEffect(() => {
     if (!immersive) return
@@ -678,6 +699,21 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
               </div>
             ) : null}
             <div className="file-actions meta-actions">
+              <button
+                className="icon-btn wrap-toggle"
+                onClick={() => {
+                  setWrapCode((value) => {
+                    localStorage.setItem('nemorous.codeWrap', value ? 'off' : 'on')
+                    return !value
+                  })
+                }}
+                aria-label="自动换行"
+                aria-pressed={wrapCode}
+                title="自动换行"
+                disabled={isMarkdown && markdownPreview}
+              >
+                <Icon name="wrap" size={16} />
+              </button>
               <button className="icon-btn" onClick={() => setImmersive(true)} aria-label="沉浸查看" title="沉浸查看">
                 <Icon name="expand" />
               </button>
@@ -690,6 +726,25 @@ export function FileScreen({ repoId, path, rev, line }: { repoId: string; path: 
           {isMarkdown && markdownPreview ? (
             <div className="markdown-scroll" ref={scrollRef}>
               <div className="markdown-body" dangerouslySetInnerHTML={{ __html: markdownHtml }} />
+            </div>
+          ) : wrapCode ? (
+            <div className="code-scroll wrapped" ref={scrollRef}>
+              <div className="code-lines">
+                {lines.slice(0, lineCount).map((text, i) => (
+                  <div key={i} className={`code-line ${lineParam === i + 1 ? 'hit' : ''}`} data-line={i + 1}>
+                    <span className="code-line-no" aria-hidden="true">{i + 1}</span>
+                    {highlightedLines ? (
+                      <span
+                        className="code-line-text"
+                        style={{ '--code-indent': leadingColumns(text) } as CSSProperties}
+                        dangerouslySetInnerHTML={{ __html: highlightedLines[i] ?? '' }}
+                      />
+                    ) : (
+                      <span className="code-line-text" style={{ '--code-indent': leadingColumns(text) } as CSSProperties}>{text || ' '}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           ) : (
             <div className="code-scroll" ref={scrollRef}>

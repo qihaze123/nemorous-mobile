@@ -4819,3 +4819,89 @@ h1 {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
   background: color-mix(in srgb, var(--accent) 10%, var(--surface));
 }
+
+.patch.wrap-lines > .diff-line {
+  position: relative;
+  left: auto;
+  top: auto;
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  align-items: flex-start;
+  min-height: var(--diff-line-height, 20px);
+}
+
+.patch.wrap-lines > .diff-line .code {
+  flex: 1;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: none;
+  tab-size: 8;
+  padding-left: calc(10px + var(--code-indent, 0) * 1ch);
+  text-indent: calc(var(--code-indent, 0) * -1ch);
+  padding-bottom: 2px;
+}
+
+.nav-icon.wrap-toggle[aria-pressed="true"] {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}
+
+.nav-icon.wrap-toggle:disabled {
+  opacity: 0.4;
+}
+
+/* Code viewer, wrapped mode: one row per source line so line numbers stay
+   aligned even when the code spans several visual lines. */
+.code-scroll.wrapped {
+  overflow-x: hidden;
+}
+
+.code-lines {
+  min-width: 0;
+  padding: 10px 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--code-font-size, 12.5px);
+  line-height: var(--code-line-height, 20px);
+}
+
+.code-line {
+  display: flex;
+  align-items: flex-start;
+  min-height: var(--code-line-height, 20px);
+}
+
+.code-line.hit {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.code-line-no {
+  flex: none;
+  min-width: 36px;
+  padding: 0 8px 0 10px;
+  border-right: 1px solid var(--border-soft);
+  background: var(--bg);
+  color: var(--muted);
+  text-align: right;
+  user-select: none;
+  font-size: max(7px, calc(var(--code-font-size, 12.5px) - 1px));
+}
+
+.code-line-text {
+  flex: 1;
+  min-width: 0;
+  padding: 0 14px 0 calc(10px + var(--code-indent, 0) * 1ch);
+  text-indent: calc(var(--code-indent, 0) * -1ch);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: none;
+  tab-size: 8;
+}
+
+.icon-btn.wrap-toggle[aria-pressed="true"] {
+  color: var(--accent);
+}

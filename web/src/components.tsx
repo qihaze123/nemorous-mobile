@@ -852,8 +852,8 @@ export interface PatchViewHandle {
   currentLine(): number | undefined
 }
 
-export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: boolean; style?: 'unified' | 'split'; idea?: boolean; folded?: boolean; focusChange?: 'first' | 'last'; fontSize?: number; language?: string }>(function PatchView(
-  { patch, binary, style = 'unified', idea = false, folded = false, focusChange = 'first', fontSize = 12, language = '' },
+export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: boolean; style?: 'unified' | 'split'; idea?: boolean; folded?: boolean; focusChange?: 'first' | 'last'; fontSize?: number; language?: string; wrapLines?: boolean }>(function PatchView(
+  { patch, binary, style = 'unified', idea = false, folded = false, focusChange = 'first', fontSize = 12, language = '', wrapLines = false },
   ref,
 ) {
   const lineHeight = Math.round(fontSize * 5 / 3)
@@ -915,7 +915,8 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
   const [scrollTop, setScrollTop] = useState(0)
   const [height, setHeight] = useState(600)
   const settle = useRef<number | undefined>(undefined)
-  const virtual = rows.length > DIFF_VIRTUAL_THRESHOLD
+  const wrapped = wrapLines && style === 'unified'
+  const virtual = rows.length > DIFF_VIRTUAL_THRESHOLD && !wrapped
   const hunkRows = useMemo(
     () => rows.map((row, index) => (row.kind === 'hunk' ? index : -1)).filter((index) => index >= 0),
     [rows],
@@ -1082,7 +1083,7 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
         }, 120)
       }}
     >
-      <div className={`patch ${virtual ? 'virtual' : ''} ${style} ${expandedFolds.size ? 'has-expanded' : ''}`} style={patchStyle}>
+      <div className={`patch ${virtual ? 'virtual' : ''} ${style} ${expandedFolds.size ? 'has-expanded' : ''} ${wrapped ? 'wrap-lines' : ''}`} style={patchStyle}>
         {visible.map((row, i) => {
           const index = virtual ? start + i : i
           if (style === 'split') {
@@ -1186,6 +1187,7 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
               key={index}
               className={`diff-line ${line.kind}`}
               style={rowStyle(index)}
+              data-row={index}
               data-change-key={line.kind === 'add' ? `a:${line.new ?? ''}:${line.text}` : line.kind === 'del' ? `d:${line.old ?? ''}:${line.text}` : undefined}
               data-line-key={line.kind === 'hunk' || line.kind === 'meta' ? undefined : `l:${line.old ?? ''}:${line.new ?? ''}:${line.text}`}
             >
@@ -1198,7 +1200,7 @@ export const PatchView = forwardRef<PatchViewHandle, { patch: string; binary?: b
                   <span className={`marker ${line.kind}`}>{line.kind === 'add' ? '+' : line.kind === 'del' ? '−' : ''}</span>
                 )
               ) : null}
-              <span className="code">
+              <span className="code" style={wrapped ? ({ '--code-indent': leadingColumns(line.text) } as React.CSSProperties) : undefined}>
                 {!idea ? (line.kind === 'add' ? '+' : line.kind === 'del' ? '-' : line.kind === 'ctx' ? ' ' : '') : null}
                 <SyntaxCode
                   text={line.text}
@@ -1241,7 +1243,7 @@ const MP_OVERSCAN = 10
 
 // leadingColumns counts indentation for the hanging indent used while wrapping.
 // Tabs use the same 8-column stops as the CSS tab-size.
-function leadingColumns(text: string): number {
+export function leadingColumns(text: string): number {
   let columns = 0
   for (const ch of text) {
     if (ch === ' ') columns += 1
