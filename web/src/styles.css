@@ -4905,3 +4905,31 @@ h1 {
 .icon-btn.wrap-toggle[aria-pressed="true"] {
   color: var(--accent);
 }
+
+/* The expanded diff toolbar is horizontally scrollable instead of squeezing
+   every icon into an unreadable width on narrow phones. */
+.commit-file-nav .commit-file-tools {
+  min-width: 0;
+}
+
+.commit-file-nav .inline-tools > * {
+  flex: none;
+}
+
+.commit-file-nav .inline-tools {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Final override: keep the tools toggle fixed and let only the action group
+   scroll, so a narrow phone never squeezes the icons. */
+.commit-file-tools .inline-tools {
+  flex: 1 1 auto;
+  width: 0;
+  min-width: 0;
+  overflow-x: auto;
+  justify-content: flex-start;
+}
+
+.commit-file-tools .inline-tools > * {
+  flex: none;
+}
